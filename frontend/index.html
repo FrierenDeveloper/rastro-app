@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Rastro — Mascotas perdidas y encontradas</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2A2F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="icons/icon-192.png">
+</head>
+<body>
+
+<!-- ===================== AUTH SCREEN ===================== -->
+<div id="auth-screen">
+  <div class="brand"><div class="paw">🐾</div><h1 class="serif">Rastro</h1>
+    <p class="tag">Ayuda a los animales de tu barrio a volver a casa</p>
+  </div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button data-auth="login" class="active">Iniciar sesión</button>
+      <button data-auth="register">Crear cuenta</button>
+    </div>
+
+    <form class="auth-form active" id="form-login">
+      <label class="required">Correo</label>
+      <input type="email" id="login-email" required>
+      <label class="required">Contraseña</label>
+      <input type="password" id="login-password" required>
+      <button type="submit" class="submit-btn auth">Entrar</button>
+      <p class="auth-error" id="login-error"></p>
+    </form>
+
+    <form class="auth-form" id="form-register">
+      <label class="required">Correo</label>
+      <input type="email" id="register-email" required>
+      <label class="required">Contraseña</label>
+      <input type="password" id="register-password" minlength="8" required>
+      <p class="loc-note">Mínimo 8 caracteres.</p>
+      <label>Teléfono (opcional)</label>
+      <input type="tel" id="register-phone" placeholder="+56 9 1234 5678">
+      <button type="submit" class="submit-btn auth">Crear cuenta</button>
+      <p class="auth-error" id="register-error"></p>
+    </form>
+    <p class="loc-note" style="margin-top:14px;">Tu correo y teléfono nunca se muestran públicamente. Solo se usan para que otros usuarios puedan escribirte dentro de la app.</p>
+  </div>
+</div>
+
+<!-- ===================== MAIN APP ===================== -->
+<div id="app" class="hidden">
+
+  <header>
+    <div class="brand"><span class="paw">🐾</span><h1>Rastro</h1></div>
+    <p>Ayuda a los animales de tu barrio a volver a casa</p>
+    <div class="header-row">
+      <span class="loc-chip" id="loc-chip">📍 Ubicándote…</span>
+      <button class="logout-btn" id="btn-logout">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="home" class="active">Mapa</button>
+    <button data-tab="found">Encontré uno</button>
+    <button data-tab="lost">Perdí el mío</button>
+    <button data-tab="inbox">Mis avisos</button>
+  </nav>
+
+  <main>
+
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div class="toolbar">
+        <select id="filter-tipo">
+          <option value="">Todos los tipos</option>
+          <option value="perro">Perros</option>
+          <option value="gato">Gatos</option>
+          <option value="ave">Aves</option>
+          <option value="conejo">Conejos</option>
+          <option value="otro">Otros</option>
+        </select>
+        <select id="filter-estado">
+          <option value="">Perdidos y encontrados</option>
+          <option value="encontrado">Solo encontrados</option>
+          <option value="perdido">Solo perdidos</option>
+        </select>
+      </div>
+      <div class="toolbar">
+        <button class="icon-btn active" id="btn-view-map">Mapa</button>
+        <button class="icon-btn" id="btn-view-list">Lista</button>
+        <button class="icon-btn" id="btn-refresh" style="margin-left:auto;">↻ Actualizar</button>
+      </div>
+      <div id="list-map"></div>
+      <div id="reports-list"></div>
+    </section>
+
+    <!-- FOUND -->
+    <section class="view" id="view-found">
+      <div class="card">
+        <h2>Encontré un animal 🐾</h2>
+        <p class="sub">Sube una foto y sus características para avisar a quien lo esté buscando.</p>
+        <form id="form-found">
+          <label>Foto del animal</label>
+          <div class="photo-zone" id="photo-zone-found">
+            <div class="hint"><b>📷</b>Toca para tomar o subir una foto</div>
+            <input type="file" accept="image/*" capture="environment" id="photo-input-found">
+          </div>
+
+          <label class="required">Tipo de animal</label>
+          <select id="tipo-found" required>
+            <option value="">Selecciona…</option>
+            <option value="perro">Perro</option><option value="gato">Gato</option>
+            <option value="ave">Ave</option><option value="conejo">Conejo</option><option value="otro">Otro</option>
+          </select>
+
+          <div class="row2">
+            <div><label class="required">Sexo</label>
+              <select id="sexo-found" required>
+                <option value="desconocido">No estoy seguro/a</option>
+                <option value="macho">Macho</option><option value="hembra">Hembra</option>
+              </select></div>
+            <div><label class="required">Color</label>
+              <input type="text" id="color-found" placeholder="Ej: café y blanco" required></div>
+          </div>
+
+          <div class="row2">
+            <div><label>Raza</label><input type="text" id="raza-found" placeholder="Si la conoces"></div>
+            <div><label>Color del collar</label>
+              <select id="collar-found">
+                <option value="">Sin collar</option><option value="rojo">Rojo</option><option value="azul">Azul</option>
+                <option value="negro">Negro</option><option value="verde">Verde</option><option value="otro">Otro color</option>
+              </select></div>
+          </div>
+
+          <label>Descripción</label>
+          <textarea id="desc-found" placeholder="Tamaño, señas particulares, actitud, estado de salud…"></textarea>
+
+          <label class="required">Ubicación donde lo encontraste</label>
+          <div class="mini-map" id="map-found"></div>
+          <p class="loc-note">Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros usuarios.</p>
+
+          <button type="submit" class="submit-btn found">Publicar aviso de animal encontrado</button>
+          <div id="match-area-found"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- LOST -->
+    <section class="view" id="view-lost">
+      <div class="card">
+        <h2>Perdí a mi mascota 💔</h2>
+        <p class="sub">Cuéntanos cómo es para avisarte si alguien la encuentra cerca.</p>
+        <form id="form-lost">
+          <label>Nombre de tu mascota</label>
+          <input type="text" id="nombre-lost" placeholder="Ej: Firulais">
+
+          <label>Foto de tu mascota</label>
+          <div class="photo-zone" id="photo-zone-lost">
+            <div class="hint"><b>📷</b>Toca para tomar o subir una foto</div>
+            <input type="file" accept="image/*" capture="environment" id="photo-input-lost">
+          </div>
+
+          <label class="required">Tipo de animal</label>
+          <select id="tipo-lost" required>
+            <option value="">Selecciona…</option>
+            <option value="perro">Perro</option><option value="gato">Gato</option>
+            <option value="ave">Ave</option><option value="conejo">Conejo</option><option value="otro">Otro</option>
+          </select>
+
+          <div class="row2">
+            <div><label class="required">Sexo</label>
+              <select id="sexo-lost" required>
+                <option value="desconocido">No estoy seguro/a</option>
+                <option value="macho">Macho</option><option value="hembra">Hembra</option>
+              </select></div>
+            <div><label class="required">Color</label>
+              <input type="text" id="color-lost" placeholder="Ej: café y blanco" required></div>
+          </div>
+
+          <div class="row2">
+            <div><label>Raza</label><input type="text" id="raza-lost" placeholder="Si la conoces"></div>
+            <div><label>Color del collar</label>
+              <select id="collar-lost">
+                <option value="">Sin collar</option><option value="rojo">Rojo</option><option value="azul">Azul</option>
+                <option value="negro">Negro</option><option value="verde">Verde</option><option value="otro">Otro color</option>
+              </select></div>
+          </div>
+
+          <label>Descripción</label>
+          <textarea id="desc-lost" placeholder="Tamaño, señas particulares, temperamento…"></textarea>
+
+          <label class="required">Última vez visto en</label>
+          <div class="mini-map" id="map-lost"></div>
+          <p class="loc-note">Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros usuarios.</p>
+
+          <button type="submit" class="submit-btn lost">Publicar aviso de mascota perdida</button>
+          <div id="match-area-lost"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- INBOX / MIS AVISOS -->
+    <section class="view" id="view-inbox">
+      <div id="inbox-list"></div>
+      <div class="danger-zone">
+        <p class="loc-note">Si ya no quieres usar Rastro, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos y tus mensajes de forma permanente.</p>
+        <button id="btn-delete-account">Eliminar mi cuenta y mis datos</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="note">Los avisos publicados aquí son visibles para todas las personas que usan esta app. Tu contacto directo nunca se muestra: la comunicación ocurre dentro de la app.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
