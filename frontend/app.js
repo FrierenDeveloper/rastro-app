@@ -77,7 +77,7 @@ document.getElementById('form-login').addEventListener('submit', async e=>{
   e.preventDefault();
   const err = document.getElementById('login-error'); err.classList.remove('show');
   try{
-    const data = await api('/api/auth/login', { auth:false, body:{
+    const data = await api('/api/auth/login', { method:'POST', auth:false, body:{
       email: document.getElementById('login-email').value.trim(),
       password: document.getElementById('login-password').value
     }});
@@ -89,7 +89,7 @@ document.getElementById('form-register').addEventListener('submit', async e=>{
   e.preventDefault();
   const err = document.getElementById('register-error'); err.classList.remove('show');
   try{
-    const data = await api('/api/auth/register', { auth:false, body:{
+    const data = await api('/api/auth/register', { method:'POST', auth:false, body:{
       email: document.getElementById('register-email').value.trim(),
       password: document.getElementById('register-password').value,
       phone: document.getElementById('register-phone').value.trim()
@@ -355,3 +355,4 @@ if(token){
   document.getElementById('app').classList.remove('hidden');
   startApp();
 }
+
