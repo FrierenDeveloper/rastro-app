@@ -1,3 +1,9 @@
+// Registrar el service worker ANTES que cualquier otro código: si algo más
+// abajo en este archivo llegara a fallar, el registro no debe verse afectado.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
 // ============ Configuración ============
 // Cambia esto por la URL de tu backend cuando lo despliegues (ej: https://api.rastro.cl)
 const API_BASE = window.RASTRO_API_BASE || '';
@@ -348,8 +354,4 @@ if(token){
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   startApp();
-}
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
