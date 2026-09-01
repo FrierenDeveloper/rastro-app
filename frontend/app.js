@@ -17,6 +17,14 @@ let listMap, listMarkersLayer, mapFound, mapLost, markerFound, markerLost;
 const TIPO_ICON = { perro:'🐕', gato:'🐈', ave:'🐦', conejo:'🐇', otro:'🐾' };
 
 /* ============ Utilidades ============ */
+// Escapa el texto que escriben los usuarios antes de mostrarlo, para que
+// nadie pueda inyectar código en la página a través de un aviso o mensaje.
+function esc(v){
+  if(v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -129,7 +137,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById('view-'+btn.dataset.tab).classList.add('active');
-    if(btn.dataset.tab==='home'){ setTimeout(()=> listMap && listMap.invalidateSize(),50); renderList(); }
+    if(btn.dataset.tab==='home'){ setTimeout(()=> listMap && listMap.invalidateSize(),50); renderList().then(renderListMap).catch(()=>{}); }
     if(btn.dataset.tab==='found'){ setTimeout(()=> mapFound && mapFound.invalidateSize(),50); }
     if(btn.dataset.tab==='lost'){ setTimeout(()=> mapLost && mapLost.invalidateSize(),50); }
     if(btn.dataset.tab==='inbox'){ renderInbox(); }
@@ -170,11 +178,26 @@ function initPhotoZone(zoneId, inputId, key){
     try{
       const blob = await compressImage(input.files[0]);
       photoFile[key] = blob;
-      const url = URL.createObjectURL(blob);
-      zone.innerHTML = `<img src="${url}" alt="Foto del animal">`;
-      zone.appendChild(input);
+      mostrarPreviewFoto(zone, input, URL.createObjectURL(blob));
     }catch(e){ toast('No se pudo procesar la foto.'); }
   });
+}
+
+// Cambia el contenido visible de la zona sin tocar el <input>, para no perder
+// (ni duplicar) los listeners que ya están conectados.
+function mostrarPreviewFoto(zone, input, url){
+  Array.from(zone.children).forEach(ch => { if(ch !== input) ch.remove(); });
+  const img = document.createElement('img');
+  img.src = url; img.alt = 'Foto del animal';
+  zone.appendChild(img);
+}
+
+function limpiarZonaFoto(zone, input){
+  Array.from(zone.children).forEach(ch => { if(ch !== input) ch.remove(); });
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.innerHTML = '<b>📷</b>Toca para tomar o subir una foto';
+  zone.appendChild(hint);
 }
 
 /* ============ Publicar aviso ============ */
@@ -182,8 +205,9 @@ function resetForm(key){
   document.getElementById('form-'+key).reset();
   photoFile[key] = null;
   const zone = document.getElementById('photo-zone-'+key);
-  zone.innerHTML = `<div class="hint"><b>📷</b>Toca para tomar o subir una foto</div><input type="file" accept="image/*" capture="environment" id="photo-input-${key}">`;
-  initPhotoZone('photo-zone-'+key, 'photo-input-'+key, key);
+  const input = document.getElementById('photo-input-'+key);
+  input.value = '';
+  limpiarZonaFoto(zone, input);
 }
 
 function renderMatchBanner(containerId, matches){
@@ -192,7 +216,7 @@ function renderMatchBanner(containerId, matches){
   el.innerHTML = `<div class="match-banner">
     <h3>🐾 ${matches.length} posible${matches.length>1?'s':''} coincidencia${matches.length>1?'s':''} cerca</h3>
     <p>Mismo tipo de animal, color parecido y a menos de 5 km. Ábrelo desde "Mapa" para contactar dentro de la app.</p>
-    ${matches.map(m=>`<div class="match-item">${TIPO_ICON[m.tipo]} ${m.color} · ${m.distancia_km} km</div>`).join('')}
+    ${matches.map(m=>`<div class="match-item">${TIPO_ICON[m.tipo]||'🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`).join('')}
   </div>`;
 }
 
@@ -202,156 +226,4 @@ async function handleSubmit(estado, key){
         collar = get('collar'), desc = get('desc'), nombre = key==='lost' ? get('nombre') : '';
   if(!tipo || !color){ toast('Completa los campos obligatorios (*).'); return; }
 
-  const loc = pickedLoc[key] || userLoc;
-  const btn = document.querySelector(`#form-${key} .submit-btn`);
-  btn.disabled = true; btn.textContent = 'Publicando…';
-
-  try{
-    const fd = new FormData();
-    fd.append('estado', estado); fd.append('tipo', tipo); fd.append('sexo', sexo);
-    fd.append('color', color); fd.append('raza', raza); fd.append('collar', collar);
-    fd.append('descripcion', desc); fd.append('nombre_mascota', nombre);
-    fd.append('lat', loc.lat); fd.append('lng', loc.lng);
-    if(photoFile[key]) fd.append('foto', photoFile[key], 'foto.jpg');
-
-    const { report } = await api('/api/reports', { method:'POST', isForm:true, body: fd });
-    toast('¡Aviso publicado!');
-    const { matches } = await api(`/api/reports/${report.id}/matches`, { auth:false });
-    renderMatchBanner('match-area-'+key, matches);
-    resetForm(key);
-    renderList(); renderListMap();
-  }catch(ex){
-    toast(ex.message);
-  }finally{
-    btn.disabled = false;
-    btn.textContent = estado==='encontrado' ? 'Publicar aviso de animal encontrado' : 'Publicar aviso de mascota perdida';
-  }
-}
-document.getElementById('form-found').addEventListener('submit', e=>{ e.preventDefault(); handleSubmit('encontrado','found'); });
-document.getElementById('form-lost').addEventListener('submit', e=>{ e.preventDefault(); handleSubmit('perdido','lost'); });
-
-/* ============ Home: lista y mapa ============ */
-let allReports = [];
-async function fetchReports(){
-  const tipo = document.getElementById('filter-tipo').value;
-  const estado = document.getElementById('filter-estado').value;
-  const qs = new URLSearchParams(); if(tipo) qs.set('tipo',tipo); if(estado) qs.set('estado',estado);
-  const { reports } = await api('/api/reports?'+qs.toString(), { auth:false });
-  allReports = reports.sort((a,b)=>b.created_at-a.created_at);
-}
-
-async function renderList(){
-  await fetchReports();
-  const el = document.getElementById('reports-list');
-  if(allReports.length===0){
-    el.innerHTML = `<div class="empty-state"><div class="big">🐾</div>Todavía no hay avisos.<br>Publica el primero desde las pestañas de arriba.</div>`;
-    return;
-  }
-  el.innerHTML = allReports.map(r=>`
-    <div class="report-card ${r.estado==='perdido'?'lost':''}" data-id="${r.id}">
-      ${r.foto_url ? `<img src="${API_BASE}${r.foto_url}" alt="">` : `<div class="ph-placeholder">${TIPO_ICON[r.tipo]}</div>`}
-      <div class="report-body">
-        <div class="report-top">
-          <h4>${TIPO_ICON[r.tipo]} ${r.color}${r.raza ? ' · '+r.raza : ''}</h4>
-          <span class="tag ${r.estado==='perdido'?'lost':'found'}">${r.estado==='perdido'?'Perdido':'Encontrado'}</span>
-        </div>
-        <div class="report-meta">${r.sexo!=='desconocido'?({macho:'Macho',hembra:'Hembra'})[r.sexo]+' · ':''}${r.collar?'Collar '+r.collar+' · ':''}${timeAgo(r.created_at)}</div>
-        <div class="report-actions">
-          <button onclick="toggleMatches('${r.id}')">Ver coincidencias</button>
-          <button onclick="toggleContact('${r.id}')">Contactar</button>
-        </div>
-        <div class="matches-box" id="matches-${r.id}" style="display:none;"></div>
-        <div class="contact-box hidden" id="contact-${r.id}">
-          <textarea id="contact-text-${r.id}" placeholder="Escribe un mensaje para quien publicó este aviso…"></textarea>
-          <button onclick="sendContact('${r.id}')">Enviar mensaje</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-window.toggleMatches = async function(id){
-  const box = document.getElementById('matches-'+id);
-  if(box.style.display==='block'){ box.style.display='none'; return; }
-  const { matches } = await api(`/api/reports/${id}/matches`, { auth:false });
-  box.innerHTML = matches.length
-    ? matches.map(m=>`<div>${TIPO_ICON[m.tipo]} ${m.color} · ${m.distancia_km} km</div>`).join('')
-    : `<span class="none">Sin coincidencias por ahora.</span>`;
-  box.style.display='block';
-};
-window.toggleContact = function(id){
-  document.getElementById('contact-'+id).classList.toggle('hidden');
-};
-window.sendContact = async function(id){
-  const ta = document.getElementById('contact-text-'+id);
-  if(!ta.value.trim()) return;
-  try{
-    await api(`/api/reports/${id}/messages`, { method:'POST', body:{ mensaje: ta.value.trim() } });
-    toast('Mensaje enviado. Solo lo verá la persona que publicó el aviso.');
-    ta.value=''; document.getElementById('contact-'+id).classList.add('hidden');
-  }catch(ex){ toast(ex.message); }
-};
-
-async function renderListMap(){
-  if(!listMap){
-    listMap = L.map('list-map').setView([userLoc.lat,userLoc.lng], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(listMap);
-    listMarkersLayer = L.layerGroup().addTo(listMap);
-  }
-  listMarkersLayer.clearLayers();
-  allReports.forEach(r=>{
-    const color = r.estado==='perdido' ? '#D98A2B' : '#3F8361';
-    const marker = L.circleMarker([r.lat, r.lng], { radius:9, fillColor:color, fillOpacity:0.9, color:'#fff', weight:2 }).addTo(listMarkersLayer);
-    marker.bindPopup(`<b>${TIPO_ICON[r.tipo]} ${r.color}</b><br>${r.estado==='perdido'?'Perdido':'Encontrado'} · ${timeAgo(r.created_at)}`);
-  });
-}
-
-document.getElementById('filter-tipo').addEventListener('change', ()=>{ renderList().then(renderListMap); });
-document.getElementById('filter-estado').addEventListener('change', ()=>{ renderList().then(renderListMap); });
-document.getElementById('btn-refresh').addEventListener('click', async ()=>{ await renderList(); await renderListMap(); toast('Lista actualizada.'); });
-document.getElementById('btn-view-map').addEventListener('click', ()=>{
-  document.getElementById('btn-view-map').classList.add('active');
-  document.getElementById('btn-view-list').classList.remove('active');
-  document.getElementById('list-map').style.display='block';
-  document.getElementById('reports-list').style.display='block';
-  setTimeout(()=>listMap && listMap.invalidateSize(),50);
-});
-document.getElementById('btn-view-list').addEventListener('click', ()=>{
-  document.getElementById('btn-view-list').classList.add('active');
-  document.getElementById('btn-view-map').classList.remove('active');
-  document.getElementById('list-map').style.display='none';
-});
-
-/* ============ Mis avisos / inbox ============ */
-async function renderInbox(){
-  const el = document.getElementById('inbox-list');
-  try{
-    const { reports } = await api('/api/reports/mine/all');
-    if(reports.length===0){ el.innerHTML = `<div class="empty-state"><div class="big">📭</div>Todavía no has publicado avisos.</div>`; return; }
-    el.innerHTML = reports.map(r=>`
-      <div class="inbox-item">
-        <h4>${TIPO_ICON[r.tipo]} ${r.color} · ${r.estado==='perdido'?'Perdido':'Encontrado'}</h4>
-        <div class="report-meta">Publicado ${timeAgo(r.created_at)}</div>
-        ${r.mensajes.length===0
-          ? `<p class="loc-note">Sin mensajes todavía.</p>`
-          : r.mensajes.map(m=>`<div class="msg">${m.mensaje}<div class="when">${timeAgo(m.created_at)}</div></div>`).join('')}
-      </div>
-    `).join('');
-  }catch(ex){ el.innerHTML = `<p class="loc-note">${ex.message}</p>`; }
-}
-
-/* ============ Arranque ============ */
-function startApp(){
-  initPhotoZone('photo-zone-found','photo-input-found','found');
-  initPhotoZone('photo-zone-lost','photo-input-lost','lost');
-  const pf = initPicker('map-found','found'); mapFound = pf.map; markerFound = pf.marker;
-  const pl = initPicker('map-lost','lost'); mapLost = pl.map; markerLost = pl.marker;
-  locateUser();
-  renderList().then(renderListMap);
-}
-
-if(token){
-  document.getElementById('auth-screen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  startApp();
-}
+  const loc =
