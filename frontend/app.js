@@ -355,4 +355,3 @@ if(token){
   document.getElementById('app').classList.remove('hidden');
   startApp();
 }
-
