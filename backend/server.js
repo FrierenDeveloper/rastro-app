@@ -15,7 +15,42 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "https://cdnjs.cloudflare.com"  // Leaflet JS
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",              // Leaflet inline styles
+        "https://cdnjs.cloudflare.com", // Leaflet CSS
+        "https://fonts.googleapis.com"  // Google Fonts CSS
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com"     // Google Fonts archivos
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://*.tile.openstreetmap.org",  // Mapa OSM
+        "https://*.supabase.co"              // Fotos en Supabase Storage
+      ],
+      connectSrc: [
+        "'self'",
+        "https://*.supabase.co",        // Supabase API
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        "https://cdnjs.cloudflare.com"
+      ],
+      workerSrc: ["'self'"],
+      manifestSrc: ["'self'"]
+    }
+  }
 }));
 
 const allowedOrigin = process.env.CORS_ORIGIN || '*';
