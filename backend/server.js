@@ -15,6 +15,12 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 
+// Render (y la mayoría de hostings) van detrás de un proxy que agrega la
+// cabecera X-Forwarded-For. Sin esto, express-rate-limit no identifica bien a
+// cada usuario y req.protocol sería "http" (rompe los enlaces de recuperar
+// contraseña). Confiamos en el primer salto (el proxy de Render).
+app.set('trust proxy', 1);
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
