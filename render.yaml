@@ -1,0 +1,32 @@
+# Blueprint de Render: crea el servicio web y pide las variables necesarias.
+# Los valores marcados con "sync: false" se completan al crear el Blueprint.
+services:
+  - type: web
+    name: rastro-app
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: SUPABASE_BUCKET
+        value: fotos
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:contacto@example.com
