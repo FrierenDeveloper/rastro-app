@@ -22,6 +22,10 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet({
+  // OpenStreetMap exige que el navegador envíe un Referer válido; con el
+  // "no-referrer" por defecto de Helmet, OSM bloquea los tiles (403) y el mapa
+  // queda gris. Este valor manda solo el origen en peticiones cross-origin.
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
     directives: {
