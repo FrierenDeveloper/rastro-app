@@ -258,7 +258,7 @@ function locateUser() {
 
 function initPicker(elId, key) {
   const map = L.map(elId, { zoomControl: true }).setView([userLoc.lat, userLoc.lng], 14);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap · © CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
   const marker = L.marker([userLoc.lat, userLoc.lng], { draggable: true }).addTo(map);
   pickedLoc[key] = { ...userLoc };
   marker.on('dragend', () => { const p = marker.getLatLng(); pickedLoc[key] = { lat: p.lat, lng: p.lng }; });
@@ -467,7 +467,7 @@ document.getElementById('reports-list').addEventListener('click', e => {
 async function renderListMap() {
   if (!listMap) {
     listMap = L.map('list-map').setView([userLoc.lat, userLoc.lng], 12);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(listMap);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap · © CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(listMap);
     clusterGroup = L.markerClusterGroup();
     listMap.addLayer(clusterGroup);
     setTimeout(() => listMap.invalidateSize(), 200);

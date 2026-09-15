@@ -53,6 +53,7 @@ app.use(helmet({
         "blob:",
         "https://*.tile.openstreetmap.org",   // Mapa OSM (subdominios)
         "https://tile.openstreetmap.org",      // Mapa OSM
+        "https://*.basemaps.cartocdn.com",     // Tiles CARTO
         "https://cdnjs.cloudflare.com",       // iconos de Leaflet
         "https://*.supabase.co"               // Fotos en Supabase Storage
       ],
