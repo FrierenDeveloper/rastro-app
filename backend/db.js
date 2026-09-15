@@ -22,6 +22,7 @@ async function init() {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       phone TEXT,
+      google_sub TEXT,
       created_at BIGINT NOT NULL
     );
 
@@ -42,6 +43,9 @@ async function init() {
       lat_public DOUBLE PRECISION NOT NULL, -- ubicación difuminada (~300m) para el mapa público
       lng_public DOUBLE PRECISION NOT NULL,
       active BOOLEAN NOT NULL DEFAULT TRUE,
+      resolved BOOLEAN NOT NULL DEFAULT FALSE,
+      resolved_at BIGINT,
+      flags INTEGER NOT NULL DEFAULT 0,
       created_at BIGINT NOT NULL
     );
 
@@ -49,13 +53,67 @@ async function init() {
       id UUID PRIMARY KEY,
       report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
       sender_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
       mensaje TEXT NOT NULL,
+      lat DOUBLE PRECISION,
+      lng DOUBLE PRECISION,
       created_at BIGINT NOT NULL,
       read BOOLEAN NOT NULL DEFAULT FALSE
     );
 
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token TEXT PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at BIGINT NOT NULL,
+      used BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at BIGINT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id UUID PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      endpoint TEXT UNIQUE NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS report_flags (
+      report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (report_id, user_id)
+    );
+  `);
+
+  // Migraciones para bases de datos creadas con la versión anterior del esquema.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_at BIGINT;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS flags INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+    ALTER TABLE messages ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
+    ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
+  `);
+
+  // Índices (después de las migraciones, para que las columnas nuevas ya existan).
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_reports_estado_tipo ON reports(estado, tipo, active);
+    CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id);
     CREATE INDEX IF NOT EXISTS idx_messages_report ON messages(report_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_user_id);
+    CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
+  `);
+
+  // Rellena el destinatario de los mensajes antiguos (eran siempre al dueño del aviso).
+  await pool.query(`
+    UPDATE messages m
+       SET recipient_user_id = r.user_id
+      FROM reports r
+     WHERE m.report_id = r.id
+       AND m.recipient_user_id IS NULL
   `);
 }
 

@@ -1,0 +1,12 @@
+# Dependencias
+node_modules/
+
+# Secretos y configuración local
+.env
+.env.local
+*.pem
+
+#Archivos de sistema / temporales
+*.log
+.DS_Store
+Thumbs.db

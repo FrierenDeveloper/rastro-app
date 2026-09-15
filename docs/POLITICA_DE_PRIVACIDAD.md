@@ -23,6 +23,8 @@ abogado, especialmente si vas a operar en varios países.
 | Ubicación GPS | Ubicar el aviso en el mapa y calcular coincidencias cercanas | Solo una versión **aproximada** (difuminada ~300 m); la ubicación exacta nunca se muestra públicamente |
 | Mensajes dentro de la app | Permitir que dos usuarios coordinen la devolución de un animal | Solo lo ve la persona destinataria del mensaje |
 | Características del animal (tipo, color, raza, sexo, collar, descripción) | Mostrar el aviso y calcular coincidencias | Sí, es contenido público del aviso |
+| Suscripción a notificaciones push (identificador del dispositivo) | Enviarte un aviso cuando alguien te escribe | No |
+| Cuenta de Google (solo si eliges ese acceso) | Iniciar sesión sin contraseña | No |
 
 No vendemos datos personales a terceros ni los usamos con fines publicitarios.
 
@@ -45,6 +47,12 @@ casa o del lugar donde viste al animal.
 - **No compartimos** tus datos personales con terceros para fines comerciales.
 - Los datos se almacenan en [nombre de tu proveedor de hosting/base de datos, ej.
   Render/Railway/Supabase], que actúa como encargado técnico del tratamiento.
+- Si activas las notificaciones push, el navegador entrega el mensaje a través
+  del servicio de notificaciones del sistema (por ejemplo, el de Google en
+  Android/Chrome). Ese servicio no recibe el contenido más allá del texto del
+  aviso.
+- Si usas "Iniciar sesión con Google", Google verifica tu identidad; nosotros
+  solo recibimos tu correo para crear o vincular tu cuenta.
 - Si en el futuro integras notificaciones por correo o SMS, agrega aquí el proveedor
   (ej. SendGrid, Twilio) y qué datos les llegan.
 

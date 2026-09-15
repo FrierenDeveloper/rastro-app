@@ -29,6 +29,8 @@ Tienes dos caminos razonables:
 - [ ] Firmar el `.aab` (Play App Signing, gestionado por Google).
 - [ ] Verificar que los permisos declarados (ubicación, cámara) tengan una
       justificación clara y coincidan con el formulario de Data Safety.
+- [ ] Si la app pide notificaciones, declara el permiso
+      `POST_NOTIFICATIONS` (Android 13+) y explica para qué se usa.
 
 ## Fase 3 — Cuenta de desarrollador
 - [ ] Crear cuenta en Play Console: pago único de **US$25**.

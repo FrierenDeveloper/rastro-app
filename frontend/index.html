@@ -6,14 +6,35 @@
 <title>Rastro — Mascotas perdidas y encontradas</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1B2A2F">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="icons/icon-192.png">
 </head>
 <body>
+
+<!-- ===================== RESET SCREEN ===================== -->
+<div id="reset-screen" class="hidden">
+  <div class="brand"><div class="paw">🐾</div><h1 class="serif">Rastro</h1>
+    <p class="tag">Elige una contraseña nueva</p>
+  </div>
+  <div class="auth-card">
+    <form id="form-reset">
+      <label class="required">Nueva contraseña</label>
+      <input type="password" id="reset-password" minlength="8" required>
+      <p class="loc-note">Mínimo 8 caracteres.</p>
+      <button type="submit" class="submit-btn auth">Guardar contraseña</button>
+      <p class="auth-error" id="reset-error"></p>
+    </form>
+  </div>
+</div>
 
 <!-- ===================== AUTH SCREEN ===================== -->
 <div id="auth-screen">
@@ -32,7 +53,17 @@
       <label class="required">Contraseña</label>
       <input type="password" id="login-password" required>
       <button type="submit" class="submit-btn auth">Entrar</button>
+      <p class="link-note"><a href="#" id="link-forgot">¿Olvidaste tu contraseña?</a></p>
       <p class="auth-error" id="login-error"></p>
+    </form>
+
+    <form class="auth-form" id="form-forgot">
+      <label class="required">Tu correo</label>
+      <input type="email" id="forgot-email" required>
+      <button type="submit" class="submit-btn auth">Enviar enlace</button>
+      <p class="link-note"><a href="#" id="link-back-login">Volver a iniciar sesión</a></p>
+      <p class="auth-error" id="forgot-error"></p>
+      <p class="auth-ok" id="forgot-ok"></p>
     </form>
 
     <form class="auth-form" id="form-register">
@@ -46,6 +77,13 @@
       <button type="submit" class="submit-btn auth">Crear cuenta</button>
       <p class="auth-error" id="register-error"></p>
     </form>
+
+    <div id="google-area" class="hidden">
+      <div class="sep"><span>o</span></div>
+      <div id="g_id_onload" data-context="signin" data-ux_mode="popup" data-auto_prompt="false"></div>
+      <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="signin_with" data-shape="rectangular" data-logo_alignment="left" data-width="100"></div>
+    </div>
+
     <p class="loc-note" style="margin-top:14px;">Tu correo y teléfono nunca se muestran públicamente. Solo se usan para que otros usuarios puedan escribirte dentro de la app.</p>
   </div>
 </div>
@@ -58,15 +96,19 @@
     <p>Ayuda a los animales de tu barrio a volver a casa</p>
     <div class="header-row">
       <span class="loc-chip" id="loc-chip">📍 Ubicándote…</span>
-      <button class="logout-btn" id="btn-logout">Cerrar sesión</button>
+      <span class="header-actions">
+        <button class="icon-btn dark hidden" id="btn-push" title="Activar notificaciones">🔔</button>
+        <button class="logout-btn" id="btn-logout">Cerrar sesión</button>
+      </span>
     </div>
   </header>
 
   <nav class="tabs">
     <button data-tab="home" class="active">Mapa</button>
-    <button data-tab="found">Encontré uno</button>
-    <button data-tab="lost">Perdí el mío</button>
-    <button data-tab="inbox">Mis avisos</button>
+    <button data-tab="found">Encontré</button>
+    <button data-tab="lost">Perdí</button>
+    <button data-tab="chats">Chats <span class="badge hidden" id="badge-chats">0</span></button>
+    <button data-tab="inbox">Avisos</button>
   </nav>
 
   <main>
@@ -202,11 +244,28 @@
       </div>
     </section>
 
+    <!-- CHATS -->
+    <section class="view" id="view-chats">
+      <div id="threads-list"></div>
+      <div id="conversation" class="hidden">
+        <div class="conv-head">
+          <button class="icon-btn" id="btn-conv-back">‹ Volver</button>
+          <span id="conv-title"></span>
+        </div>
+        <div class="conv-msgs" id="conv-msgs"></div>
+        <div class="conv-reply">
+          <textarea id="conv-text" placeholder="Escribe un mensaje…"></textarea>
+          <label class="check"><input type="checkbox" id="conv-attach-loc"> Adjuntar mi ubicación</label>
+          <button id="btn-conv-send">Enviar</button>
+        </div>
+      </div>
+    </section>
+
     <!-- INBOX / MIS AVISOS -->
     <section class="view" id="view-inbox">
       <div id="inbox-list"></div>
       <div class="danger-zone">
-        <p class="loc-note">Si ya no quieres usar Rastro, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos y tus mensajes de forma permanente.</p>
+        <p class="loc-note">Si ya no quieres usar Rastro, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos, tus fotos y tus mensajes de forma permanente.</p>
         <button id="btn-delete-account">Eliminar mi cuenta y mis datos</button>
       </div>
     </section>
@@ -214,6 +273,39 @@
   </main>
 
   <footer class="note">Los avisos publicados aquí son visibles para todas las personas que usan esta app. Tu contacto directo nunca se muestra: la comunicación ocurre dentro de la app.</footer>
+</div>
+
+<!-- ===================== EDIT MODAL ===================== -->
+<div id="edit-modal" class="modal hidden">
+  <div class="modal-box">
+    <h3>Editar aviso</h3>
+    <form id="form-edit">
+      <label>Tipo</label>
+      <select id="edit-tipo">
+        <option value="perro">Perro</option><option value="gato">Gato</option>
+        <option value="ave">Ave</option><option value="conejo">Conejo</option><option value="otro">Otro</option>
+      </select>
+      <label>Sexo</label>
+      <select id="edit-sexo">
+        <option value="desconocido">No estoy seguro/a</option>
+        <option value="macho">Macho</option><option value="hembra">Hembra</option>
+      </select>
+      <label class="required">Color</label>
+      <input type="text" id="edit-color" required>
+      <div class="row2">
+        <div><label>Raza</label><input type="text" id="edit-raza"></div>
+        <div><label>Collar</label><input type="text" id="edit-collar"></div>
+      </div>
+      <label>Nombre</label>
+      <input type="text" id="edit-nombre">
+      <label>Descripción</label>
+      <textarea id="edit-desc"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="icon-btn" id="btn-edit-cancel">Cancelar</button>
+        <button type="submit" class="submit-btn auth" style="margin-top:0;">Guardar</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

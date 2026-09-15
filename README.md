@@ -33,6 +33,12 @@ Abre `.env` y completa:
 - `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: opcionales. Si los dejas
   vacíos, las fotos se guardan en el disco local del servidor (sirve para
   probar, pero no persiste en hosting gratuito).
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: para las notificaciones push.
+  Genera las tuyas con `npm run gen:vapid` (el `.env` de ejemplo ya trae unas
+  de prueba).
+- `RESEND_API_KEY` (opcional): para enviar correos reales de recuperación de
+  contraseña. Sin ella, el enlace se imprime en la consola.
+- `GOOGLE_CLIENT_ID` (opcional): para mostrar el botón "Iniciar con Google".
 
 ```bash
 npm start
@@ -41,8 +47,21 @@ npm start
 Abre `http://localhost:3000` — el mismo servidor sirve la app completa (crea
 una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
 
-## Qué seguridad ya tiene esto (vs. el prototipo anterior)
-- Cuentas con contraseña **cifrada** (bcrypt), sesiones con JWT.
+## Qué incluye
+- Cuentas con contraseña **cifrada** (bcrypt), sesiones con JWT, y **recuperar
+  contraseña** por correo (funciona con Resend; sin configurar, el enlace se
+  imprime en la consola del servidor).
+- **Inicio de sesión con Google** (opcional: solo aparece si configuras
+  `GOOGLE_CLIENT_ID`).
+- **Chat bidireccional** entre quien publica un aviso y quien lo ve: el dueño
+  puede responder, con hilos de conversación y contador de no leídos. Puedes
+  adjuntar tu ubicación actual a un mensaje ("lo vi aquí").
+- **Notificaciones push** reales cuando te escriben (Web Push / VAPID, sin
+  cuentas externas: `npm run gen:vapid`).
+- **Editar** tus avisos, **marcar como resuelto** (deja de aparecer en el mapa),
+  **compartir** por WhatsApp/redes y **reportar** avisos inapropiados (se ocultan
+  automáticamente tras 3 reportes).
+- **Clustering de marcadores** en el mapa cuando hay muchos avisos.
 - La ubicación exacta de cada aviso solo la ve su dueño; a todos los demás se
   les muestra un punto difuminado (~300 m) — nunca se expone dónde vive alguien.
 - El contacto (teléfono/correo) **nunca se muestra públicamente**: la
@@ -53,7 +72,7 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
   (evita ataques de path traversal), máximo 5 MB.
 - Cabeceras de seguridad HTTP (Helmet), CORS restringible a tu dominio.
 - El usuario puede **eliminar su cuenta y todos sus datos** en cualquier
-  momento (requisito de Google Play).
+  momento (requisito de Google Play): se borran avisos, fotos y mensajes.
 - Fotos guardadas en **Supabase Storage** cuando está configurado (persisten de
   verdad); si no lo configuras, caen a disco local como respaldo para pruebas.
 - `npm audit`: 0 vulnerabilidades en las dependencias al momento de construir esto.
@@ -74,10 +93,12 @@ persistente, todo en capas gratuitas. Después:
 - Los planes gratis de Supabase (500 MB de base de datos, 1 GB de
   almacenamiento) alcanzan de sobra para partir, pero tienen techo — si el
   proyecto crece mucho, tocará pasar a un plan pago.
-- No hay notificaciones push ni por correo todavía: cuando alguien te escribe,
-  el mensaje queda esperando en "Mis avisos" dentro de la app. Para avisar de
-  verdad en tiempo real necesitarías integrar algo como Firebase Cloud
-  Messaging (push) o SendGrid (correo) — no lo agregué porque requiere que tú
-  crees esas cuentas y me des las claves de API.
+- Las **notificaciones push** funcionan en Android/Chrome (PWA y app
+  empaquetada). En iPhone requieren que la PWA esté instalada en la pantalla de
+  inicio (limitación de iOS, no del código). Para notificaciones nativas
+  garantizadas en iOS necesitarías Firebase Cloud Messaging con una app nativa.
+- **Recuperar contraseña** usa Resend (plan gratis) si configuras
+  `RESEND_API_KEY`. Sin esa clave el enlace se imprime en la consola del
+  servidor: sirve para probar, pero no envía correos reales.
 - Este backend no ha pasado una auditoría de seguridad profesional. Lo que
   incluye son buenas prácticas estándar (OWASP básico), no una certificación.

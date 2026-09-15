@@ -40,6 +40,15 @@ almacenamiento de archivos — de sobra para empezar.
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `SUPABASE_BUCKET` → `fotos`
+   - `APP_URL` → la URL de tu app en Render (ej. `https://rastro-xxxx.onrender.com`)
+     — se usa para el enlace de recuperar contraseña
+   - `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` → genéralas con
+     `npm run gen:vapid` en tu computador y pega los dos valores
+     (necesarias para las notificaciones push)
+   - `VAPID_SUBJECT` → `mailto:tucorreo@ejemplo.com`
+   - `RESEND_API_KEY` → opcional, para enviar correos reales de recuperación
+   - `MAIL_FROM` → remitente verificado en Resend (opcional)
+   - `GOOGLE_CLIENT_ID` → opcional, para el botón de Google
    - `CORS_ORIGIN` → `*` para empezar (puedes restringirlo después a tu dominio)
    - `NODE_ENV` → `production`
 5. **Create Web Service**. Render construye y despliega — toma unos minutos.

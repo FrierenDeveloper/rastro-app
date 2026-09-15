@@ -6,6 +6,7 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const storage = require('./storage');
+const push = require('./push');
 
 if (!process.env.JWT_SECRET) {
   console.error('Falta JWT_SECRET en el archivo .env. Revisa .env.example.');
@@ -21,12 +22,15 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'",
-        "https://cdnjs.cloudflare.com"  // Leaflet JS
+        "https://cdnjs.cloudflare.com",  // Leaflet JS
+        "https://unpkg.com",             // Leaflet.markercluster
+        "https://accounts.google.com"    // Google Sign-In
       ],
       styleSrc: [
         "'self'",
         "'unsafe-inline'",              // Leaflet inline styles
         "https://cdnjs.cloudflare.com", // Leaflet CSS
+        "https://unpkg.com",            // Leaflet.markercluster CSS
         "https://fonts.googleapis.com"  // Google Fonts CSS
       ],
       fontSrc: [
@@ -45,7 +49,13 @@ app.use(helmet({
         "https://*.supabase.co",        // Supabase API
         "https://fonts.googleapis.com",
         "https://fonts.gstatic.com",
-        "https://cdnjs.cloudflare.com"
+        "https://cdnjs.cloudflare.com",
+        "https://unpkg.com",
+        "https://accounts.google.com"
+      ],
+      frameSrc: [
+        "'self'",
+        "https://accounts.google.com"   // iframe de Google Sign-In
       ],
       workerSrc: ["'self'"],
       manifestSrc: ["'self'"]
@@ -64,8 +74,18 @@ app.use('/uploads', express.static(storage.localDir, { maxAge: '7d' }));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/push', require('./routes/push'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// El frontend consulta esto para activar funciones opcionales (Google, push).
+app.get('/api/config', (req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+    pushEnabled: push.enabled,
+    vapidPublicKey: push.publicKey || ''
+  });
+});
 
 // Sirve el frontend (PWA) desde el mismo servidor. Para producción a mayor escala,
 // puedes separarlos y desplegar el frontend en un CDN/hosting estático aparte.
@@ -76,6 +96,15 @@ app.get(/^(?!\/api\/).*/, (req, res) => res.sendFile(path.join(frontendDir, 'ind
 // Manejador de errores centralizado: nunca exponer detalles internos al cliente.
 app.use((err, req, res, next) => {
   console.error(err);
+  if (err && err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'La foto es demasiado grande (máximo 5 MB).' });
+    }
+    return res.status(400).json({ error: 'No se pudo procesar la imagen subida.' });
+  }
+  if (err && err.message === 'Formato de imagen no permitido.') {
+    return res.status(400).json({ error: err.message });
+  }
   res.status(err.status || 500).json({ error: 'Ocurrió un error en el servidor.' });
 });
 

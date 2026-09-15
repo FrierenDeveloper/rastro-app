@@ -39,6 +39,16 @@ en el mismo orden en que aparecen en el formulario. Ajusta si cambias la app.
 **Sí** (siempre que despliegues el backend detrás de HTTPS, que es obligatorio en
 producción — ver README de despliegue).
 
+## Notificaciones push
+- **Identificador del dispositivo (token de push)**: Sí, se recolecta un
+  identificador técnico del dispositivo/navegador para poder enviarte avisos
+  cuando alguien te escribe. Finalidad: Funcionalidad de la app. Es opcional
+  (solo si el usuario activa las notificaciones y se borra al eliminar la cuenta).
+
+## Inicio de sesión con Google (si lo activas)
+- Si ofreces "Iniciar sesión con Google", se recolecta el correo de la cuenta de
+  Google y un identificador de esa cuenta. Finalidad: autenticación. No se comparte.
+
 ## ¿Los usuarios pueden pedir que se borren sus datos?
 **Sí.** Existe una función en la app ("Eliminar mi cuenta y mis datos") que borra
 la cuenta, los avisos y los mensajes de forma permanente. Debes declarar la URL de
