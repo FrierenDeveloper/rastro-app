@@ -48,10 +48,15 @@ router.post('/register',
 
       const id = uuidv4();
       const hash = await bcrypt.hash(password, 12);
-      await db.query(
-        'INSERT INTO users (id, email, password_hash, phone, created_at) VALUES ($1,$2,$3,$4,$5)',
+      // ON CONFLICT evita un 500 si dos registros con el mismo correo entran a la vez.
+      const inserted = await db.query(
+        `INSERT INTO users (id, email, password_hash, phone, created_at)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id`,
         [id, email, hash, phone || null, Date.now()]
       );
+      if (!inserted.rows.length) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
 
       res.status(201).json({ token: signToken(id, 0), user: { id, email, phone: phone || null } });
     } catch (err) { next(err); }
@@ -170,11 +175,16 @@ router.post('/google',
         const id = uuidv4();
         // Contraseña aleatoria: esta cuenta se usa solo vía Google.
         const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
-        await db.query(
-          'INSERT INTO users (id, email, password_hash, phone, google_sub, created_at) VALUES ($1,$2,$3,NULL,$4,$5)',
+        const inserted = await db.query(
+          `INSERT INTO users (id, email, password_hash, phone, google_sub, created_at)
+           VALUES ($1,$2,$3,NULL,$4,$5)
+           ON CONFLICT (email) DO NOTHING
+           RETURNING id`,
           [id, email, hash, info.sub || null, Date.now()]
         );
-        user = { id, email, phone: null, token_version: 0 };
+        user = inserted.rows.length
+          ? { id, email, phone: null, token_version: 0 }
+          : (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
       } else if (!user.google_sub && info.sub) {
         await db.query('UPDATE users SET google_sub = $1 WHERE id = $2', [info.sub, user.id]);
       }

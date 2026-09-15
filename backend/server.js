@@ -16,10 +16,12 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 
 // Render (y la mayoría de hostings) van detrás de un proxy que agrega la
-// cabecera X-Forwarded-For. Sin esto, express-rate-limit no identifica bien a
-// cada usuario y req.protocol sería "http" (rompe los enlaces de recuperar
-// contraseña). Confiamos en el primer salto (el proxy de Render).
-app.set('trust proxy', 1);
+// cabecera X-Forwarded-For. Confiamos en el primer salto.
+// IMPORTANTE: si algún día expones la app SIN proxy por delante, pon TRUST_PROXY=0
+// en el .env; de lo contrario se podría falsear la IP con X-Forwarded-For y
+// evadir los límites de peticiones.
+const trustProxy = process.env.TRUST_PROXY !== undefined ? Number(process.env.TRUST_PROXY) : 1;
+app.set('trust proxy', trustProxy);
 
 app.use(helmet({
   // OpenStreetMap exige que el navegador envíe un Referer válido; con el
