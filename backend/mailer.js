@@ -7,10 +7,15 @@ const MAIL_FROM = process.env.MAIL_FROM || 'Rastro <onboarding@resend.dev>';
 
 async function sendMail({ to, subject, text, html }) {
   if (!RESEND_API_KEY) {
-    console.log('[mailer] RESEND_API_KEY no configurada. Correo que se habría enviado:');
-    console.log(`  Para: ${to}`);
-    console.log(`  Asunto: ${subject}`);
-    console.log(`  ${text}`);
+    if (process.env.NODE_ENV === 'production') {
+      // En producción NO imprimimos el contenido (puede incluir enlaces de reset).
+      console.warn(`[mailer] RESEND_API_KEY no configurada: no se envió el correo a ${to}.`);
+    } else {
+      console.log('[mailer] RESEND_API_KEY no configurada. Correo que se habría enviado:');
+      console.log(`  Para: ${to}`);
+      console.log(`  Asunto: ${subject}`);
+      console.log(`  ${text}`);
+    }
     return { skipped: true };
   }
   const res = await fetch('https://api.resend.com/emails', {

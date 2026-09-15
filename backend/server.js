@@ -76,8 +76,10 @@ app.use(helmet({
   }
 }));
 
-const allowedOrigin = process.env.CORS_ORIGIN || '*';
-app.use(cors({ origin: allowedOrigin }));
+// El frontend se sirve desde el mismo origen, así que CORS no hace falta.
+// Si separas el frontend en otro dominio, define CORS_ORIGIN con ese dominio.
+const allowedOrigin = process.env.CORS_ORIGIN || '';
+app.use(cors(allowedOrigin ? { origin: allowedOrigin } : { origin: false }));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
@@ -104,6 +106,8 @@ app.get('/api/config', (req, res) => {
 // Sirve el frontend (PWA) desde el mismo servidor. Para producción a mayor escala,
 // puedes separarlos y desplegar el frontend en un CDN/hosting estático aparte.
 const frontendDir = path.join(__dirname, '..', 'frontend');
+// Cualquier ruta /api desconocida responde JSON (no el index.html de la app).
+app.use('/api', (req, res) => res.status(404).json({ error: 'No encontrado.' }));
 app.use(express.static(frontendDir));
 app.get(/^(?!\/api\/).*/, (req, res) => res.sendFile(path.join(frontendDir, 'index.html')));
 

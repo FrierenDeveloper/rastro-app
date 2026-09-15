@@ -6,13 +6,17 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 const TIPOS_VALIDOS = ['perro', 'gato', 'ave', 'conejo', 'otro'];
 const SEXOS_VALIDOS = ['macho', 'hembra', 'desconocido'];
-const FLAGS_PARA_OCULTAR = 3;
+const FLAGS_PARA_OCULTAR = 5;              // antes de ocultar un aviso
+const FLAGS_POR_DIA = 10;                  // por cuenta
+const AVISOS_POR_DIA = 20;                 // por cuenta
+const MENSAJES_POR_DIA = 100;              // por cuenta
+const CUENTA_MINIMA_PARA_REPORTAR = 24 * 60 * 60 * 1000; // 24 h
 
 const createLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -37,6 +41,16 @@ const upload = multer({
   }
 });
 
+// No confiamos en el mimetype que manda el cliente: verificamos los primeros
+// bytes del archivo (magic bytes) para saber el tipo real.
+function tipoImagenReal(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371, toRad = d => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
@@ -51,13 +65,14 @@ function jitter(lat, lng, meters = 300) {
   return { lat: lat + dLat, lng: lng + dLng };
 }
 
-function publicReport(r) {
+function publicReport(r, me) {
   return {
     id: r.id, estado: r.estado, tipo: r.tipo, sexo: r.sexo, color: r.color,
     raza: r.raza, collar: r.collar, descripcion: r.descripcion,
     nombre_mascota: r.estado === 'perdido' ? r.nombre_mascota : null,
     foto_url: r.foto_url || null,
     resolved: !!r.resolved,
+    es_mio: !!me && r.user_id === me,
     lat: r.lat_public, lng: r.lng_public,
     created_at: Number(r.created_at)
   };
@@ -71,6 +86,11 @@ async function findReport(id) {
 // Etiqueta pública de un usuario: nunca mostramos su correo ni teléfono.
 function peerLabel(id) {
   return 'Usuario ' + String(id).slice(0, 6);
+}
+
+async function contarUltimas24h(sql, userId) {
+  const r = await db.query(sql, [userId, Date.now() - 24 * 60 * 60 * 1000]);
+  return r.rows[0].n;
 }
 
 /* ---------- Crear aviso (requiere sesión) ---------- */
@@ -90,13 +110,20 @@ router.post('/', requireAuth, createLimiter, upload.single('foto'),
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
+      const avisosHoy = await contarUltimas24h('SELECT COUNT(*)::int AS n FROM reports WHERE user_id = $1 AND created_at > $2', req.userId);
+      if (avisosHoy >= AVISOS_POR_DIA) return res.status(429).json({ error: 'Alcanzaste el límite de avisos por hoy. Intenta mañana.' });
+
       const { estado, tipo, sexo, color, raza, collar, descripcion, nombre_mascota } = req.body;
       const lat = parseFloat(req.body.lat), lng = parseFloat(req.body.lng);
       const pub = jitter(lat, lng);
       const id = uuidv4();
 
       let fotoUrl = null;
-      if (req.file) fotoUrl = await storage.savePhoto(req.file.buffer, req.file.mimetype);
+      if (req.file) {
+        const tipoReal = tipoImagenReal(req.file.buffer);
+        if (!tipoReal) return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
+        fotoUrl = await storage.savePhoto(req.file.buffer, tipoReal);
+      }
 
       await db.query(
         `INSERT INTO reports
@@ -108,13 +135,14 @@ router.post('/', requireAuth, createLimiter, upload.single('foto'),
       );
 
       const result = await db.query('SELECT * FROM reports WHERE id = $1', [id]);
-      res.status(201).json({ report: publicReport(result.rows[0]) });
+      res.status(201).json({ report: publicReport(result.rows[0], req.userId) });
     } catch (err) { next(err); }
   }
 );
 
 /* ---------- Listado público (sin datos exactos ni de contacto) ---------- */
-router.get('/', infoLimiter, async (req, res, next) => {
+// optionalAuth marca es_mio para que el frontend sepa si puede gestionar el aviso.
+router.get('/', optionalAuth, infoLimiter, async (req, res, next) => {
   try {
     const { tipo, estado } = req.query;
     let q = 'SELECT * FROM reports WHERE active = TRUE AND resolved = FALSE';
@@ -123,7 +151,7 @@ router.get('/', infoLimiter, async (req, res, next) => {
     if (estado && ['perdido', 'encontrado'].includes(estado)) { params.push(estado); q += ` AND estado = $${params.length}`; }
     q += ' ORDER BY created_at DESC LIMIT 200';
     const result = await db.query(q, params);
-    res.json({ reports: result.rows.map(publicReport) });
+    res.json({ reports: result.rows.map(r => publicReport(r, req.userId)) });
   } catch (err) { next(err); }
 });
 
@@ -132,29 +160,34 @@ router.get('/threads', requireAuth, async (req, res, next) => {
   try {
     const me = req.userId;
     const pairs = await db.query(
-      `SELECT report_id,
-              CASE WHEN sender_user_id = $1 THEN recipient_user_id ELSE sender_user_id END AS peer,
-              MAX(created_at) AS last_at
-         FROM messages
-        WHERE sender_user_id = $1 OR recipient_user_id = $1
+      `WITH m AS (
+         SELECT report_id,
+                CASE WHEN sender_user_id = $1 THEN recipient_user_id ELSE sender_user_id END AS peer,
+                mensaje, created_at,
+                CASE WHEN recipient_user_id = $1 AND read = FALSE THEN 1 ELSE 0 END AS unread
+           FROM messages
+          WHERE sender_user_id = $1 OR recipient_user_id = $1
+       )
+       SELECT report_id, peer,
+              (array_agg(mensaje ORDER BY created_at DESC))[1] AS last_message,
+              MAX(created_at) AS last_at,
+              SUM(unread)::int AS unread
+         FROM m
         GROUP BY report_id, peer
-        ORDER BY last_at DESC`,
+        ORDER BY MAX(created_at) DESC`,
       [me]
     );
 
-    const threads = await Promise.all(pairs.rows.map(async p => {
-      const report = await findReport(p.report_id);
+    const ids = pairs.rows.map(p => p.report_id);
+    let byId = {};
+    if (ids.length) {
+      const reps = await db.query('SELECT * FROM reports WHERE id = ANY($1)', [ids]);
+      byId = Object.fromEntries(reps.rows.map(r => [r.id, r]));
+    }
+
+    const threads = pairs.rows.map(p => {
+      const report = byId[p.report_id];
       if (!report) return null;
-      const last = await db.query(
-        `SELECT mensaje, created_at, sender_user_id FROM messages
-          WHERE report_id = $1 AND ((sender_user_id = $2 AND recipient_user_id = $3) OR (sender_user_id = $3 AND recipient_user_id = $2))
-          ORDER BY created_at DESC LIMIT 1`,
-        [p.report_id, me, p.peer]
-      );
-      const unread = await db.query(
-        'SELECT COUNT(*)::int AS n FROM messages WHERE report_id = $1 AND sender_user_id = $2 AND recipient_user_id = $3 AND read = FALSE',
-        [p.report_id, p.peer, me]
-      );
       return {
         report_id: report.id,
         peer_id: p.peer,
@@ -165,11 +198,11 @@ router.get('/threads', requireAuth, async (req, res, next) => {
         color: report.color,
         foto_url: report.foto_url || null,
         resolved: !!report.resolved,
-        last_message: last.rows[0] ? last.rows[0].mensaje : null,
-        last_at: last.rows[0] ? Number(last.rows[0].created_at) : Number(p.last_at),
-        unread: unread.rows[0].n
+        last_message: p.last_message,
+        last_at: Number(p.last_at),
+        unread: p.unread
       };
-    }));
+    });
 
     res.json({ threads: threads.filter(Boolean) });
   } catch (err) { next(err); }
@@ -179,43 +212,52 @@ router.get('/threads', requireAuth, async (req, res, next) => {
 router.get('/mine/all', requireAuth, async (req, res, next) => {
   try {
     const result = await db.query('SELECT * FROM reports WHERE user_id = $1 ORDER BY created_at DESC', [req.userId]);
-    const withMeta = await Promise.all(result.rows.map(async r => {
-      const unread = await db.query(
-        'SELECT COUNT(*)::int AS n FROM messages WHERE report_id = $1 AND recipient_user_id = $2 AND read = FALSE',
-        [r.id, req.userId]
-      );
-      return {
-        ...publicReport(r),
+    const counts = await db.query(
+      'SELECT report_id, COUNT(*)::int AS n FROM messages WHERE recipient_user_id = $1 AND read = FALSE GROUP BY report_id',
+      [req.userId]
+    );
+    const unreadById = Object.fromEntries(counts.rows.map(c => [c.report_id, c.n]));
+    res.json({
+      reports: result.rows.map(r => ({
+        ...publicReport(r, req.userId),
         lat_exacto: r.lat, lng_exacto: r.lng,
-        unread: unread.rows[0].n
-      };
-    }));
-    res.json({ reports: withMeta });
+        unread: unreadById[r.id] || 0
+      }))
+    });
   } catch (err) { next(err); }
 });
 
 /* ---------- Coincidencias posibles para un aviso ---------- */
-router.get('/:id/matches', infoLimiter, param('id').isUUID(), async (req, res, next) => {
+// Solo el dueño del aviso puede ver las coincidencias (evita que cualquiera use
+// las distancias para triangular ubicaciones). Se acota con un bounding box y
+// un LIMIT para no recorrer toda la tabla.
+router.get('/:id/matches', requireAuth, infoLimiter, param('id').isUUID(), async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
 
     const report = await findReport(req.params.id);
     if (!report || !report.active) return res.status(404).json({ error: 'Aviso no encontrado.' });
+    if (report.user_id !== req.userId) return res.status(403).json({ error: 'Solo puedes ver coincidencias de tus propios avisos.' });
 
     const opuesto = report.estado === 'perdido' ? 'encontrado' : 'perdido';
+    const dLat = 5 / 111.32;                                             // ~5 km
+    const dLng = 5 / (111.32 * Math.max(0.1, Math.cos(report.lat * Math.PI / 180)));
     const candidatos = await db.query(
-      'SELECT * FROM reports WHERE estado = $1 AND tipo = $2 AND active = TRUE AND resolved = FALSE',
-      [opuesto, report.tipo]
+      `SELECT * FROM reports
+        WHERE estado = $1 AND tipo = $2 AND active = TRUE AND resolved = FALSE
+          AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6
+        LIMIT 100`,
+      [opuesto, report.tipo, report.lat - dLat, report.lat + dLat, report.lng - dLng, report.lng + dLng]
     );
 
     const matches = candidatos.rows
-      .map(c => ({ ...c, dist: haversine(report.lat, report.lng, c.lat, c.lng) })) // distancia real, en el servidor
+      .map(c => ({ ...c, dist: haversine(report.lat, report.lng, c.lat, c.lng) }))
       .filter(c => c.dist <= 5 &&
         (c.color.toLowerCase().includes(report.color.toLowerCase().split(' ')[0]) ||
          report.color.toLowerCase().includes(c.color.toLowerCase().split(' ')[0])))
       .sort((a, b) => a.dist - b.dist)
-      .map(c => ({ ...publicReport(c), distancia_km: Math.round(c.dist * 10) / 10 }));
+      .map(c => ({ ...publicReport(c, req.userId), distancia_km: Math.round(c.dist * 10) / 10 }));
 
     res.json({ matches });
   } catch (err) { next(err); }
@@ -280,6 +322,9 @@ router.post('/:id/messages', requireAuth, messageLimiter,
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+      const mensajesHoy = await contarUltimas24h('SELECT COUNT(*)::int AS n FROM messages WHERE sender_user_id = $1 AND created_at > $2', req.userId);
+      if (mensajesHoy >= MENSAJES_POR_DIA) return res.status(429).json({ error: 'Enviaste demasiados mensajes hoy. Intenta mañana.' });
 
       const report = await findReport(req.params.id);
       if (!report || !report.active) return res.status(404).json({ error: 'Aviso no encontrado.' });
@@ -362,7 +407,7 @@ router.patch('/:id', requireAuth, param('id').isUUID(), ...editValidators, async
     );
 
     const updated = await findReport(report.id);
-    res.json({ report: publicReport(updated) });
+    res.json({ report: publicReport(updated, req.userId) });
   } catch (err) { next(err); }
 });
 
@@ -387,6 +432,8 @@ router.post('/:id/resolve', requireAuth, param('id').isUUID(),
 );
 
 /* ---------- Reportar un aviso inapropiado ---------- */
+// Para evitar que cuentas nuevas oculten avisos ajenos: se exige una cuenta con
+// al menos 24 h, un límite diario, y hacen falta 5 reportes de 5 cuentas distintas.
 router.post('/:id/flag', requireAuth, flagLimiter, param('id').isUUID(), async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -396,16 +443,21 @@ router.post('/:id/flag', requireAuth, flagLimiter, param('id').isUUID(), async (
     if (!report || !report.active) return res.status(404).json({ error: 'Aviso no encontrado.' });
     if (report.user_id === req.userId) return res.status(400).json({ error: 'No puedes reportar tu propio aviso.' });
 
+    const user = (await db.query('SELECT created_at FROM users WHERE id = $1', [req.userId])).rows[0];
+    if (!user || Number(user.created_at) > Date.now() - CUENTA_MINIMA_PARA_REPORTAR) {
+      return res.status(403).json({ error: 'Tu cuenta es demasiado nueva para reportar avisos.' });
+    }
+    const flagsHoy = await contarUltimas24h('SELECT COUNT(*)::int AS n FROM report_flags WHERE user_id = $1 AND created_at > $2', req.userId);
+    if (flagsHoy >= FLAGS_POR_DIA) return res.status(429).json({ error: 'Reportaste demasiados avisos hoy.' });
+
     const inserted = await db.query(
       'INSERT INTO report_flags (report_id, user_id, created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING report_id',
       [report.id, req.userId, Date.now()]
     );
 
-    let flags = report.flags;
     if (inserted.rows.length) {
       const upd = await db.query('UPDATE reports SET flags = flags + 1 WHERE id = $1 RETURNING flags', [report.id]);
-      flags = upd.rows[0].flags;
-      if (flags >= FLAGS_PARA_OCULTAR) {
+      if (upd.rows[0].flags >= FLAGS_PARA_OCULTAR) {
         await db.query('UPDATE reports SET active = FALSE WHERE id = $1', [report.id]);
       }
     }

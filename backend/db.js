@@ -23,6 +23,7 @@ async function init() {
       password_hash TEXT NOT NULL,
       phone TEXT,
       google_sub TEXT,
+      token_version INTEGER NOT NULL DEFAULT 0,
       created_at BIGINT NOT NULL
     );
 
@@ -89,6 +90,7 @@ async function init() {
   // Migraciones para bases de datos creadas con la versión anterior del esquema.
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_at BIGINT;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS flags INTEGER NOT NULL DEFAULT 0;
@@ -103,6 +105,7 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id);
     CREATE INDEX IF NOT EXISTS idx_messages_report ON messages(report_id);
     CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_user_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_user_id);
     CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
     CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
   `);

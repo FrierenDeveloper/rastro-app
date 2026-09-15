@@ -14,8 +14,6 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: CORS_ORIGIN
-        value: "*"
       - key: SUPABASE_BUCKET
         value: fotos
       - key: DATABASE_URL

@@ -20,12 +20,16 @@ const authLimiter = rateLimit({
   message: { error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' }
 });
 
-function signToken(userId) {
-  return jwt.sign({ sub: userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+function signToken(userId, version = 0) {
+  return jwt.sign({ sub: userId, ver: version || 0 }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
 function baseUrl(req) {
   return process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+function hashResetToken(raw) {
+  return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
 router.post('/register',
@@ -43,14 +47,13 @@ router.post('/register',
       if (existing.rows.length) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
 
       const id = uuidv4();
-      const hash = bcrypt.hashSync(password, 12);
+      const hash = await bcrypt.hash(password, 12);
       await db.query(
         'INSERT INTO users (id, email, password_hash, phone, created_at) VALUES ($1,$2,$3,$4,$5)',
         [id, email, hash, phone || null, Date.now()]
       );
 
-      const token = signToken(id);
-      res.status(201).json({ token, user: { id, email, phone: phone || null } });
+      res.status(201).json({ token: signToken(id, 0), user: { id, email, phone: phone || null } });
     } catch (err) { next(err); }
   }
 );
@@ -67,11 +70,10 @@ router.post('/login',
       const { email, password } = req.body;
       const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
       const user = result.rows[0];
-      if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      if (!user || !(await bcrypt.compare(password, user.password_hash))) {
         return res.status(401).json({ error: 'Correo o contraseña incorrectos.' });
       }
-      const token = signToken(user.id);
-      res.json({ token, user: { id: user.id, email: user.email, phone: user.phone } });
+      res.json({ token: signToken(user.id, user.token_version), user: { id: user.id, email: user.email, phone: user.phone } });
     } catch (err) { next(err); }
   }
 );
@@ -91,12 +93,14 @@ router.post('/forgot',
       const user = result.rows[0];
 
       if (user) {
-        const token = crypto.randomBytes(32).toString('hex');
+        // En el enlace va el token en claro; en la base se guarda solo su hash.
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        await db.query('UPDATE password_resets SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id]);
         await db.query(
           'INSERT INTO password_resets (token, user_id, expires_at, used, created_at) VALUES ($1,$2,$3,FALSE,$4)',
-          [token, user.id, Date.now() + 60 * 60 * 1000, Date.now()]
+          [hashResetToken(rawToken), user.id, Date.now() + 60 * 60 * 1000, Date.now()]
         );
-        const link = `${baseUrl(req)}/?reset=${token}`;
+        const link = `${baseUrl(req)}/?reset=${rawToken}`;
         try {
           await mailer.sendMail({
             to: user.email,
@@ -122,16 +126,17 @@ router.post('/reset',
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
-      const { token, password } = req.body;
-      const result = await db.query('SELECT * FROM password_resets WHERE token = $1', [token]);
+      const tokenHash = hashResetToken(req.body.token);
+      const result = await db.query('SELECT * FROM password_resets WHERE token = $1', [tokenHash]);
       const reset = result.rows[0];
       if (!reset || reset.used || Number(reset.expires_at) < Date.now()) {
         return res.status(400).json({ error: 'El enlace es inválido o ya venció. Pide uno nuevo.' });
       }
 
-      const hash = bcrypt.hashSync(password, 12);
-      await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, reset.user_id]);
-      await db.query('UPDATE password_resets SET used = TRUE WHERE token = $1', [token]);
+      const hash = await bcrypt.hash(req.body.password, 12);
+      // Subir token_version revoca todas las sesiones abiertas de esa cuenta.
+      await db.query('UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2', [hash, reset.user_id]);
+      await db.query('UPDATE password_resets SET used = TRUE WHERE token = $1', [tokenHash]);
 
       res.json({ ok: true, message: 'Contraseña actualizada. Ya puedes iniciar sesión.' });
     } catch (err) { next(err); }
@@ -164,18 +169,17 @@ router.post('/google',
       if (!user) {
         const id = uuidv4();
         // Contraseña aleatoria: esta cuenta se usa solo vía Google.
-        const hash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
+        const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
         await db.query(
           'INSERT INTO users (id, email, password_hash, phone, google_sub, created_at) VALUES ($1,$2,$3,NULL,$4,$5)',
           [id, email, hash, info.sub || null, Date.now()]
         );
-        user = { id, email, phone: null };
+        user = { id, email, phone: null, token_version: 0 };
       } else if (!user.google_sub && info.sub) {
         await db.query('UPDATE users SET google_sub = $1 WHERE id = $2', [info.sub, user.id]);
       }
 
-      const token = signToken(user.id);
-      res.json({ token, user: { id: user.id, email: user.email, phone: user.phone || null } });
+      res.json({ token: signToken(user.id, user.token_version), user: { id: user.id, email: user.email, phone: user.phone || null } });
     } catch (err) { next(err); }
   }
 );

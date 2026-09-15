@@ -117,6 +117,10 @@ function logout() {
   token = null; me = null;
   localStorage.removeItem('rastro_token');
   if (currentConv.poll) { clearInterval(currentConv.poll); currentConv.poll = null; }
+  if (userWatchId !== null && navigator.geolocation && navigator.geolocation.clearWatch) {
+    navigator.geolocation.clearWatch(userWatchId);
+    userWatchId = null;
+  }
   showAuth();
 }
 
@@ -328,7 +332,7 @@ function initAddressSearch(inputId, resultsId, onPick) {
     if (q.length < 3) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     timer = setTimeout(async () => {
       try {
-        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q), { auth: false });
+        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q));
         if (!results.length) {
           box.innerHTML = '<div class="addr-empty">Sin resultados en Chile.</div>';
           box.classList.remove('hidden');
@@ -348,8 +352,13 @@ function initAddressSearch(inputId, resultsId, onPick) {
     box.classList.add('hidden');
     onPick(parseFloat(item.dataset.lat), parseFloat(item.dataset.lng));
   });
-  document.addEventListener('click', e => { if (!e.target.closest('.addr-search')) box.classList.add('hidden'); });
 }
+// Un solo listener global cierra cualquier lista de sugerencias abierta.
+document.addEventListener('click', e => {
+  if (!e.target.closest('.addr-search')) {
+    document.querySelectorAll('.addr-results').forEach(b => b.classList.add('hidden'));
+  }
+});
 
 /* ============ Zonas de foto ============ */
 function initPhotoZone(zoneId, inputId, key) {
@@ -421,7 +430,7 @@ async function handleSubmit(estado, key) {
     toast('¡Aviso publicado!');
     resetForm(key);
     try {
-      const { matches } = await api(`/api/reports/${report.id}/matches`, { auth: false });
+      const { matches } = await api(`/api/reports/${report.id}/matches`);
       renderMatchBanner('match-area-' + key, matches);
     } catch (e) { /* el aviso ya se publicó; las coincidencias son un extra */ }
     renderList().then(renderListMap).catch(() => {});
@@ -440,7 +449,7 @@ async function fetchReports() {
   const tipo = document.getElementById('filter-tipo').value;
   const estado = document.getElementById('filter-estado').value;
   const qs = new URLSearchParams(); if (tipo) qs.set('tipo', tipo); if (estado) qs.set('estado', estado);
-  const { reports } = await api('/api/reports?' + qs.toString(), { auth: false });
+  const { reports } = await api('/api/reports?' + qs.toString());
   allReports = reports.sort((a, b) => b.created_at - a.created_at);
 }
 function reportCard(r) {
@@ -455,10 +464,10 @@ function reportCard(r) {
         <div class="report-meta">${r.sexo !== 'desconocido' ? ({ macho: 'Macho', hembra: 'Hembra' })[r.sexo] + ' · ' : ''}${r.collar ? 'Collar ' + esc(r.collar) + ' · ' : ''}${timeAgo(r.created_at)}</div>
         ${r.descripcion ? `<div class="report-meta">${esc(r.descripcion)}</div>` : ''}
         <div class="report-actions">
-          <button data-action="matches" data-id="${esc(r.id)}">Coincidencias</button>
-          <button data-action="contact" data-id="${esc(r.id)}">Contactar</button>
+          ${r.es_mio
+            ? `<button data-action="matches" data-id="${esc(r.id)}">Coincidencias</button>`
+            : `<button data-action="contact" data-id="${esc(r.id)}">Contactar</button><button data-action="flag" data-id="${esc(r.id)}">Reportar</button>`}
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
-          <button data-action="flag" data-id="${esc(r.id)}">Reportar</button>
         </div>
         <div class="matches-box" id="matches-${esc(r.id)}" style="display:none;"></div>
         <div class="contact-box hidden" id="contact-${esc(r.id)}">
@@ -485,7 +494,7 @@ async function toggleMatches(id) {
   box.style.display = 'block';
   box.innerHTML = '<span class="none">Buscando…</span>';
   try {
-    const { matches } = await api(`/api/reports/${id}/matches`, { auth: false });
+    const { matches } = await api(`/api/reports/${id}/matches`);
     box.innerHTML = matches.length
       ? matches.map(m => `<div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`).join('')
       : `<span class="none">Sin coincidencias por ahora.</span>`;
