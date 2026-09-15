@@ -116,6 +116,12 @@
     <!-- HOME -->
     <section class="view active" id="view-home">
       <div class="toolbar">
+        <div class="addr-search" style="flex:1;">
+          <input type="text" id="addr-home" placeholder="Buscar dirección en Chile…" autocomplete="off">
+          <div class="addr-results hidden" id="addr-results-home"></div>
+        </div>
+      </div>
+      <div class="toolbar">
         <select id="filter-tipo">
           <option value="">Todos los tipos</option>
           <option value="perro">Perros</option>
@@ -133,7 +139,8 @@
       <div class="toolbar">
         <button class="icon-btn active" id="btn-view-map">Mapa</button>
         <button class="icon-btn" id="btn-view-list">Lista</button>
-        <button class="icon-btn" id="btn-refresh" style="margin-left:auto;">↻ Actualizar</button>
+        <button class="icon-btn" id="btn-my-loc" style="margin-left:auto;">📍 Ir a mí</button>
+        <button class="icon-btn" id="btn-refresh">↻ Actualizar</button>
       </div>
       <div id="list-map"></div>
       <div id="reports-list"></div>
@@ -179,6 +186,12 @@
 
           <label>Descripción</label>
           <textarea id="desc-found" placeholder="Tamaño, señas particulares, actitud, estado de salud…"></textarea>
+
+          <label>Buscar dirección</label>
+          <div class="addr-search">
+            <input type="text" id="addr-found" placeholder="Ej: Av. Providencia 1234, Santiago" autocomplete="off">
+            <div class="addr-results hidden" id="addr-results-found"></div>
+          </div>
 
           <label class="required">Ubicación donde lo encontraste</label>
           <div class="mini-map" id="map-found"></div>
@@ -233,6 +246,12 @@
 
           <label>Descripción</label>
           <textarea id="desc-lost" placeholder="Tamaño, señas particulares, temperamento…"></textarea>
+
+          <label>Buscar dirección</label>
+          <div class="addr-search">
+            <input type="text" id="addr-lost" placeholder="Ej: Plaza Ñuñoa, Santiago" autocomplete="off">
+            <div class="addr-results hidden" id="addr-results-lost"></div>
+          </div>
 
           <label class="required">Última vez visto en</label>
           <div class="mini-map" id="map-lost"></div>

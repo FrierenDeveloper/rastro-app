@@ -53,6 +53,9 @@ casa o del lugar donde viste al animal.
   aviso.
 - Si usas "Iniciar sesión con Google", Google verifica tu identidad; nosotros
   solo recibimos tu correo para crear o vincular tu cuenta.
+- Cuando buscas una dirección, el texto que escribes se envía a Photon
+  (geocodificador basado en OpenStreetMap) solo para convertirla en coordenadas.
+  No se envía ningún dato de tu cuenta. Los resultados se limitan a Chile.
 - Si en el futuro integras notificaciones por correo o SMS, agrega aquí el proveedor
   (ej. SendGrid, Twilio) y qué datos les llegan.
 

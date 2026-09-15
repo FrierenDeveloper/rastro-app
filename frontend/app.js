@@ -14,6 +14,9 @@ let userLoc = { lat: -33.4489, lng: -70.6693 }; // Santiago, Chile (fallback)
 let photoFile = { found: null, lost: null };
 let pickedLoc = { found: null, lost: null };
 let listMap, clusterGroup, mapFound, mapLost, markerFound, markerLost;
+let userMarker = null, userAccuracy = null, destinoMarker = null, userWatchId = null;
+let ultimaUbicacion = null, primeraUbicacion = true;
+let pickedManual = { found: false, lost: false };
 let allReports = [];
 let myReports = [];
 let currentConv = { reportId: null, peerId: null, esMio: false, poll: null };
@@ -243,17 +246,55 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 });
 
 /* ============ Geolocalización ============ */
+// Marcador azul "estás aquí" (con el círculo de precisión) en el mapa principal.
+function pintarMarcadorUsuario() {
+  if (!listMap || !ultimaUbicacion) return;
+  const { lat, lng, accuracy } = ultimaUbicacion;
+  if (!userMarker) {
+    userAccuracy = L.circle([lat, lng], { radius: accuracy || 0, color: '#2B7DE9', weight: 1, fillColor: '#2B7DE9', fillOpacity: 0.12, interactive: false }).addTo(listMap);
+    userMarker = L.circleMarker([lat, lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#2B7DE9', fillOpacity: 1 }).addTo(listMap);
+    userMarker.bindPopup('Estás aquí');
+  } else {
+    userMarker.setLatLng([lat, lng]);
+    userAccuracy.setLatLng([lat, lng]).setRadius(accuracy || 0);
+  }
+}
+
+function aplicarUbicacion(lat, lng, accuracy) {
+  userLoc = { lat, lng };
+  ultimaUbicacion = { lat, lng, accuracy: accuracy || 0 };
+  const chip = document.getElementById('loc-chip');
+  if (chip) chip.textContent = '📍 Ubicación detectada';
+  pintarMarcadorUsuario();
+  // Solo movemos los mapas de "Encontré/Perdí" en la primera lectura y si el
+  // usuario no eligió una ubicación a mano.
+  if (primeraUbicacion) {
+    primeraUbicacion = false;
+    ['found', 'lost'].forEach(key => {
+      const map = key === 'found' ? mapFound : mapLost;
+      const marker = key === 'found' ? markerFound : markerLost;
+      if (map && !pickedManual[key]) {
+        map.setView([lat, lng], 15);
+        if (marker) marker.setLatLng([lat, lng]);
+        pickedLoc[key] = { lat, lng };
+      }
+    });
+  }
+}
+
 function locateUser() {
   const chip = document.getElementById('loc-chip');
   if (!navigator.geolocation) { chip.textContent = '📍 Santiago (ubicación manual)'; return; }
-  navigator.geolocation.getCurrentPosition(pos => {
-    userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    chip.textContent = '📍 Ubicación detectada';
-    [mapFound, mapLost].forEach(m => m && m.setView([userLoc.lat, userLoc.lng], 15));
-    if (markerFound) { markerFound.setLatLng([userLoc.lat, userLoc.lng]); pickedLoc.found = { ...userLoc }; }
-    if (markerLost) { markerLost.setLatLng([userLoc.lat, userLoc.lng]); pickedLoc.lost = { ...userLoc }; }
-    if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 13);
-  }, () => { chip.textContent = '📍 Santiago (toca el mapa para ajustar)'; }, { timeout: 6000 });
+  const onPos = pos => aplicarUbicacion(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+  navigator.geolocation.getCurrentPosition(
+    onPos,
+    () => { chip.textContent = '📍 Santiago (toca el mapa para ajustar)'; },
+    { timeout: 8000, enableHighAccuracy: true }
+  );
+  // Seguimiento continuo: mantiene el punto azul actualizado mientras se mueve.
+  if (navigator.geolocation.watchPosition && userWatchId === null) {
+    userWatchId = navigator.geolocation.watchPosition(onPos, () => {}, { enableHighAccuracy: true, maximumAge: 10000 });
+  }
 }
 
 function initPicker(elId, key) {
@@ -261,9 +302,53 @@ function initPicker(elId, key) {
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 }).addTo(map);
   const marker = L.marker([userLoc.lat, userLoc.lng], { draggable: true }).addTo(map);
   pickedLoc[key] = { ...userLoc };
-  marker.on('dragend', () => { const p = marker.getLatLng(); pickedLoc[key] = { lat: p.lat, lng: p.lng }; });
-  map.on('click', e => { marker.setLatLng(e.latlng); pickedLoc[key] = { lat: e.latlng.lat, lng: e.latlng.lng }; });
+  marker.on('dragend', () => { const p = marker.getLatLng(); pickedLoc[key] = { lat: p.lat, lng: p.lng }; pickedManual[key] = true; });
+  map.on('click', e => { marker.setLatLng(e.latlng); pickedLoc[key] = { lat: e.latlng.lat, lng: e.latlng.lng }; pickedManual[key] = true; });
   return { map, marker };
+}
+
+/* ============ Buscador de direcciones (solo Chile) ============ */
+function elegirUbicacion(key, lat, lng) {
+  pickedLoc[key] = { lat, lng };
+  pickedManual[key] = true;
+  const map = key === 'found' ? mapFound : mapLost;
+  const marker = key === 'found' ? markerFound : markerLost;
+  if (map) map.setView([lat, lng], 16);
+  if (marker) marker.setLatLng([lat, lng]);
+}
+
+function initAddressSearch(inputId, resultsId, onPick) {
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(resultsId);
+  if (!input || !box) return;
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 3) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    timer = setTimeout(async () => {
+      try {
+        const { results } = await api('/api/geocode?q=' + encodeURIComponent(q), { auth: false });
+        if (!results.length) {
+          box.innerHTML = '<div class="addr-empty">Sin resultados en Chile.</div>';
+          box.classList.remove('hidden');
+          return;
+        }
+        box.innerHTML = results.map(r =>
+          `<div class="addr-item" data-lat="${r.lat}" data-lng="${r.lng}" data-label="${esc(r.label)}">${esc(r.label)}</div>`
+        ).join('');
+        box.classList.remove('hidden');
+      } catch (e) { box.classList.add('hidden'); box.innerHTML = ''; }
+    }, 350);
+  });
+  box.addEventListener('click', e => {
+    const item = e.target.closest('.addr-item');
+    if (!item) return;
+    input.value = item.dataset.label;
+    box.classList.add('hidden');
+    onPick(parseFloat(item.dataset.lat), parseFloat(item.dataset.lng));
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.addr-search')) box.classList.add('hidden'); });
 }
 
 /* ============ Zonas de foto ============ */
@@ -471,6 +556,7 @@ async function renderListMap() {
     clusterGroup = L.markerClusterGroup();
     listMap.addLayer(clusterGroup);
     setTimeout(() => listMap.invalidateSize(), 200);
+    pintarMarcadorUsuario();
   }
   clusterGroup.clearLayers();
   allReports.forEach(r => {
@@ -724,6 +810,21 @@ function startApp() {
   if (!appIniciada) {
     initPhotoZone('photo-zone-found', 'photo-input-found', 'found');
     initPhotoZone('photo-zone-lost', 'photo-input-lost', 'lost');
+    initAddressSearch('addr-found', 'addr-results-found', (lat, lng) => elegirUbicacion('found', lat, lng));
+    initAddressSearch('addr-lost', 'addr-results-lost', (lat, lng) => elegirUbicacion('lost', lat, lng));
+    initAddressSearch('addr-home', 'addr-results-home', (lat, lng) => {
+      if (!listMap) return;
+      listMap.setView([lat, lng], 16);
+      if (destinoMarker) listMap.removeLayer(destinoMarker);
+      destinoMarker = L.marker([lat, lng]).addTo(listMap).bindPopup('Dirección').openPopup();
+    });
+    document.getElementById('btn-my-loc').addEventListener('click', () => {
+      if (!navigator.geolocation) { if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 15); return; }
+      navigator.geolocation.getCurrentPosition(p => {
+        aplicarUbicacion(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
+        if (listMap) listMap.setView([p.coords.latitude, p.coords.longitude], 15);
+      }, () => { if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 15); }, { enableHighAccuracy: true, timeout: 6000 });
+    });
     appIniciada = true;
   }
   locateUser();

@@ -88,6 +88,7 @@ app.use('/uploads', express.static(storage.localDir, { maxAge: '7d' }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/push', require('./routes/push'));
+app.use('/api/geocode', require('./routes/geocode'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
