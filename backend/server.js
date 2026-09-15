@@ -77,11 +77,11 @@ app.use(helmet({
 }));
 
 // El frontend se sirve desde el mismo origen, así que CORS no hace falta.
-// Si separas el frontend en otro dominio, define CORS_ORIGIN con ese dominio.
-// El comodín "*" se ignora en producción (por seguridad).
+// Solo montamos el middleware si defines un dominio explícito: así no se
+// devuelve la cabecera Access-Control-Allow-Origin a terceros.
 let allowedOrigin = process.env.CORS_ORIGIN || '';
-if (allowedOrigin === '*' && process.env.NODE_ENV === 'production') allowedOrigin = '';
-app.use(cors(allowedOrigin ? { origin: allowedOrigin } : { origin: false }));
+if (allowedOrigin === '*') allowedOrigin = '';
+if (allowedOrigin) app.use(cors({ origin: allowedOrigin }));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
