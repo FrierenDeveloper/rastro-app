@@ -235,8 +235,8 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'home') { setTimeout(() => listMap && listMap.invalidateSize(), 50); renderList().then(renderListMap).catch(() => {}); }
-    if (btn.dataset.tab === 'found') { setTimeout(() => mapFound && mapFound.invalidateSize(), 50); }
-    if (btn.dataset.tab === 'lost') { setTimeout(() => mapLost && mapLost.invalidateSize(), 50); }
+    if (btn.dataset.tab === 'found') { asegurarPicker('found'); }
+    if (btn.dataset.tab === 'lost') { asegurarPicker('lost'); }
     if (btn.dataset.tab === 'chats') { cerrarConversacion(); renderThreads(); }
     if (btn.dataset.tab === 'inbox') { renderInbox(); }
   });
@@ -258,7 +258,7 @@ function locateUser() {
 
 function initPicker(elId, key) {
   const map = L.map(elId, { zoomControl: true }).setView([userLoc.lat, userLoc.lng], 14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
   const marker = L.marker([userLoc.lat, userLoc.lng], { draggable: true }).addTo(map);
   pickedLoc[key] = { ...userLoc };
   marker.on('dragend', () => { const p = marker.getLatLng(); pickedLoc[key] = { lat: p.lat, lng: p.lng }; });
@@ -467,9 +467,10 @@ document.getElementById('reports-list').addEventListener('click', e => {
 async function renderListMap() {
   if (!listMap) {
     listMap = L.map('list-map').setView([userLoc.lat, userLoc.lng], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(listMap);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(listMap);
     clusterGroup = L.markerClusterGroup();
     listMap.addLayer(clusterGroup);
+    setTimeout(() => listMap.invalidateSize(), 200);
   }
   clusterGroup.clearLayers();
   allReports.forEach(r => {
@@ -705,12 +706,24 @@ document.getElementById('btn-push').addEventListener('click', async () => {
 
 /* ============ Arranque ============ */
 let appIniciada = false;
+let pickersIniciados = { found: false, lost: false };
+// Los mapas de "Encontré/Perdí" se crean recién al abrir su pestaña: si se
+// crean con la vista oculta (display:none), Leaflet les asigna tamaño 0 y el
+// mapa queda gris sin cargar tiles.
+function asegurarPicker(key) {
+  if (!pickersIniciados[key]) {
+    const p = initPicker('map-' + key, key);
+    if (key === 'found') { mapFound = p.map; markerFound = p.marker; }
+    else { mapLost = p.map; markerLost = p.marker; }
+    pickersIniciados[key] = true;
+  }
+  const m = key === 'found' ? mapFound : mapLost;
+  setTimeout(() => m && m.invalidateSize(), 80);
+}
 function startApp() {
   if (!appIniciada) {
     initPhotoZone('photo-zone-found', 'photo-input-found', 'found');
     initPhotoZone('photo-zone-lost', 'photo-input-lost', 'lost');
-    const pf = initPicker('map-found', 'found'); mapFound = pf.map; markerFound = pf.marker;
-    const pl = initPicker('map-lost', 'lost'); mapLost = pl.map; markerLost = pl.marker;
     appIniciada = true;
   }
   locateUser();

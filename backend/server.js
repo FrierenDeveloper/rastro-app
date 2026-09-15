@@ -47,8 +47,10 @@ app.use(helmet({
         "'self'",
         "data:",
         "blob:",
-        "https://*.tile.openstreetmap.org",  // Mapa OSM
-        "https://*.supabase.co"              // Fotos en Supabase Storage
+        "https://*.tile.openstreetmap.org",   // Mapa OSM (subdominios)
+        "https://tile.openstreetmap.org",      // Mapa OSM
+        "https://cdnjs.cloudflare.com",       // iconos de Leaflet
+        "https://*.supabase.co"               // Fotos en Supabase Storage
       ],
       connectSrc: [
         "'self'",
