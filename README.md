@@ -74,8 +74,9 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
   les muestra un punto difuminado (~300 m) — nunca se expone dónde vive alguien.
 - El contacto (teléfono/correo) **nunca se muestra públicamente**: la
   comunicación pasa por mensajería interna dentro de la app.
-- Límites de velocidad (rate limiting) contra fuerza bruta en login y contra
-  spam de avisos falsos.
+- Límites de velocidad (rate limiting) contra fuerza bruta en login — cupo por
+  IP y por cuenta, aunque el atacante cambie de red — y contra spam de avisos
+  falsos. Las contraseñas nuevas piden un mínimo de 10 caracteres.
 - Fotos validadas por tipo real de archivo, guardadas con nombre aleatorio
   (evita ataques de path traversal), máximo 5 MB.
 - Cabeceras de seguridad HTTP (Helmet), CORS restringible a tu dominio.

@@ -40,20 +40,26 @@ function keyPorIp(req) {
   return ipReal(req);
 }
 
-// Clave para endpoints anónimos que además identifican una cuenta o un intento
-// concreto (login / registro / recuperar contraseña / reset / Google). Sumar el
-// identificador al cupo por IP evita que alguien pruebe contraseñas o tokens de
-// una misma cuenta rotando la IP o la cabecera X-Forwarded-For: al agotar el
-// cupo de ese identificador, se bloquea.
-function keyPorIpYCuenta(req) {
+// Clave del cupo por cuenta (login / registro / recuperar contraseña / reset /
+// Google). A propósito NO lleva la IP: el cupo es el mismo venga de donde venga
+// la petición, para que la fuerza bruta distribuida contra una cuenta choque
+// con el límite y no con una IP suelta.
+//
+// Las rutas de auth hacen `body('email').normalizeEmail()` ANTES de montar este
+// limitador, igual que el login, así que "Foo.Bar+x@Gmail.com" y
+// "foobar@gmail.com" cuentan como la misma cuenta. Contrapartida asumida:
+// alguien puede dejar una cuenta 15 minutos en espera a propósito; solo
+// molesta, no compromete nada.
+function keyPorCuenta(req) {
   const cuerpo = req.body || {};
-  const campos = [cuerpo.email, cuerpo.token, cuerpo.credential];
-  for (const valor of campos) {
-    if (typeof valor === 'string' && valor.trim()) {
-      return `${ipReal(req)}|${valor.trim().toLowerCase().slice(0, 120)}`;
-    }
+  if (typeof cuerpo.email === 'string' && cuerpo.email.trim()) {
+    return 'cuenta:' + cuerpo.email.trim().toLowerCase().slice(0, 120);
   }
-  return ipReal(req);
+  const valor = typeof cuerpo.token === 'string' ? cuerpo.token
+    : typeof cuerpo.credential === 'string' ? cuerpo.credential
+    : '';
+  if (valor.trim()) return 'valor:' + valor.trim().slice(0, 120);
+  return 'ip:' + ipReal(req);
 }
 
-module.exports = { ipReal, keyPorIp, keyPorIpYCuenta };
+module.exports = { ipReal, keyPorIp, keyPorCuenta };

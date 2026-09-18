@@ -9,7 +9,7 @@ const db = require('../db');
 const storage = require('../storage');
 const mailer = require('../mailer');
 const { requireAuth } = require('../middleware/auth');
-const { keyPorIp, keyPorIpYCuenta } = require('../middleware/client-ip');
+const { keyPorIp, keyPorCuenta } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
 
 const router = express.Router();
@@ -23,17 +23,23 @@ const authLimiter = rateLimit({
   message: { error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' }
 });
 
-// Segundo cupo, atado al correo: evita que alguien pruebe contraseñas de una
-// misma cuenta repartiendo los intentos entre muchas IPs (fuerza bruta
-// distribuida). Es más estricto que el anterior, así que va después.
+// Segundo cupo, atado SOLO al correo (sin IP): 10 intentos por cuenta cada
+// 15 minutos, vengan de donde vengan. Así la fuerza bruta distribuida contra
+// una misma cuenta choca con el límite aunque rote IPs o X-Forwarded-For.
+//
+// El correo se normaliza ANTES de contar el intento, con el mismo
+// normalizeEmail() del login, para que variantes como "Foo.Bar+1@Gmail.com"
+// no abran un cupo nuevo.
 const cuentaLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: numEnv('LIMITE_CUENTA_15MIN', 10),
   standardHeaders: false,
   legacyHeaders: false,
-  keyGenerator: keyPorIpYCuenta,
+  keyGenerator: keyPorCuenta,
   message: { error: 'Demasiados intentos para esta cuenta. Espera unos minutos.' }
 });
+
+const normalizarCorreo = body('email').normalizeEmail();
 
 function signToken(userId, version = 0) {
   return jwt.sign({ sub: userId, ver: version || 0 }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -58,9 +64,10 @@ function hashResetToken(raw) {
 
 router.post('/register',
   authLimiter,
+  normalizarCorreo,
   cuentaLimiter,
   body('email').isEmail().normalizeEmail().withMessage('Correo inválido.'),
-  body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres.'),
+  body('password').isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres.'),
   body('phone').optional().trim().isLength({ max: 40 }),
   async (req, res, next) => {
     try {
@@ -90,6 +97,7 @@ router.post('/register',
 
 router.post('/login',
   authLimiter,
+  normalizarCorreo,
   cuentaLimiter,
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty(),
@@ -114,6 +122,7 @@ router.post('/login',
 // están registrados).
 router.post('/forgot',
   authLimiter,
+  normalizarCorreo,
   cuentaLimiter,
   body('email').isEmail().normalizeEmail(),
   async (req, res, next) => {
@@ -163,7 +172,7 @@ router.post('/reset',
   authLimiter,
   cuentaLimiter,
   body('token').isString().isLength({ min: 32, max: 128 }),
-  body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres.'),
+  body('password').isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres.'),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
