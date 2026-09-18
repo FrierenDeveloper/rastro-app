@@ -39,8 +39,17 @@ function signToken(userId, version = 0) {
   return jwt.sign({ sub: userId, ver: version || 0 }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
+// Base para los enlaces que se mandan por correo (recuperar contraseña).
+// NUNCA se arma con el Host de la petición salvo en desarrollo: esa cabecera
+// la controla quien llama, y si el enlace de recuperación sale apuntando a un
+// dominio ajeno, el token de reseteo se filtra a un tercero.
 function baseUrl(req) {
-  return process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const configurada = (process.env.APP_URL || '').trim();
+  if (configurada) return configurada.replace(/\/+$/, '');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Falta APP_URL en el .env: sin ella no se puede armar un enlace de recuperación seguro.');
+  }
+  return `${req.protocol}://${req.get('host')}`;
 }
 
 function hashResetToken(raw) {
@@ -116,6 +125,17 @@ router.post('/forgot',
       const user = result.rows[0];
 
       if (user) {
+        // El enlace se arma ANTES de guardar nada: si falta APP_URL en
+        // producción, preferimos fallar entero antes que emitir un token de
+        // reseteo dentro de un enlace que apunte a un dominio ajeno.
+        let link;
+        try {
+          link = `${baseUrl(req)}/?reset=`;
+        } catch (e) {
+          console.error('[auth/forgot]', e.message);
+          return res.status(503).json({ error: 'La recuperación por correo no está configurada en este servidor.' });
+        }
+
         // En el enlace va el token en claro; en la base se guarda solo su hash.
         const rawToken = crypto.randomBytes(32).toString('hex');
         await db.query('UPDATE password_resets SET used = TRUE WHERE user_id = $1 AND used = FALSE', [user.id]);
@@ -123,12 +143,11 @@ router.post('/forgot',
           'INSERT INTO password_resets (token, user_id, expires_at, used, created_at) VALUES ($1,$2,$3,FALSE,$4)',
           [hashResetToken(rawToken), user.id, Date.now() + 60 * 60 * 1000, Date.now()]
         );
-        const link = `${baseUrl(req)}/?reset=${rawToken}`;
         try {
           await mailer.sendMail({
             to: user.email,
             subject: 'Recuperar tu contraseña de Rastro',
-            text: `Para elegir una contraseña nueva entra a: ${link}\n\nEl enlace vence en 1 hora. Si no lo pediste, ignora este correo.`
+            text: `Para elegir una contraseña nueva entra a: ${link}${rawToken}\n\nEl enlace vence en 1 hora. Si no lo pediste, ignora este correo.`
           });
         } catch (e) {
           console.error('No se pudo enviar el correo de recuperación:', e.message);

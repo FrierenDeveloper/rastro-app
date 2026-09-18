@@ -232,6 +232,21 @@ router.get('/mine/all', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ---------- Un aviso puntual (para los enlaces compartidos) ---------- */
+// El listado público solo trae los 200 más recientes; sin esto, un enlace
+// compartido a un aviso más antiguo no abría nada en el frontend.
+router.get('/:id', optionalAuth, param('id').isUUID(), async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
+
+    const report = await findReport(req.params.id);
+    if (!report || !report.active || report.resolved) return res.status(404).json({ error: 'Aviso no encontrado.' });
+
+    res.json({ report: publicReport(report, req.userId) });
+  } catch (err) { next(err); }
+});
+
 /* ---------- Coincidencias posibles para un aviso ---------- */
 // Solo el dueño del aviso puede ver las coincidencias (evita que cualquiera use
 // las distancias para triangular ubicaciones). Se acota con un bounding box y

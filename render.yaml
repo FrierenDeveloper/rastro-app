@@ -16,6 +16,18 @@ services:
         generateValue: true
       - key: SUPABASE_BUCKET
         value: fotos
+      # Obligatoria: se usa para armar el enlace de "recuperar contraseña".
+      # Sin ella el servidor se niega a generar el enlace (evita que un
+      # tercero lo desvíe a su propio dominio falseando la cabecera Host).
+      # Ponla con la URL real: https://tu-app.onrender.com
+      - key: APP_URL
+        sync: false
+      # Deja TRUST_PROXY=1 SOLO si tu proxy reescribe la cabecera
+      # X-Forwarded-For. Si tu app queda expuesta sin proxy, déjalo en 0:
+      # así los límites de peticiones usan la IP real de la conexión y no se
+      # pueden falsear con cabeceras.
+      - key: TRUST_PROXY
+        value: "1"
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
