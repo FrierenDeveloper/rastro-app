@@ -241,6 +241,33 @@ router.get('/mine/all', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ---------- Muro de reencuentros (público) ---------- */
+// Avisos resueltos con su foto/nota del reencuentro. Da prueba social y
+// motivación para seguir publicando.
+router.get('/reunions', optionalAuth, infoLimiter, async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT id, tipo, color, raza, estado, nombre_mascota, foto_url,
+              reunion_foto_url, reunion_nota, resolved_at
+         FROM reports
+        WHERE resolved = TRUE AND active = TRUE
+        ORDER BY resolved_at DESC NULLS LAST
+        LIMIT 60`
+    );
+    const total = await db.query('SELECT COUNT(*)::int AS n FROM reports WHERE resolved = TRUE AND active = TRUE');
+    res.json({
+      total: total.rows[0].n,
+      reunions: result.rows.map(r => ({
+        id: r.id, tipo: r.tipo, color: r.color, raza: r.raza, estado: r.estado,
+        nombre_mascota: r.nombre_mascota,
+        foto_url: r.reunion_foto_url || r.foto_url || null,
+        nota: r.reunion_nota || null,
+        resolved_at: r.resolved_at ? Number(r.resolved_at) : null
+      }))
+    });
+  } catch (err) { next(err); }
+});
+
 /* ---------- Un aviso puntual (para los enlaces compartidos) ---------- */
 // El listado público solo trae los 200 más recientes; sin esto, un enlace
 // compartido a un aviso más antiguo no abría nada en el frontend.
@@ -440,6 +467,37 @@ router.patch('/:id', requireAuth, param('id').isUUID(), ...editValidators, async
   } catch (err) { next(err); }
 });
 
+/* ---------- Marcar el reencuentro (con foto y nota opcionales) ---------- */
+// Es la forma "buena" de resolver: además de sacar el aviso del mapa, permite
+// subir una foto del reencuentro y una nota corta para el muro público.
+router.post('/:id/reunion', requireAuth, param('id').isUUID(), upload.single('foto'),
+  body('nota').optional().trim().isLength({ max: 500 }),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+      const report = await findReport(req.params.id);
+      if (!report || report.user_id !== req.userId) return res.status(404).json({ error: 'Aviso no encontrado.' });
+
+      let reunionFoto = report.reunion_foto_url;
+      if (req.file) {
+        const tipoReal = tipoImagenReal(req.file.buffer);
+        if (!tipoReal) return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
+        if (reunionFoto) await storage.deletePhoto(reunionFoto);
+        reunionFoto = await storage.savePhoto(req.file.buffer, tipoReal);
+      }
+
+      await db.query(
+        'UPDATE reports SET resolved = TRUE, resolved_at = $1, reunion_foto_url = $2, reunion_nota = $3 WHERE id = $4',
+        [Date.now(), reunionFoto || null, req.body.nota || null, report.id]
+      );
+      const updated = await findReport(report.id);
+      res.json({ report: publicReport(updated, req.userId) });
+    } catch (err) { next(err); }
+  }
+);
+
 /* ---------- Marcar como resuelto / reabrir ---------- */
 router.post('/:id/resolve', requireAuth, param('id').isUUID(),
   body('resolved').isBoolean(),
@@ -505,6 +563,7 @@ router.delete('/:id', requireAuth, param('id').isUUID(), async (req, res, next) 
     if (!report || report.user_id !== req.userId) return res.status(404).json({ error: 'Aviso no encontrado.' });
     await db.query('UPDATE reports SET active = FALSE WHERE id = $1', [req.params.id]);
     await storage.deletePhoto(report.foto_url);
+    if (report.reunion_foto_url) await storage.deletePhoto(report.reunion_foto_url);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

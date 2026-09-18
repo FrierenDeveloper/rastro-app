@@ -112,6 +112,7 @@
     <button data-tab="found">Encontré</button>
     <button data-tab="lost">Perdí</button>
     <button data-tab="chats">Chats <span class="badge hidden" id="badge-chats">0</span></button>
+    <button data-tab="exitos">Éxitos</button>
     <button data-tab="inbox">Avisos</button>
   </nav>
 
@@ -288,6 +289,12 @@
       </div>
     </section>
 
+    <!-- ÉXITOS / REENCUENTROS -->
+    <section class="view" id="view-exitos">
+      <div class="reunion-total" id="reunion-total"></div>
+      <div id="reunions-grid"></div>
+    </section>
+
     <!-- INBOX / MIS AVISOS -->
     <section class="view" id="view-inbox">
       <div id="inbox-list"></div>
@@ -332,6 +339,25 @@
         <button type="submit" class="submit-btn auth" style="margin-top:0;">Guardar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ===================== MODAL REENCUENTRO ===================== -->
+<div id="reunion-modal" class="modal hidden">
+  <div class="modal-box">
+    <h3>🎉 ¿Volvió a casa?</h3>
+    <p class="sub">Cuéntaselo a la comunidad: tu historia motiva a otros y deja el aviso como resuelto.</p>
+    <label>Foto del reencuentro (opcional)</label>
+    <div class="photo-zone" id="photo-zone-reunion">
+      <div class="hint"><b>📷</b>Toca para subir una foto</div>
+      <input type="file" accept="image/*" id="photo-input-reunion">
+    </div>
+    <label>Nota (opcional)</label>
+    <textarea id="reunion-nota" maxlength="500" placeholder="Ej: Apareció a 3 cuadras de casa, ¡gracias a todos!"></textarea>
+    <div class="modal-actions">
+      <button type="button" class="icon-btn" id="btn-reunion-cancel">Solo marcarlo resuelto</button>
+      <button type="button" class="submit-btn auth" id="btn-reunion-save" style="margin-top:0;">Compartir reencuentro</button>
+    </div>
   </div>
 </div>
 

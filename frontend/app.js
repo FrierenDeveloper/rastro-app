@@ -11,7 +11,7 @@ let token = localStorage.getItem('rastro_token') || null;
 let me = null;
 let config = { googleClientId: '', pushEnabled: false, vapidPublicKey: '' };
 let userLoc = { lat: -33.4489, lng: -70.6693 }; // Santiago, Chile (fallback)
-let photoFile = { found: null, lost: null };
+let photoFile = { found: null, lost: null, reunion: null };
 let pickedLoc = { found: null, lost: null };
 let listMap, clusterGroup, mapFound, mapLost, markerFound, markerLost;
 let userMarker = null, userAccuracy = null, destinoMarker = null, userWatchId = null;
@@ -313,6 +313,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
     if (btn.dataset.tab === 'found') { asegurarPicker('found'); }
     if (btn.dataset.tab === 'lost') { asegurarPicker('lost'); }
     if (btn.dataset.tab === 'chats') { cerrarConversacion(); renderThreads(); }
+    if (btn.dataset.tab === 'exitos') { renderReunions(); }
     if (btn.dataset.tab === 'inbox') { renderInbox(); }
   });
 });
@@ -790,9 +791,10 @@ document.getElementById('inbox-list').addEventListener('click', async e => {
   const action = btn.dataset.action;
   if (action === 'share') return shareReport(id);
   if (action === 'resolve') {
+    if (btn.dataset.resolved === 'true') return abrirModalReunion(id);
     try {
-      const r = await api(`/api/reports/${id}/resolve`, { method: 'POST', body: { resolved: btn.dataset.resolved === 'true' } });
-      toast(r.resolved ? 'Aviso marcado como resuelto.' : 'Aviso reabierto.');
+      await api(`/api/reports/${id}/resolve`, { method: 'POST', body: { resolved: false } });
+      toast('Aviso reabierto.');
       renderInbox();
     } catch (ex) { toast(ex.message); }
   }
@@ -930,6 +932,71 @@ function initOnboarding() {
   mostrar();
 }
 
+/* ============ Muro de reencuentros ============ */
+async function renderReunions() {
+  const grid = document.getElementById('reunions-grid');
+  const totalEl = document.getElementById('reunion-total');
+  grid.innerHTML = '<div class="empty-state">Cargando…</div>';
+  try {
+    const { reunions, total } = await api('/api/reports/reunions');
+    totalEl.innerHTML = total > 0
+      ? `💚 <b>${total}</b> mascota${total > 1 ? 's' : ''} reunida${total > 1 ? 's' : ''} con su familia`
+      : '';
+    if (!reunions.length) {
+      grid.innerHTML = `<div class="empty-state"><div class="big">🐾</div>Todavía no hay reencuentros.<br>Cuando una mascota vuelva a casa, aparecerá aquí.</div>`;
+      return;
+    }
+    grid.innerHTML = reunions.map(r => `
+      <div class="reunion-card">
+        ${r.foto_url ? `<img src="${esc(fotoSrc(r.foto_url))}" alt="" loading="lazy">` : `<div class="reunion-ph">${TIPO_ICON[r.tipo] || '🐾'}</div>`}
+        <div class="reunion-body">
+          <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.nombre_mascota || r.color)} <span class="tag found">Reunido</span></h4>
+          ${r.resolved_at ? `<div class="report-meta">${timeAgo(r.resolved_at)}</div>` : ''}
+          ${r.nota ? `<p class="reunion-nota">“${esc(r.nota)}”</p>` : ''}
+        </div>
+      </div>`).join('');
+  } catch (ex) {
+    grid.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
+}
+
+let reunionReportId = null;
+function abrirModalReunion(id) {
+  reunionReportId = id;
+  document.getElementById('reunion-nota').value = '';
+  photoFile.reunion = null;
+  const zone = document.getElementById('photo-zone-reunion');
+  const input = document.getElementById('photo-input-reunion');
+  input.value = '';
+  limpiarZonaFoto(zone, input);
+  document.getElementById('reunion-modal').classList.remove('hidden');
+}
+document.getElementById('btn-reunion-cancel').addEventListener('click', async () => {
+  if (!reunionReportId) return;
+  try {
+    await api(`/api/reports/${reunionReportId}/resolve`, { method: 'POST', body: { resolved: true } });
+    toast('Aviso marcado como resuelto.');
+    document.getElementById('reunion-modal').classList.add('hidden');
+    renderInbox(); renderList().then(renderListMap).catch(() => {});
+  } catch (ex) { toast(ex.message); }
+});
+document.getElementById('btn-reunion-save').addEventListener('click', async () => {
+  if (!reunionReportId) return;
+  const btn = document.getElementById('btn-reunion-save');
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    const nota = document.getElementById('reunion-nota').value.trim();
+    if (nota) fd.append('nota', nota);
+    if (photoFile.reunion) fd.append('foto', photoFile.reunion, 'reunion.jpg');
+    await api(`/api/reports/${reunionReportId}/reunion`, { method: 'POST', isForm: true, body: fd });
+    toast('¡Gracias por compartirlo! 🎉');
+    document.getElementById('reunion-modal').classList.add('hidden');
+    renderInbox(); renderList().then(renderListMap).catch(() => {});
+  } catch (ex) { toast(ex.message); }
+  finally { btn.disabled = false; }
+});
+
 /* ============ Arranque ============ */
 let appIniciada = false;
 let pickersIniciados = { found: false, lost: false };
@@ -951,6 +1018,7 @@ function startApp() {
     initOnboarding();
     initPhotoZone('photo-zone-found', 'photo-input-found', 'found');
     initPhotoZone('photo-zone-lost', 'photo-input-lost', 'lost');
+    initPhotoZone('photo-zone-reunion', 'photo-input-reunion', 'reunion');
     initAddressSearch('addr-found', 'addr-results-found', (lat, lng) => elegirUbicacion('found', lat, lng));
     initAddressSearch('addr-lost', 'addr-results-lost', (lat, lng) => elegirUbicacion('lost', lat, lng));
     initAddressSearch('addr-home', 'addr-results-home', (lat, lng) => {

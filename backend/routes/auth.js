@@ -259,8 +259,8 @@ router.get('/me', requireAuth, async (req, res, next) => {
 // Requisito de Google Play: el usuario debe poder eliminar su cuenta y sus datos.
 router.delete('/me', requireAuth, async (req, res, next) => {
   try {
-    const reports = await db.query('SELECT foto_url FROM reports WHERE user_id = $1', [req.userId]);
-    await Promise.all(reports.rows.map(r => storage.deletePhoto(r.foto_url)));
+    const reports = await db.query('SELECT foto_url, reunion_foto_url FROM reports WHERE user_id = $1', [req.userId]);
+    await Promise.all(reports.rows.flatMap(r => [storage.deletePhoto(r.foto_url), storage.deletePhoto(r.reunion_foto_url)]));
     await db.query('DELETE FROM users WHERE id = $1', [req.userId]); // ON DELETE CASCADE limpia el resto
     res.json({ ok: true, message: 'Cuenta y datos asociados eliminados.' });
   } catch (err) { next(err); }
