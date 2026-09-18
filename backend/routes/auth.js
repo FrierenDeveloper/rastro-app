@@ -9,7 +9,7 @@ const db = require('../db');
 const storage = require('../storage');
 const mailer = require('../mailer');
 const { requireAuth } = require('../middleware/auth');
-const { keyPorIp, keyPorCuenta } = require('../middleware/client-ip');
+const { keyPorIp, keyPorCuenta, normalizarCuenta } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
 
 const router = express.Router();
@@ -150,7 +150,15 @@ router.post('/register',
       if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
       const { email, password, phone } = req.body;
-      const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+      // normalizeEmail() solo quita el "+alias" en Gmail/Outlook/Yahoo; en el
+      // resto de dominios "a@x.com" y "a+loquesea@x.com" llegan al MISMO buzón
+      // pero se guardaban como cuentas distintas. Eso permitía crear identidades
+      // ilimitadas (y con ellas reportes/flags) con un solo correo real.
+      const cuenta = normalizarCuenta(email);
+      const existing = await db.query(
+        `SELECT id FROM users WHERE email = $1 OR normalizar_correo(email) = $2`,
+        [email, cuenta]
+      );
       if (existing.rows.length) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
 
       const id = uuidv4();
@@ -158,14 +166,22 @@ router.post('/register',
       // Sin proveedor de correo configurado no podemos verificar a nadie: en ese
       // caso la cuenta nace verificada para no dejar a la gente sin poder publicar.
       const verificado = !mailer.usingEmail;
-      // ON CONFLICT evita un 500 si dos registros con el mismo correo entran a la vez.
-      const inserted = await db.query(
-        `INSERT INTO users (id, email, password_hash, phone, email_verified, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (email) DO NOTHING
-         RETURNING id`,
-        [id, email, hash, phone || null, verificado, Date.now()]
-      );
+      // ON CONFLICT evita un 500 si dos registros con el mismo correo entran a la
+      // vez. El índice único sobre normalizar_correo() cubre además el caso del
+      // "+alias": si salta, lo tratamos igual que un correo repetido.
+      let inserted;
+      try {
+        inserted = await db.query(
+          `INSERT INTO users (id, email, password_hash, phone, email_verified, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6)
+           ON CONFLICT (email) DO NOTHING
+           RETURNING id`,
+          [id, email, hash, phone || null, verificado, Date.now()]
+        );
+      } catch (e) {
+        if (e && e.code === '23505') return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
+        throw e;
+      }
       if (!inserted.rows.length) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
 
       if (!verificado) await enviarVerificacion(id, email, req);
@@ -187,7 +203,17 @@ router.post('/login',
       if (!errors.isEmpty()) return res.status(400).json({ error: 'Correo o contraseña inválidos.' });
 
       const { email, password } = req.body;
-      const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+      // Se busca por correo exacto o comparando AMBOS lados en su forma
+      // normalizada. Es importante normalizar también el texto que escribió el
+      // usuario: si solo se normalizara el guardado, alguien que se registró con
+      // "a+etiqueta@x.com" no podría entrar escribiendo "a@x.com".
+      const result = await db.query(
+        `SELECT * FROM users
+          WHERE email = $1 OR normalizar_correo(email) = $2
+          ORDER BY (email = $1) DESC
+          LIMIT 1`,
+        [email, normalizarCuenta(email)]
+      );
       const user = result.rows[0];
       if (!user || !(await bcrypt.compare(password, user.password_hash))) {
         return res.status(401).json({ error: 'Correo o contraseña incorrectos.' });
@@ -210,7 +236,12 @@ router.post('/forgot',
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: 'Correo inválido.' });
 
-      const result = await db.query('SELECT id, email FROM users WHERE email = $1', [req.body.email]);
+      const result = await db.query(
+        `SELECT id, email FROM users
+          WHERE email = $1 OR normalizar_correo(email) = $2
+          ORDER BY (email = $1) DESC LIMIT 1`,
+        [req.body.email, normalizarCuenta(req.body.email)]
+      );
       const user = result.rows[0];
 
       if (user) {
@@ -297,22 +328,36 @@ router.post('/google',
       if (String(info.email_verified) !== 'true') return res.status(401).json({ error: 'Tu correo de Google no está verificado.' });
 
       const email = info.email.toLowerCase();
-      let user = (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
+      // Igual que en el login: el correo de Google puede llegar con "+alias" y
+      // debe encontrar la cuenta que ya existe para ese buzón.
+      const buscarUsuario = () => db.query(
+        `SELECT * FROM users
+          WHERE email = $1 OR normalizar_correo(email) = $2
+          ORDER BY (email = $1) DESC LIMIT 1`,
+        [email, normalizarCuenta(email)]
+      );
+      let user = (await buscarUsuario()).rows[0];
 
       if (!user) {
         const id = uuidv4();
         // Contraseña aleatoria: esta cuenta se usa solo vía Google.
         const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
-        const inserted = await db.query(
-          `INSERT INTO users (id, email, password_hash, phone, google_sub, email_verified, created_at)
-           VALUES ($1,$2,$3,NULL,$4,TRUE,$5)
-           ON CONFLICT (email) DO NOTHING
-           RETURNING id`,
-          [id, email, hash, info.sub || null, Date.now()]
-        );
+        let inserted;
+        try {
+          inserted = await db.query(
+            `INSERT INTO users (id, email, password_hash, phone, google_sub, email_verified, created_at)
+             VALUES ($1,$2,$3,NULL,$4,TRUE,$5)
+             ON CONFLICT (email) DO NOTHING
+             RETURNING id`,
+            [id, email, hash, info.sub || null, Date.now()]
+          );
+        } catch (e) {
+          if (!e || e.code !== '23505') throw e;
+          inserted = { rows: [] };
+        }
         user = inserted.rows.length
           ? { id, email, phone: null, token_version: 0 }
-          : (await db.query('SELECT * FROM users WHERE email = $1', [email])).rows[0];
+          : (await buscarUsuario()).rows[0];
       } else if (!user.google_sub && info.sub) {
         await db.query('UPDATE users SET google_sub = $1 WHERE id = $2', [info.sub, user.id]);
       }

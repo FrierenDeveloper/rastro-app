@@ -125,6 +125,41 @@ async function init() {
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
   `);
 
+  // Normaliza un correo para detectar cuentas duplicadas del MISMO buzón.
+  // Se hace en SQL (y no solo en JS) para poder ponerle un índice único: así la
+  // regla también vale ante dos registros simultáneos.
+  //
+  // Por qué existe: normalizeEmail() de express-validator solo quita el "+alias"
+  // en Gmail, Outlook y Yahoo. En cualquier otro dominio "a@x.com" y
+  // "a+loquesea@x.com" llegan al mismo buzón, así que sin esto se podían crear
+  // identidades ilimitadas (para publicar y reportar) con un solo correo real.
+  //
+  // Tiene que dar EXACTAMENTE el mismo resultado que normalizarCuenta() de
+  // middleware/client-ip.js (hay una prueba que compara ambas).
+  //
+  // OJO: va en una sola línea a propósito. Postgres no admite cuerpos de función
+  // en formato "SQL estándar" (BEGIN ATOMIC) antes de la versión 14; con una
+  // única expresión funciona en cualquier versión.
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION normalizar_correo(texto TEXT)
+    RETURNS TEXT AS $$ SELECT CASE WHEN strpos(btrim(texto), '@') > 0 THEN split_part(split_part(lower(btrim(texto)), '+', 1), '@', 1) || '@' || split_part(lower(btrim(texto)), '@', 2) ELSE lower(btrim(texto)) END $$ LANGUAGE sql IMMUTABLE;
+  `);
+
+  // Aviso si ya hay cuentas duplicadas del mismo buzón (creadas antes de este
+  // índice). No rompe el arranque: solo lo señala para que se puedan revisar.
+  try {
+    const dups = await pool.query(`
+      SELECT normalizar_correo(email) AS cuenta, count(*)::int AS n, string_agg(email, ', ') AS correos
+        FROM users GROUP BY 1 HAVING count(*) > 1 ORDER BY n DESC LIMIT 20
+    `);
+    if (dups.rows.length) {
+      console.warn('[db] Correos duplicados del mismo buzón (revisar a mano):');
+      for (const d of dups.rows) console.warn(`      ${d.cuenta} x${d.n}  ->  ${d.correos}`);
+    }
+  } catch (e) {
+    console.warn('[db] No se pudo comprobar duplicados de correo:', e.message);
+  }
+
   // Índices (después de las migraciones, para que las columnas nuevas ya existan).
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_reports_estado_tipo ON reports(estado, tipo, active);
@@ -137,6 +172,16 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_emailverif_user ON email_verifications(user_id);
     CREATE INDEX IF NOT EXISTS idx_zone_alertas ON zone_alerts(lat, lng);
   `);
+
+  // Índice único sobre el correo normalizado. Si ya existen duplicados de antes,
+  // el índice fallaría al crearse y el servidor no arrancaría; en ese caso se
+  // avisa y se sigue (el registro igual comprueba duplicados antes de insertar).
+  try {
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_correo_normalizado ON users(normalizar_correo(email))');
+  } catch (e) {
+    console.warn('[db] No se pudo crear el índice único de correo normalizado:', e.message);
+    console.warn('[db] Suele significar que hay cuentas duplicadas del mismo buzón. Revísalas y vuelve a arrancar.');
+  }
 
   // Rellena el destinatario de los mensajes antiguos (eran siempre al dueño del aviso).
   await pool.query(`

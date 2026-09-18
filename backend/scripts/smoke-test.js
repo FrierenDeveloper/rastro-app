@@ -30,6 +30,19 @@ async function req(path, { method = 'GET', token, body, form } = {}) {
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00]);
 
+const CLAVE = 'password12345'; // el mínimo son 10 caracteres
+
+// El registro exige el captcha liviano: se pide un reto, se espera el mínimo de
+// 1,5 s que exige el servidor y se envía junto al formulario.
+async function registrar(email) {
+  const reto = await req('/api/auth/challenge');
+  await new Promise(r => setTimeout(r, 1600));
+  return req('/api/auth/register', {
+    method: 'POST',
+    body: { email, password: CLAVE, captcha: reto.data.challenge }
+  });
+}
+
 async function crearAviso(token, campos, fotoBytes) {
   const fd = new FormData();
   Object.entries(campos).forEach(([k, v]) => fd.append(k, v));
@@ -45,11 +58,17 @@ async function crearAviso(token, campos, fotoBytes) {
   const nf = await req('/api/ruta-que-no-existe');
   ok(nf.status === 404, 'ruta /api desconocida responde 404 JSON');
 
+  console.log('== captcha del registro ==');
+  const sinCaptcha = await req('/api/auth/register', { method: 'POST', body: { email: `sc${s}@x.com`, password: CLAVE } });
+  ok(sinCaptcha.status === 400, 'registro sin captcha -> 400');
+
   console.log('== registro ==');
-  const a = await req('/api/auth/register', { method: 'POST', body: { email: `a${s}@x.com`, password: 'password123' } });
-  const b = await req('/api/auth/register', { method: 'POST', body: { email: `b${s}@x.com`, password: 'password123' } });
-  const c = await req('/api/auth/register', { method: 'POST', body: { email: `c${s}@x.com`, password: 'password123' } });
+  const a = await registrar(`a${s}@x.com`);
+  const b = await registrar(`b${s}@x.com`);
+  const c = await registrar(`c${s}@x.com`);
   ok(a.status === 201 && b.status === 201 && c.status === 201, 'registro de 3 usuarios');
+  const dupAlias = await registrar(`a${s}+otro@x.com`);
+  ok(dupAlias.status === 409, 'un "+alias" del mismo buzón no crea otra cuenta');
   let ta = a.data.token, tb = b.data.token;
   const tc = c.data.token;
 
@@ -131,6 +150,13 @@ async function crearAviso(token, campos, fotoBytes) {
   const relogin = await req('/api/auth/login', { method: 'POST', body: { email: b.data.user.email, password: 'nuevaclave123' } });
   ok(relogin.status === 200, 'login con la contraseña nueva');
   if (relogin.data.token) tb = relogin.data.token;
+
+  console.log('== un buzón real = una cuenta ==');
+  // normalizeEmail() solo quita el "+alias" en Gmail/Outlook/Yahoo; en el resto
+  // de dominios dos variantes del mismo buzón se guardaban como cuentas
+  // distintas (identidades ilimitadas con un solo correo real).
+  const aliasLogin = await req('/api/auth/login', { method: 'POST', body: { email: b.data.user.email.replace('@', '+variante@'), password: 'nuevaclave123' } });
+  ok(aliasLogin.status === 200, 'se entra con un "+alias" del mismo buzón');
 
   console.log('== borrado y revocación ==');
   const del = await req(`/api/reports/${rid}`, { method: 'DELETE', token: ta });
