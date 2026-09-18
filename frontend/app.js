@@ -28,10 +28,12 @@ const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', ot
 // Algunas redes, bloqueadores o países bloquean un proveedor de tiles concreto
 // y el mapa queda gris. Si el proveedor principal falla varias veces seguidas,
 // saltamos automáticamente al siguiente para que el mapa siempre se vea.
+// Nota: CARTO y Stadia ya exigen API key (devuelven tiles con marca de agua),
+// por eso no se usan aquí.
 const TILE_PROVIDERS = [
   { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution: '© Esri', maxZoom: 19 },
   { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap', maxZoom: 19 },
-  { url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', attribution: '© CARTO', maxZoom: 20 }
+  { url: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png', attribution: '© OpenTopoMap', maxZoom: 17 }
 ];
 
 function agregarCapaTiles(map) {

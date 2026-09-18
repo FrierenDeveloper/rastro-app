@@ -57,7 +57,7 @@ app.use(helmet({
         "https://*.tile.openstreetmap.org",   // Mapa OSM (subdominios)
         "https://tile.openstreetmap.org",      // Mapa OSM
         "https://server.arcgisonline.com",     // Tiles Esri
-        "https://*.basemaps.cartocdn.com",     // Tiles CARTO (respaldo)
+        "https://*.tile.opentopomap.org",      // Tiles OpenTopoMap (respaldo)
         "https://cdnjs.cloudflare.com",       // iconos de Leaflet
         "https://*.supabase.co"               // Fotos en Supabase Storage
       ],
