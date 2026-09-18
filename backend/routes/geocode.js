@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { query, validationResult } = require('express-validator');
 const { requireAuth } = require('../middleware/auth');
+const { keyPorIp } = require('../middleware/client-ip');
 
 const router = express.Router();
 
@@ -11,6 +12,7 @@ const geoLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: keyPorIp,
   message: { error: 'Demasiadas búsquedas seguidas. Espera un momento.' }
 });
 

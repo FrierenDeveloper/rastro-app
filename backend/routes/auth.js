@@ -9,15 +9,30 @@ const db = require('../db');
 const storage = require('../storage');
 const mailer = require('../mailer');
 const { requireAuth } = require('../middleware/auth');
+const { keyPorIp, keyPorIpYCuenta } = require('../middleware/client-ip');
+const { numEnv } = require('../middleware/limits');
 
 const router = express.Router();
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: numEnv('LIMITE_AUTH_15MIN', 20),
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: keyPorIp,
   message: { error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' }
+});
+
+// Segundo cupo, atado al correo: evita que alguien pruebe contraseñas de una
+// misma cuenta repartiendo los intentos entre muchas IPs (fuerza bruta
+// distribuida). Es más estricto que el anterior, así que va después.
+const cuentaLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: numEnv('LIMITE_CUENTA_15MIN', 10),
+  standardHeaders: false,
+  legacyHeaders: false,
+  keyGenerator: keyPorIpYCuenta,
+  message: { error: 'Demasiados intentos para esta cuenta. Espera unos minutos.' }
 });
 
 function signToken(userId, version = 0) {
@@ -34,6 +49,7 @@ function hashResetToken(raw) {
 
 router.post('/register',
   authLimiter,
+  cuentaLimiter,
   body('email').isEmail().normalizeEmail().withMessage('Correo inválido.'),
   body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres.'),
   body('phone').optional().trim().isLength({ max: 40 }),
@@ -65,6 +81,7 @@ router.post('/register',
 
 router.post('/login',
   authLimiter,
+  cuentaLimiter,
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty(),
   async (req, res, next) => {
@@ -88,6 +105,7 @@ router.post('/login',
 // están registrados).
 router.post('/forgot',
   authLimiter,
+  cuentaLimiter,
   body('email').isEmail().normalizeEmail(),
   async (req, res, next) => {
     try {
@@ -124,6 +142,7 @@ router.post('/forgot',
 
 router.post('/reset',
   authLimiter,
+  cuentaLimiter,
   body('token').isString().isLength({ min: 32, max: 128 }),
   body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres.'),
   async (req, res, next) => {
@@ -153,6 +172,7 @@ router.post('/reset',
 // directamente contra Google (no necesita dependencias extra).
 router.post('/google',
   authLimiter,
+  cuentaLimiter,
   body('credential').isString().notEmpty(),
   async (req, res, next) => {
     try {

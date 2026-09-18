@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const storage = require('./storage');
 const push = require('./push');
+const { keyPorIp } = require('./middleware/client-ip');
 
 if (!process.env.JWT_SECRET) {
   console.error('Falta JWT_SECRET en el archivo .env. Revisa .env.example.');
@@ -86,7 +87,13 @@ if (allowedOrigin === '*') allowedOrigin = '';
 if (allowedOrigin) app.use(cors({ origin: allowedOrigin }));
 
 app.use(express.json({ limit: '1mb' }));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: keyPorIp
+}));
 
 // Fotos locales (solo se usan si NO configuraste Supabase Storage; ver storage.js).
 app.use('/uploads', express.static(storage.localDir, { maxAge: '7d' }));

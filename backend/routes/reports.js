@@ -7,6 +7,8 @@ const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { keyPorIp } = require('../middleware/client-ip');
+const { numEnv } = require('../middleware/limits');
 
 const router = express.Router();
 
@@ -18,17 +20,20 @@ const AVISOS_POR_DIA = 20;                 // por cuenta
 const MENSAJES_POR_DIA = 100;              // por cuenta
 const CUENTA_MINIMA_PARA_REPORTAR = 24 * 60 * 60 * 1000; // 24 h
 
+// Los cupos por IP se pueden ajustar por entorno (útil para pruebas de carga
+// o para subirlos si tu comunidad es muy activa detrás de una misma red).
 const createLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 15,
+  max: numEnv('LIMITE_AVISOS_HORA', 15),
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: keyPorIp,
   message: { error: 'Publicaste demasiados avisos en poco tiempo. Intenta más tarde.' }
 });
 
-const messageLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 60 });
-const flagLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20 });
-const infoLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+const messageLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: numEnv('LIMITE_MENSAJES_HORA', 60), keyGenerator: keyPorIp });
+const flagLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: numEnv('LIMITE_REPORTES_HORA', 20), keyGenerator: keyPorIp });
+const infoLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: numEnv('LIMITE_CONSULTAS_15MIN', 200), keyGenerator: keyPorIp });
 
 // multer en memoria: el buffer se pasa directo a storage.savePhoto()
 // (Supabase Storage o disco local, según esté configurado).
