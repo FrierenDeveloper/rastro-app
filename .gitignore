@@ -13,3 +13,6 @@ Thumbs.db
 
 # Arnés de pruebas local (Postgres embebido, scripts de ataque, etc.)
 .audit/
+
+# Documento de trabajo con estado del despliegue
+ESTADO_DESPLIEGUE_Y_ACCESOS.md
