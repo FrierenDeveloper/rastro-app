@@ -204,6 +204,37 @@ document.getElementById('form-reset').addEventListener('submit', async e => {
   } catch (ex) { err.textContent = ex.message; err.classList.add('show'); }
 });
 
+const NOTAS_PW = { 1: 'Débil: agrega mayúsculas, números o símbolos.', 2: 'Aceptable.', 3: 'Buena.', 4: 'Excelente.' };
+function fuerzaPassword(pw) {
+  let score = 1;
+  if (pw.length >= 12) score++;
+  if (pw.length >= 16) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.min(score, 4);
+}
+function activarMedidorPassword(inputId, meterId, noteId) {
+  const input = document.getElementById(inputId);
+  const meter = document.getElementById(meterId);
+  const note = document.getElementById(noteId);
+  input.addEventListener('input', () => {
+    const pw = input.value;
+    if (!pw) {
+      meter.dataset.score = '0';
+      note.textContent = 'Mínimo 10 caracteres.';
+    } else if (pw.length < 10) {
+      meter.dataset.score = '1';
+      note.textContent = `Faltan ${10 - pw.length} caracteres.`;
+    } else {
+      const score = fuerzaPassword(pw);
+      meter.dataset.score = String(score);
+      note.textContent = NOTAS_PW[score];
+    }
+  });
+}
+activarMedidorPassword('register-password', 'register-pw-meter', 'register-pw-note');
+activarMedidorPassword('reset-password', 'reset-pw-meter', 'reset-pw-note');
+
 function initGoogle() {
   const area = document.getElementById('google-area');
   area.classList.remove('hidden');

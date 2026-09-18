@@ -68,6 +68,13 @@ input[type=file]{display:none;}
 .mini-map{height:190px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-top:6px;}
 .loc-note{font-size:12px;color:var(--ink-soft);margin-top:6px;}
 
+.pw-meter{display:flex;gap:4px;margin-top:8px;}
+.pw-meter i{flex:1;height:4px;border-radius:2px;background:var(--line);transition:background .15s ease;}
+.pw-meter[data-score="1"] i:nth-child(-n+1){background:var(--rust);}
+.pw-meter[data-score="2"] i:nth-child(-n+2){background:var(--amber);}
+.pw-meter[data-score="3"] i:nth-child(-n+3){background:var(--green);}
+.pw-meter[data-score="4"] i{background:var(--green);}
+
 .submit-btn{width:100%;margin-top:18px;padding:13px;border:none;border-radius:10px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
 .submit-btn.found{background:var(--green);}
 .submit-btn.lost{background:var(--amber);}
