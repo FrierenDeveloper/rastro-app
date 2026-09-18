@@ -24,6 +24,41 @@ let editingId = null;
 
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
 
+/* ============ Capa de mapa con proveedores de respaldo ============ */
+// Algunas redes, bloqueadores o países bloquean un proveedor de tiles concreto
+// y el mapa queda gris. Si el proveedor principal falla varias veces seguidas,
+// saltamos automáticamente al siguiente para que el mapa siempre se vea.
+const TILE_PROVIDERS = [
+  { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution: '© Esri', maxZoom: 19 },
+  { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap', maxZoom: 19 },
+  { url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', attribution: '© CARTO', maxZoom: 20 }
+];
+
+function agregarCapaTiles(map) {
+  let idx = 0;
+  let capa = null;
+
+  const montar = () => {
+    const p = TILE_PROVIDERS[idx];
+    capa = L.tileLayer(p.url, { attribution: p.attribution, maxZoom: p.maxZoom });
+    let fallos = 0;
+    capa.on('tileerror', () => {
+      fallos++;
+      // Varios fallos seguidos = ese proveedor no sirve en esta red: probamos el siguiente.
+      if (fallos >= 3 && idx < TILE_PROVIDERS.length - 1) {
+        console.warn('Rastro: los tiles de ' + p.url + ' fallaron; probando un proveedor de respaldo…');
+        map.removeLayer(capa);
+        idx++;
+        montar();
+      }
+    });
+    capa.addTo(map);
+  };
+
+  montar();
+  return capa;
+}
+
 /* ============ Utilidades ============ */
 // Escapa el texto que escriben los usuarios antes de mostrarlo, para que
 // nadie pueda inyectar código en la página a través de un aviso o mensaje.
@@ -334,7 +369,7 @@ function locateUser() {
 
 function initPicker(elId, key) {
   const map = L.map(elId, { zoomControl: true }).setView([userLoc.lat, userLoc.lng], 14);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 }).addTo(map);
+  agregarCapaTiles(map);
   const marker = L.marker([userLoc.lat, userLoc.lng], { draggable: true }).addTo(map);
   pickedLoc[key] = { ...userLoc };
   marker.on('dragend', () => { const p = marker.getLatLng(); pickedLoc[key] = { lat: p.lat, lng: p.lng }; pickedManual[key] = true; });
@@ -592,7 +627,7 @@ document.getElementById('reports-list').addEventListener('click', e => {
 async function renderListMap() {
   if (!listMap) {
     listMap = L.map('list-map').setView([userLoc.lat, userLoc.lng], 12);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 }).addTo(listMap);
+    agregarCapaTiles(listMap);
     clusterGroup = L.markerClusterGroup();
     listMap.addLayer(clusterGroup);
     setTimeout(() => listMap.invalidateSize(), 200);

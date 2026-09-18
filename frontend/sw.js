@@ -2,7 +2,7 @@
 // Así, si publicas una corrección, el navegador la recibe de inmediato en vez
 // de quedarse pegado con una versión vieja guardada en caché.
 // La caché queda solo como respaldo para cuando no hay conexión.
-const CACHE = 'rastro-shell-v4';
+const CACHE = 'rastro-shell-v5';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -19,6 +19,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Deja pasar sin tocarlas las peticiones a OTROS dominios (tiles del mapa,
+  // fotos de Supabase, CDNs). Que las maneje el navegador directamente: así el
+  // service worker nunca puede interferir con el mapa ni servir una copia
+  // vieja de un tile.
+  if (url.origin !== self.location.origin) return;
 
   // Datos en vivo y fotos: siempre a la red, nunca desde caché.
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) return;
