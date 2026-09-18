@@ -516,7 +516,8 @@ document.getElementById('form-lost').addEventListener('submit', e => { e.prevent
 async function fetchReports() {
   const tipo = document.getElementById('filter-tipo').value;
   const estado = document.getElementById('filter-estado').value;
-  const qs = new URLSearchParams(); if (tipo) qs.set('tipo', tipo); if (estado) qs.set('estado', estado);
+  const q = (document.getElementById('search-text').value || '').trim();
+  const qs = new URLSearchParams(); if (tipo) qs.set('tipo', tipo); if (estado) qs.set('estado', estado); if (q) qs.set('q', q);
   const { reports } = await api('/api/reports?' + qs.toString());
   allReports = reports.sort((a, b) => b.created_at - a.created_at);
 }
@@ -646,6 +647,11 @@ async function renderListMap() {
 
 document.getElementById('filter-tipo').addEventListener('change', () => { renderList().then(renderListMap); });
 document.getElementById('filter-estado').addEventListener('change', () => { renderList().then(renderListMap); });
+let searchTimer = null;
+document.getElementById('search-text').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { renderList().then(renderListMap).catch(() => {}); }, 350);
+});
 document.getElementById('btn-refresh').addEventListener('click', async () => { await renderList(); await renderListMap(); toast('Lista actualizada.'); });
 // "Mapa" y "Lista" cambian lo que se ve en la pantalla principal: el mapa
 // arriba (con el listado debajo) o solo el listado de avisos.
@@ -865,6 +871,65 @@ document.getElementById('btn-push').addEventListener('click', async () => {
   } catch (ex) { toast(ex.message || 'No se pudieron cambiar las notificaciones.'); }
 });
 
+/* ============ Tema claro / oscuro ============ */
+function aplicarTema(tema) {
+  document.body.classList.toggle('theme-dark', tema === 'dark');
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = tema === 'dark' ? '☀️' : '🌙';
+}
+function initTema() {
+  const guardado = localStorage.getItem('rastro_tema');
+  const prefiereOscuro = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  aplicarTema(guardado || (prefiereOscuro ? 'dark' : 'light'));
+}
+document.getElementById('btn-theme').addEventListener('click', () => {
+  const nuevo = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+  localStorage.setItem('rastro_tema', nuevo);
+  aplicarTema(nuevo);
+});
+
+/* ============ Instalar como app (PWA) ============ */
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  document.getElementById('btn-install').classList.remove('hidden');
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstall = null;
+  document.getElementById('btn-install').classList.add('hidden');
+});
+document.getElementById('btn-install').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-install');
+  if (!deferredInstall) { btn.classList.add('hidden'); return; }
+  deferredInstall.prompt();
+  try { await deferredInstall.userChoice; } catch (e) { /* ignore */ }
+  deferredInstall = null;
+  btn.classList.add('hidden');
+});
+
+/* ============ Consejos ============ */
+document.getElementById('btn-tips').addEventListener('click', () => document.getElementById('tips-modal').classList.remove('hidden'));
+document.getElementById('btn-tips-close').addEventListener('click', () => document.getElementById('tips-modal').classList.add('hidden'));
+
+/* ============ Onboarding (solo la primera vez) ============ */
+function initOnboarding() {
+  if (localStorage.getItem('rastro_onboard') === '1') return;
+  const modal = document.getElementById('onboarding');
+  modal.classList.remove('hidden');
+  const total = 3;
+  let step = 0;
+  const mostrar = () => {
+    modal.querySelectorAll('.onboard-step').forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
+    modal.querySelectorAll('.onboard-dots i').forEach((d, i) => d.classList.toggle('active', i === step));
+    document.getElementById('btn-onboard-next').textContent = step === total - 1 ? 'Empezar' : 'Siguiente';
+  };
+  const cerrar = () => { localStorage.setItem('rastro_onboard', '1'); modal.classList.add('hidden'); };
+  document.getElementById('btn-onboard-next').onclick = () => { if (step === total - 1) return cerrar(); step++; mostrar(); };
+  document.getElementById('btn-onboard-skip').onclick = cerrar;
+  mostrar();
+}
+
 /* ============ Arranque ============ */
 let appIniciada = false;
 let pickersIniciados = { found: false, lost: false };
@@ -883,6 +948,7 @@ function asegurarPicker(key) {
 }
 function startApp() {
   if (!appIniciada) {
+    initOnboarding();
     initPhotoZone('photo-zone-found', 'photo-input-found', 'found');
     initPhotoZone('photo-zone-lost', 'photo-input-lost', 'lost');
     initAddressSearch('addr-found', 'addr-results-found', (lat, lng) => elegirUbicacion('found', lat, lng));
@@ -936,6 +1002,7 @@ async function abrirDeepLink() {
 
 /* ============ Bootstrap ============ */
 (async function bootstrap() {
+  initTema();
   await loadConfig();
 
   const params = new URLSearchParams(location.search);

@@ -189,3 +189,48 @@ nav.tabs button{position:relative;}
 .addr-item:last-child{border-bottom:none;}
 .addr-item:hover{background:var(--green-soft);}
 .addr-empty{padding:10px 12px;font-size:12.5px;color:var(--ink-soft);}
+
+/* ---------- Buscador de texto (home) ---------- */
+.toolbar input[type=text]{padding:9px 12px;font-size:13.5px;}
+.tip-link{display:block;width:100%;text-align:left;background:none;border:none;color:var(--green);font-size:12.5px;font-weight:600;cursor:pointer;padding:0 0 12px;}
+
+/* ---------- Consejos ---------- */
+.tips-list{margin:6px 0 0;padding-left:20px;font-size:13.5px;color:var(--ink-soft);line-height:1.55;}
+.tips-list li{margin-bottom:9px;}
+.tips-list b{color:var(--ink);}
+
+/* ---------- Onboarding ---------- */
+.onboard{text-align:center;max-width:400px;}
+.onboard-emoji{font-size:46px;margin-bottom:6px;}
+.onboard .sub{font-size:14px;line-height:1.5;}
+.onboard-dots{display:flex;justify-content:center;gap:7px;margin-top:18px;}
+.onboard-dots i{width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .2s ease;}
+.onboard-dots i.active{background:var(--green);}
+.onboard .modal-actions{justify-content:space-between;}
+
+/* ---------- Modo oscuro ---------- */
+body.theme-dark{
+  --ink:#E9E5DA; --ink-soft:#A6AEAB; --paper:#0F1719; --card:#182225;
+  --line:#2C393C; --green:#63BE8C; --green-soft:#1D3529;
+  --amber:#E6AC5A; --amber-soft:#382C18; --rust:#E37B64; --rust-soft:#3A241F;
+  --shadow:0 2px 10px rgba(0,0,0,0.40);
+}
+/* Superficies que estaban fijadas en blanco */
+body.theme-dark input[type=text],body.theme-dark input[type=email],body.theme-dark input[type=password],body.theme-dark input[type=tel],body.theme-dark select,body.theme-dark textarea,
+body.theme-dark .auth-tabs button,body.theme-dark .photo-zone,body.theme-dark .match-item,body.theme-dark .inbox-item .msg,body.theme-dark .msg.theirs,
+body.theme-dark .addr-search input,body.theme-dark .addr-results{background:#212D30;color:var(--ink);}
+body.theme-dark input::placeholder,body.theme-dark textarea::placeholder{color:#798482;}
+body.theme-dark .addr-item{border-bottom-color:#2C393C;}
+body.theme-dark .addr-item:hover{background:#1D3529;}
+body.theme-dark .report-card img,body.theme-dark .report-card .ph-placeholder,body.theme-dark .thread-ic{background:#2A3639;}
+/* "--ink" se usa como fondo en varios botones: en oscuro debe seguir siendo oscuro */
+body.theme-dark header,
+body.theme-dark .auth-tabs button.active,
+body.theme-dark .submit-btn.auth,
+body.theme-dark .contact-box button,
+body.theme-dark .conv-reply button,
+body.theme-dark .toast,
+body.theme-dark nav.tabs button[data-tab="home"].active{background:#2A3A3E;color:#F2EFE6;}
+body.theme-dark .auth-tabs button.active{border-color:#3A4B4F;}
+body.theme-dark header{background:#0A1113;}
+body.theme-dark header p{color:#A6AEAB;}

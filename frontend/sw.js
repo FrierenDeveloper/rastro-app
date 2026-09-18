@@ -2,7 +2,7 @@
 // Así, si publicas una corrección, el navegador la recibe de inmediato en vez
 // de quedarse pegado con una versión vieja guardada en caché.
 // La caché queda solo como respaldo para cuando no hay conexión.
-const CACHE = 'rastro-shell-v5';
+const CACHE = 'rastro-shell-v6';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {

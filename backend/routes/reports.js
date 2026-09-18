@@ -150,10 +150,19 @@ router.post('/', requireAuth, createLimiter, upload.single('foto'),
 router.get('/', optionalAuth, infoLimiter, async (req, res, next) => {
   try {
     const { tipo, estado } = req.query;
+    const texto = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase().slice(0, 80) : '';
     let q = 'SELECT * FROM reports WHERE active = TRUE AND resolved = FALSE';
     const params = [];
     if (tipo && TIPOS_VALIDOS.includes(tipo)) { params.push(tipo); q += ` AND tipo = $${params.length}`; }
     if (estado && ['perdido', 'encontrado'].includes(estado)) { params.push(estado); q += ` AND estado = $${params.length}`; }
+    if (texto) {
+      // Busca en los campos que la gente usa para describir a su mascota.
+      params.push('%' + texto + '%');
+      const p = '$' + params.length;
+      q += ` AND (lower(color) LIKE ${p} OR lower(coalesce(raza,'')) LIKE ${p}` +
+           ` OR lower(coalesce(descripcion,'')) LIKE ${p} OR lower(coalesce(nombre_mascota,'')) LIKE ${p}` +
+           ` OR lower(coalesce(collar,'')) LIKE ${p})`;
+    }
     q += ' ORDER BY created_at DESC LIMIT 200';
     const result = await db.query(q, params);
     res.json({ reports: result.rows.map(r => publicReport(r, req.userId)) });
