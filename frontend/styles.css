@@ -248,3 +248,10 @@ body.theme-dark .reunion-card img,body.theme-dark .reunion-ph{background:#2A3639
 
 /* Con 6 pestañas hay que apretar un poco para que quepan */
 nav.tabs button{padding:9px 3px;font-size:11.5px;}
+
+/* ---------- Anti-bot y verificación de correo ---------- */
+.hp-field{position:absolute !important;left:-9999px !important;width:1px !important;height:1px !important;opacity:0;pointer-events:none;}
+.verify-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--amber-soft);border:1px solid var(--amber);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px;}
+.verify-banner button{background:var(--amber);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0;}
+.admin-title{font-size:17px;margin:18px 0 10px;}
+.admin-title:first-child{margin-top:0;}

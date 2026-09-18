@@ -41,6 +41,56 @@ const cuentaLimiter = rateLimit({
 
 const normalizarCorreo = body('email').normalizeEmail();
 
+// Correos con permiso de administrador (variable ADMIN_EMAILS, separados por coma).
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+function esAdmin(email) { return ADMIN_EMAILS.includes(String(email || '').toLowerCase()); }
+
+/* ---------- Captcha liviano (sin servicios externos) ---------- */
+// Firma un reto con el JWT_SECRET y exige que pase un tiempo mínimo antes de
+// enviarlo. No pretende ser un captcha fuerte: junto al honeypot y al rate
+// limiting corta el spam automatizado masivo sin depender de servicios de pago.
+const retosUsados = new Map();
+function firmaReto(payload) {
+  return crypto.createHmac('sha256', process.env.JWT_SECRET).update(payload).digest('hex').slice(0, 32);
+}
+function crearReto() {
+  const payload = Date.now() + '.' + crypto.randomBytes(8).toString('hex');
+  return payload + '.' + firmaReto(payload);
+}
+function validarReto(reto) {
+  if (typeof reto !== 'string' || reto.length > 200) return false;
+  const i = reto.lastIndexOf('.');
+  if (i < 0) return false;
+  const payload = reto.slice(0, i), sig = reto.slice(i + 1);
+  const esperado = firmaReto(payload);
+  if (sig.length !== esperado.length) return false;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(esperado))) return false;
+  const ts = Number(payload.split('.')[0]);
+  if (!Number.isFinite(ts)) return false;
+  const edad = Date.now() - ts;
+  if (edad < 1500 || edad > 30 * 60 * 1000) return false; // demasiado rápido = bot / caducado
+  if (retosUsados.has(reto)) return false;                 // un reto solo sirve una vez
+  retosUsados.set(reto, Date.now() + 30 * 60 * 1000);
+  if (retosUsados.size > 5000) {
+    const ahora = Date.now();
+    for (const [k, v] of retosUsados) if (v < ahora) retosUsados.delete(k);
+  }
+  return true;
+}
+router.get('/challenge', authLimiter, (req, res) => res.json({ challenge: crearReto() }));
+
+// Middleware para las rutas sensibles a bots (registro).
+function verificarHumano(req, res, next) {
+  // Honeypot: campo oculto que solo rellenan los bots.
+  if (typeof req.body.website === 'string' && req.body.website.trim()) {
+    return res.status(400).json({ error: 'No se pudo validar el formulario.' });
+  }
+  if (!validarReto(req.body.captcha)) {
+    return res.status(400).json({ error: 'La verificación anti-spam falló. Recarga la página e inténtalo de nuevo.' });
+  }
+  next();
+}
+
 function signToken(userId, version = 0) {
   return jwt.sign({ sub: userId, ver: version || 0 }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
@@ -68,10 +118,29 @@ function hashResetToken(raw) {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
+// Manda el correo de confirmación (solo útil si hay proveedor configurado).
+async function enviarVerificacion(userId, email, req) {
+  const link = `${baseUrl(req)}/?verify=`;
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  await db.query('UPDATE email_verifications SET used = TRUE WHERE user_id = $1 AND used = FALSE', [userId]);
+  await db.query(
+    'INSERT INTO email_verifications (token, user_id, expires_at, used, created_at) VALUES ($1,$2,$3,FALSE,$4)',
+    [hashResetToken(rawToken), userId, Date.now() + 24 * 60 * 60 * 1000, Date.now()]
+  );
+  try {
+    await mailer.sendMail({
+      to: email,
+      subject: 'Confirma tu correo en Rastro',
+      text: `Confirma tu correo para poder publicar avisos en Rastro:\n${link}${rawToken}\n\nEl enlace vence en 24 horas. Si no creaste esta cuenta, ignora este correo.`
+    });
+  } catch (e) { console.error('No se pudo enviar el correo de verificación:', e.message); }
+}
+
 router.post('/register',
   authLimiter,
   normalizarCorreo,
   cuentaLimiter,
+  verificarHumano,
   body('email').isEmail().normalizeEmail().withMessage('Correo inválido.'),
   body('password').isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres.'),
   body('phone').optional().trim().isLength({ max: 40 }),
@@ -86,17 +155,22 @@ router.post('/register',
 
       const id = uuidv4();
       const hash = await bcrypt.hash(password, 12);
+      // Sin proveedor de correo configurado no podemos verificar a nadie: en ese
+      // caso la cuenta nace verificada para no dejar a la gente sin poder publicar.
+      const verificado = !mailer.usingEmail;
       // ON CONFLICT evita un 500 si dos registros con el mismo correo entran a la vez.
       const inserted = await db.query(
-        `INSERT INTO users (id, email, password_hash, phone, created_at)
-         VALUES ($1,$2,$3,$4,$5)
+        `INSERT INTO users (id, email, password_hash, phone, email_verified, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6)
          ON CONFLICT (email) DO NOTHING
          RETURNING id`,
-        [id, email, hash, phone || null, Date.now()]
+        [id, email, hash, phone || null, verificado, Date.now()]
       );
       if (!inserted.rows.length) return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' });
 
-      res.status(201).json({ token: signToken(id, 0), user: { id, email, phone: phone || null } });
+      if (!verificado) await enviarVerificacion(id, email, req);
+
+      res.status(201).json({ token: signToken(id, 0), user: { id, email, phone: phone || null, email_verified: verificado } });
     } catch (err) { next(err); }
   }
 );
@@ -230,8 +304,8 @@ router.post('/google',
         // Contraseña aleatoria: esta cuenta se usa solo vía Google.
         const hash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
         const inserted = await db.query(
-          `INSERT INTO users (id, email, password_hash, phone, google_sub, created_at)
-           VALUES ($1,$2,$3,NULL,$4,$5)
+          `INSERT INTO users (id, email, password_hash, phone, google_sub, email_verified, created_at)
+           VALUES ($1,$2,$3,NULL,$4,TRUE,$5)
            ON CONFLICT (email) DO NOTHING
            RETURNING id`,
           [id, email, hash, info.sub || null, Date.now()]
@@ -250,9 +324,41 @@ router.post('/google',
 
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
-    const result = await db.query('SELECT id, email, phone, created_at FROM users WHERE id = $1', [req.userId]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado.' });
-    res.json({ user: result.rows[0] });
+    const result = await db.query('SELECT id, email, phone, created_at, email_verified FROM users WHERE id = $1', [req.userId]);
+    const u = result.rows[0];
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado.' });
+    res.json({ user: { ...u, is_admin: esAdmin(u.email) } });
+  } catch (err) { next(err); }
+});
+
+/* ---------- Confirmar correo ---------- */
+// El enlace del correo apunta aquí; al terminar devuelve a la app.
+router.get('/verify', async (req, res, next) => {
+  try {
+    const raw = typeof req.query.token === 'string' ? req.query.token : '';
+    if (!raw) return res.redirect('/?verified=0');
+    const tokenHash = hashResetToken(raw);
+    const result = await db.query('SELECT * FROM email_verifications WHERE token = $1', [tokenHash]);
+    const v = result.rows[0];
+    if (!v || v.used || Number(v.expires_at) < Date.now()) return res.redirect('/?verified=0');
+    await db.query('UPDATE users SET email_verified = TRUE WHERE id = $1', [v.user_id]);
+    await db.query('UPDATE email_verifications SET used = TRUE WHERE token = $1', [tokenHash]);
+    res.redirect('/?verified=1');
+  } catch (err) { next(err); }
+});
+
+// Reenviar el correo de confirmación (desde la app).
+router.post('/resend-verification', requireAuth, authLimiter, async (req, res, next) => {
+  try {
+    const u = (await db.query('SELECT id, email, email_verified FROM users WHERE id = $1', [req.userId])).rows[0];
+    if (!u) return res.status(404).json({ error: 'Usuario no encontrado.' });
+    if (u.email_verified) return res.json({ ok: true, message: 'Tu correo ya está confirmado.' });
+    if (!mailer.usingEmail) {
+      await db.query('UPDATE users SET email_verified = TRUE WHERE id = $1', [u.id]);
+      return res.json({ ok: true, message: 'Correo confirmado.' });
+    }
+    await enviarVerificacion(u.id, u.email, req);
+    res.json({ ok: true, message: 'Te enviamos un correo de confirmación.' });
   } catch (err) { next(err); }
 });
 

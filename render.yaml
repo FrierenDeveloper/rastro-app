@@ -40,3 +40,6 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         value: mailto:contacto@example.com
+      # Correos con permiso para el panel de administración, separados por coma.
+      - key: ADMIN_EMAILS
+        sync: false

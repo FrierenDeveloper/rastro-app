@@ -218,11 +218,14 @@ document.getElementById('form-register').addEventListener('submit', async e => {
   e.preventDefault();
   const err = document.getElementById('register-error'); err.classList.remove('show');
   try {
+    const { challenge } = await api('/api/auth/challenge', { auth: false });
     const data = await api('/api/auth/register', {
       method: 'POST', auth: false, body: {
         email: document.getElementById('register-email').value.trim(),
         password: document.getElementById('register-password').value,
-        phone: document.getElementById('register-phone').value.trim()
+        phone: document.getElementById('register-phone').value.trim(),
+        website: document.getElementById('register-website').value,
+        captcha: challenge
       }
     });
     onAuthSuccess(data.token);
@@ -314,6 +317,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
     if (btn.dataset.tab === 'lost') { asegurarPicker('lost'); }
     if (btn.dataset.tab === 'chats') { cerrarConversacion(); renderThreads(); }
     if (btn.dataset.tab === 'exitos') { renderReunions(); }
+    if (btn.dataset.tab === 'admin') { renderAdmin(); }
     if (btn.dataset.tab === 'inbox') { renderInbox(); }
   });
 });
@@ -997,6 +1001,72 @@ document.getElementById('btn-reunion-save').addEventListener('click', async () =
   finally { btn.disabled = false; }
 });
 
+/* ============ Verificación de correo ============ */
+function actualizarBannerVerificacion() {
+  const b = document.getElementById('verify-banner');
+  if (me && me.email_verified === false) b.classList.remove('hidden');
+  else b.classList.add('hidden');
+}
+document.getElementById('btn-resend-verify').addEventListener('click', async () => {
+  try {
+    const r = await api('/api/auth/resend-verification', { method: 'POST' });
+    toast(r.message);
+    if (me) me.email_verified = true;
+    actualizarBannerVerificacion();
+  } catch (ex) { toast(ex.message); }
+});
+
+/* ============ Panel de administración ============ */
+function mostrarTabAdmin() {
+  if (me && me.is_admin) document.getElementById('tab-admin').classList.remove('hidden');
+}
+async function renderAdmin() {
+  const flagged = document.getElementById('admin-flagged');
+  const users = document.getElementById('admin-users');
+  flagged.innerHTML = '<div class="empty-state">Cargando…</div>';
+  users.innerHTML = '';
+  try {
+    const { reports } = await api('/api/admin/flagged');
+    flagged.innerHTML = reports.length ? reports.map(r => `
+      <div class="inbox-item">
+        <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)} ${r.active ? '' : '<span class="tag resolved">Oculto</span>'} <span class="unread-dot">${r.flags}</span></h4>
+        <div class="report-meta">${esc(r.owner_email || '')} · ${timeAgo(r.created_at)}</div>
+        ${r.descripcion ? `<div class="report-meta">${esc(r.descripcion)}</div>` : ''}
+        <div class="report-actions">
+          ${r.active
+            ? `<button data-admin="hide" data-id="${esc(r.id)}">Ocultar</button>`
+            : `<button data-admin="unhide" data-id="${esc(r.id)}">Restaurar</button>`}
+          <button data-admin="ver" data-id="${esc(r.id)}">Compartir</button>
+          <button data-admin="delete" data-id="${esc(r.id)}">Eliminar</button>
+        </div>
+      </div>`).join('') : '<div class="empty-state">No hay avisos reportados. 🎉</div>';
+  } catch (ex) { flagged.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`; }
+
+  try {
+    const { users: us } = await api('/api/admin/users');
+    users.innerHTML = us.map(u => `
+      <div class="inbox-item">
+        <h4>${esc(u.email)}</h4>
+        <div class="report-meta">${timeAgo(u.created_at)} · ${u.reports} aviso(s) · ${u.email_verified ? 'verificado' : 'sin verificar'}</div>
+      </div>`).join('');
+  } catch (ex) { users.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`; }
+}
+document.getElementById('admin-flagged').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-admin]'); if (!btn) return;
+  const id = btn.dataset.id, acc = btn.dataset.admin;
+  try {
+    if (acc === 'ver') return shareReport(id);
+    if (acc === 'hide') await api(`/api/admin/reports/${id}/hide`, { method: 'POST' });
+    if (acc === 'unhide') await api(`/api/admin/reports/${id}/unhide`, { method: 'POST' });
+    if (acc === 'delete') {
+      if (!confirm('¿Eliminar este aviso definitivamente?')) return;
+      await api(`/api/admin/reports/${id}`, { method: 'DELETE' });
+    }
+    toast('Hecho.');
+    renderAdmin();
+  } catch (ex) { toast(ex.message); }
+});
+
 /* ============ Arranque ============ */
 let appIniciada = false;
 let pickersIniciados = { found: false, lost: false };
@@ -1037,6 +1107,8 @@ function startApp() {
     appIniciada = true;
   }
   locateUser();
+  actualizarBannerVerificacion();
+  mostrarTabAdmin();
   renderList().then(renderListMap).then(() => abrirDeepLink()).catch(() => {});
   actualizarBadgeChats();
   actualizarBotonPush();
@@ -1074,6 +1146,8 @@ async function abrirDeepLink() {
   await loadConfig();
 
   const params = new URLSearchParams(location.search);
+  if (params.get('verified') === '1') toast('¡Correo confirmado! Ya puedes publicar.');
+  if (params.get('verified') === '0') toast('El enlace de confirmación venció o ya se usó.');
   if (params.get('reset')) {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app').classList.add('hidden');

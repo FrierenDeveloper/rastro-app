@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
-const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth, requireVerified } = require('../middleware/auth');
 const { keyPorIp } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
 
@@ -99,7 +99,7 @@ async function contarUltimas24h(sql, userId) {
 }
 
 /* ---------- Crear aviso (requiere sesión) ---------- */
-router.post('/', requireAuth, createLimiter, upload.single('foto'),
+router.post('/', requireAuth, requireVerified, createLimiter, upload.single('foto'),
   body('estado').isIn(['perdido', 'encontrado']),
   body('tipo').isIn(TIPOS_VALIDOS),
   body('sexo').isIn(SEXOS_VALIDOS),
@@ -368,7 +368,7 @@ router.get('/:id/threads/:peerId', requireAuth, param('id').isUUID(), param('pee
 });
 
 /* ---------- Contactar / responder (mensajería interna bidireccional) ---------- */
-router.post('/:id/messages', requireAuth, messageLimiter,
+router.post('/:id/messages', requireAuth, requireVerified, messageLimiter,
   param('id').isUUID(),
   body('mensaje').trim().isLength({ min: 1, max: 500 }),
   body('to_user_id').optional().isUUID(),
@@ -521,7 +521,7 @@ router.post('/:id/resolve', requireAuth, param('id').isUUID(),
 /* ---------- Reportar un aviso inapropiado ---------- */
 // Para evitar que cuentas nuevas oculten avisos ajenos: se exige una cuenta con
 // al menos 24 h, un límite diario, y hacen falta 5 reportes de 5 cuentas distintas.
-router.post('/:id/flag', requireAuth, flagLimiter, param('id').isUUID(), async (req, res, next) => {
+router.post('/:id/flag', requireAuth, requireVerified, flagLimiter, param('id').isUUID(), async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });

@@ -42,4 +42,17 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, optionalAuth };
+// Exige que la cuenta tenga el correo confirmado. Se usa en las acciones que
+// más abusa el spam (publicar avisos, mandar mensajes, reportar).
+async function requireVerified(req, res, next) {
+  try {
+    const r = await db.query('SELECT email_verified FROM users WHERE id = $1', [req.userId]);
+    if (!r.rows[0]) return res.status(401).json({ error: 'Sesión inválida o expirada.' });
+    if (r.rows[0].email_verified === false) {
+      return res.status(403).json({ error: 'Confirma tu correo para poder publicar. Revisa tu bandeja de entrada.' });
+    }
+    next();
+  } catch (err) { next(err); }
+}
+
+module.exports = { requireAuth, optionalAuth, requireVerified };

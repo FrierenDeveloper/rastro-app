@@ -76,6 +76,8 @@
       <p class="loc-note" id="register-pw-note">Mínimo 10 caracteres.</p>
       <label>Teléfono (opcional)</label>
       <input type="tel" id="register-phone" placeholder="+56 9 1234 5678">
+      <!-- Honeypot anti-bot: invisible para las personas, los bots lo rellenan. -->
+      <input type="text" id="register-website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button type="submit" class="submit-btn auth">Crear cuenta</button>
       <p class="auth-error" id="register-error"></p>
     </form>
@@ -114,10 +116,15 @@
     <button data-tab="chats">Chats <span class="badge hidden" id="badge-chats">0</span></button>
     <button data-tab="exitos">Éxitos</button>
     <button data-tab="inbox">Avisos</button>
+    <button data-tab="admin" class="hidden" id="tab-admin">Admin</button>
   </nav>
 
   <main>
 
+    <div id="verify-banner" class="verify-banner hidden">
+      <span>✉️ Confirma tu correo para poder publicar avisos.</span>
+      <button id="btn-resend-verify">Reenviar</button>
+    </div>
     <!-- HOME -->
     <section class="view active" id="view-home">
       <div class="toolbar">
@@ -293,6 +300,14 @@
     <section class="view" id="view-exitos">
       <div class="reunion-total" id="reunion-total"></div>
       <div id="reunions-grid"></div>
+    </section>
+
+    <!-- ADMIN -->
+    <section class="view" id="view-admin">
+      <h2 class="admin-title">🛡️ Avisos reportados</h2>
+      <div id="admin-flagged"></div>
+      <h2 class="admin-title">👥 Usuarios recientes</h2>
+      <div id="admin-users"></div>
     </section>
 
     <!-- INBOX / MIS AVISOS -->

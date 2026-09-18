@@ -24,6 +24,10 @@ async function init() {
       phone TEXT,
       google_sub TEXT,
       token_version INTEGER NOT NULL DEFAULT 0,
+      -- DEFAULT TRUE: las cuentas que ya existían antes de agregar la
+      -- verificación quedan verificadas. El registro siempre inserta el valor
+      -- explícito (FALSE), así que las cuentas nuevas parten sin verificar.
+      email_verified BOOLEAN NOT NULL DEFAULT TRUE,
       created_at BIGINT NOT NULL
     );
 
@@ -70,6 +74,14 @@ async function init() {
       created_at BIGINT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      token TEXT PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at BIGINT NOT NULL,
+      used BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at BIGINT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id UUID PRIMARY KEY,
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -91,6 +103,7 @@ async function init() {
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS resolved_at BIGINT;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS flags INTEGER NOT NULL DEFAULT 0;
@@ -110,6 +123,7 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_user_id);
     CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
     CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_emailverif_user ON email_verifications(user_id);
   `);
 
   // Rellena el destinatario de los mensajes antiguos (eran siempre al dueño del aviso).
