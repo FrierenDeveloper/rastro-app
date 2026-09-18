@@ -49,11 +49,17 @@ function signToken(userId, version = 0) {
 // NUNCA se arma con el Host de la petición salvo en desarrollo: esa cabecera
 // la controla quien llama, y si el enlace de recuperación sale apuntando a un
 // dominio ajeno, el token de reseteo se filtra a un tercero.
+//
+// Orden de preferencia:
+//   1. APP_URL (lo que configure el operador; sigue mandando).
+//   2. RENDER_EXTERNAL_URL: Render la inyecta sola con la URL pública del
+//      servicio y NO la controla quien hace la petición, así que es un
+//      respaldo seguro que evita tener que configurar APP_URL a mano.
 function baseUrl(req) {
-  const configurada = (process.env.APP_URL || '').trim();
+  const configurada = (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || '').trim();
   if (configurada) return configurada.replace(/\/+$/, '');
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Falta APP_URL en el .env: sin ella no se puede armar un enlace de recuperación seguro.');
+    throw new Error('Falta APP_URL (o RENDER_EXTERNAL_URL) en el entorno: sin ella no se puede armar un enlace de recuperación seguro.');
   }
   return `${req.protocol}://${req.get('host')}`;
 }
