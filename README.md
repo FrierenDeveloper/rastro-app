@@ -46,6 +46,11 @@ Abre `.env` y completa:
 - `RESEND_API_KEY` (opcional): para enviar correos reales de recuperación de
   contraseña. Sin ella, el enlace se imprime en la consola.
 - `GOOGLE_CLIENT_ID` (opcional): para mostrar el botón "Iniciar con Google".
+- `ADMIN_EMAILS` (opcional): tu correo, para activar el panel de
+  administración. Sin esta variable el panel queda cerrado.
+- `TRUST_PROXY`: `1` si la app va detrás de un proxy que reescribe
+  `X-Forwarded-For` (Render). Sin definirla, los límites por IP cuentan la IP
+  del proxy y todos los usuarios comparten cupo.
 
 ```bash
 npm start
@@ -69,14 +74,31 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
   **compartir** por WhatsApp/redes y **reportar** avisos inapropiados (se ocultan
   automáticamente tras 5 reportes de 5 cuentas distintas con más de 24 h de
   antigüedad).
-- **Clustering de marcadores** en el mapa cuando hay muchos avisos.
+- **Muro de reencuentros**: los avisos resueltos pueden llevar foto y una nota
+  del reencuentro, y se muestran públicamente en la pestaña "Éxitos".
+- **Alertas por zona**: guardas tu barrio y te llega un push cuando alguien
+  publica una mascota perdida cerca.
+- **Cartel imprimible con QR**: desde "Mis avisos" generas un cartel con la foto,
+  los datos y un código QR que lleva al aviso, para pegar en la calle.
+- **Radio de búsqueda según el tiempo perdido**: la app sugiere hasta dónde
+  buscar según cuánto lleva perdida la mascota.
+- **Verificación de correo** y **captcha liviano sin servicios externos**
+  (reto firmado + honeypot) para frenar cuentas y avisos automatizados.
+- **Panel de administración** (se activa con `ADMIN_EMAILS`): avisos reportados,
+  ocultar/restaurar/borrar y listado de usuarios.
+- **Clustering de marcadores** en el mapa cuando hay muchos avisos, **búsqueda
+  por texto**, **modo oscuro**, **onboarding**, **consejos** e **instalación como
+  PWA**.
 - La ubicación exacta de cada aviso solo la ve su dueño; a todos los demás se
   les muestra un punto difuminado (~300 m) — nunca se expone dónde vive alguien.
 - El contacto (teléfono/correo) **nunca se muestra públicamente**: la
   comunicación pasa por mensajería interna dentro de la app.
 - Límites de velocidad (rate limiting) contra fuerza bruta en login — cupo por
-  IP y por cuenta, aunque el atacante cambie de red — y contra spam de avisos
-  falsos. Las contraseñas nuevas piden un mínimo de 10 caracteres.
+  IP y por cuenta, aunque el atacante cambie de red o use variantes del mismo
+  correo — y contra spam de avisos falsos. Las contraseñas nuevas piden un
+  mínimo de 10 caracteres.
+- Un buzón de correo real = una sola cuenta: las variantes con `+alias` no
+  permiten crear identidades de más ni abrir un cupo nuevo de intentos.
 - Fotos validadas por tipo real de archivo, guardadas con nombre aleatorio
   (evita ataques de path traversal), máximo 5 MB.
 - Cabeceras de seguridad HTTP (Helmet), CORS restringible a tu dominio.
@@ -85,6 +107,28 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
 - Fotos guardadas en **Supabase Storage** cuando está configurado (persisten de
   verdad); si no lo configuras, caen a disco local como respaldo para pruebas.
 - `npm audit`: 0 vulnerabilidades en las dependencias al momento de construir esto.
+
+## Probarlo y verificar que no se ha roto nada
+
+Antes de dar por bueno un cambio, hay un test de humo que recorre la API de punta
+a punta (registro con captcha, avisos, fotos, mensajería, permisos, reset de
+contraseña, borrado de cuenta):
+
+```bash
+cd backend
+npm start                    # en una terminal
+node scripts/smoke-test.js   # en otra (SMOKE_BASE=... para apuntar a otro sitio)
+```
+
+Además existe un arnés de pruebas adversariales en `.audit/` (no se versiona)
+con un Postgres embebido para levantar todo en local sin gastar nada. Cubre
+IDOR entre usuarios, inyección SQL, subida de archivos, XSS, límites de
+peticiones y normalización de correos:
+
+```bash
+node .audit/pg-server.mjs     # base de datos local (espera "[pg] LISTO")
+pwsh .audit/run-suite.ps1     # ~93 comprobaciones contra un servidor limpio
+```
 
 ## Desplegarlo gratis en producción (Render + Supabase)
 
