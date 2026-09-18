@@ -30,6 +30,13 @@ Abre `.env` y completa:
 - `JWT_SECRET`: cualquier texto largo y aleatorio (`openssl rand -hex 32`).
 - `DATABASE_URL`: la cadena de conexión de tu proyecto de Supabase (o de
   cualquier Postgres al que tengas acceso).
+- `APP_URL`: la URL pública de tu app (`https://tu-app.onrender.com`). Es
+  **obligatoria en producción**: con ella se arma el enlace de "recuperar
+  contraseña". Si falta, el servidor responde 503 en vez de generar un enlace
+  inseguro (ese enlace lleva un token y no debe construirse con la cabecera
+  `Host`, que la controla quien hace la petición).
+- `TRUST_PROXY`: déjalo en `1` si tu app va detrás de un proxy que reescribe
+  `X-Forwarded-For` (Render). Si la expones directo a internet, ponlo en `0`.
 - `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: opcionales. Si los dejas
   vacíos, las fotos se guardan en el disco local del servidor (sirve para
   probar, pero no persiste en hosting gratuito).
@@ -60,7 +67,8 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
   cuentas externas: `npm run gen:vapid`).
 - **Editar** tus avisos, **marcar como resuelto** (deja de aparecer en el mapa),
   **compartir** por WhatsApp/redes y **reportar** avisos inapropiados (se ocultan
-  automáticamente tras 3 reportes).
+  automáticamente tras 5 reportes de 5 cuentas distintas con más de 24 h de
+  antigüedad).
 - **Clustering de marcadores** en el mapa cuando hay muchos avisos.
 - La ubicación exacta de cada aviso solo la ve su dueño; a todos los demás se
   les muestra un punto difuminado (~300 m) — nunca se expone dónde vive alguien.
