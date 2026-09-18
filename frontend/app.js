@@ -579,18 +579,16 @@ async function renderListMap() {
 document.getElementById('filter-tipo').addEventListener('change', () => { renderList().then(renderListMap); });
 document.getElementById('filter-estado').addEventListener('change', () => { renderList().then(renderListMap); });
 document.getElementById('btn-refresh').addEventListener('click', async () => { await renderList(); await renderListMap(); toast('Lista actualizada.'); });
-document.getElementById('btn-view-map').addEventListener('click', () => {
-  document.getElementById('btn-view-map').classList.add('active');
-  document.getElementById('btn-view-list').classList.remove('active');
-  document.getElementById('list-map').style.display = 'block';
-  document.getElementById('reports-list').style.display = 'block';
-  setTimeout(() => listMap && listMap.invalidateSize(), 50);
-});
-document.getElementById('btn-view-list').addEventListener('click', () => {
-  document.getElementById('btn-view-list').classList.add('active');
-  document.getElementById('btn-view-map').classList.remove('active');
-  document.getElementById('list-map').style.display = 'none';
-});
+// "Mapa" y "Lista" cambian lo que se ve en la pantalla principal: el mapa
+// arriba (con el listado debajo) o solo el listado de avisos.
+function mostrarVistaHome(conMapa) {
+  document.getElementById('btn-view-map').classList.toggle('active', conMapa);
+  document.getElementById('btn-view-list').classList.toggle('active', !conMapa);
+  document.getElementById('list-map').style.display = conMapa ? 'block' : 'none';
+  if (conMapa) setTimeout(() => listMap && listMap.invalidateSize(), 50);
+}
+document.getElementById('btn-view-map').addEventListener('click', () => mostrarVistaHome(true));
+document.getElementById('btn-view-list').addEventListener('click', () => mostrarVistaHome(false));
 
 /* ============ Chats ============ */
 function actualizarBadgeChats() {
@@ -842,15 +840,30 @@ function startApp() {
   actualizarBotonPush();
 }
 
-function abrirDeepLink() {
+// Enlaces compartidos (/?r=<id>): el listado público solo trae los 200 avisos
+// más recientes, así que si el aviso no está en la lista lo pedimos aparte.
+async function abrirDeepLink() {
   const rid = new URLSearchParams(location.search).get('r');
   if (!rid) return;
-  const card = document.querySelector(`.report-card[data-id="${rid}"]`);
-  if (card) {
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card.style.outline = '3px solid var(--rust)';
-    setTimeout(() => { card.style.outline = ''; }, 3000);
+  const enLista = allReports.some(r => r.id === rid);
+  if (!enLista) {
+    try {
+      const { report } = await api(`/api/reports/${encodeURIComponent(rid)}`);
+      allReports.unshift(report);
+      const el = document.getElementById('reports-list');
+      const vacio = el.querySelector('.empty-state');
+      if (vacio) el.innerHTML = reportCard(report);
+      else el.insertAdjacentHTML('afterbegin', reportCard(report));
+    } catch (e) {
+      toast('Ese aviso ya no está disponible.');
+      return;
+    }
   }
+  const card = document.querySelector(`.report-card[data-id="${CSS.escape(rid)}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.style.outline = '3px solid var(--rust)';
+  setTimeout(() => { card.style.outline = ''; }, 3000);
 }
 
 /* ============ Bootstrap ============ */
