@@ -136,6 +136,7 @@
       <div class="toolbar">
         <input type="text" id="search-text" placeholder="🔎 Buscar por raza, color o descripción…" autocomplete="off">
       </div>
+      <button class="tip-link" id="btn-zone">🔔 Activar alertas de mi zona</button>
       <button class="tip-link" id="btn-tips">💡 Consejos para encontrar a tu mascota</button>
       <div class="toolbar">
         <select id="filter-tipo">
@@ -272,6 +273,17 @@
           <label class="required">Última vez visto en</label>
           <div class="mini-map" id="map-lost"></div>
           <p class="loc-note">Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros usuarios.</p>
+
+          <label class="required">¿Hace cuánto se perdió?</label>
+          <select id="perdido-hace-lost" required>
+            <option value="">Selecciona…</option>
+            <option value="2">Menos de 6 horas</option>
+            <option value="12">Entre 6 y 24 horas</option>
+            <option value="48">1 a 3 días</option>
+            <option value="120">3 a 7 días</option>
+            <option value="336">Más de una semana</option>
+          </select>
+          <p class="loc-note" id="radio-hint-lost"></p>
 
           <button type="submit" class="submit-btn lost">Publicar aviso de mascota perdida</button>
           <div id="match-area-lost"></div>

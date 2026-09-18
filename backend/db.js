@@ -97,6 +97,15 @@ async function init() {
       created_at BIGINT NOT NULL,
       PRIMARY KEY (report_id, user_id)
     );
+
+    -- Alertas por zona: el usuario guarda un punto (su barrio) y recibe avisos
+    -- de mascotas perdidas cerca. Una zona por usuario.
+    CREATE TABLE IF NOT EXISTS zone_alerts (
+      user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      lat DOUBLE PRECISION NOT NULL,
+      lng DOUBLE PRECISION NOT NULL,
+      created_at BIGINT NOT NULL
+    );
   `);
 
   // Migraciones para bases de datos creadas con la versión anterior del esquema.
@@ -109,6 +118,8 @@ async function init() {
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS flags INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS reunion_foto_url TEXT;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS reunion_nota TEXT;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS perdido_hace_horas INTEGER;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS radio_km DOUBLE PRECISION;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
@@ -124,6 +135,7 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
     CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
     CREATE INDEX IF NOT EXISTS idx_emailverif_user ON email_verifications(user_id);
+    CREATE INDEX IF NOT EXISTS idx_zone_alertas ON zone_alerts(lat, lng);
   `);
 
   // Rellena el destinatario de los mensajes antiguos (eran siempre al dueño del aviso).

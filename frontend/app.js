@@ -24,6 +24,29 @@ let editingId = null;
 
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
 
+// Misma estimación que backend/busqueda.js: cuánto se aleja una mascota según
+// el tiempo. Se usa solo para mostrar la sugerencia antes de publicar.
+const RADIO_PERFIL = {
+  perro:  { base: 0.5, crece: 1.20, tope: 10.0 },
+  gato:   { base: 0.2, crece: 0.15, tope: 1.5 },
+  ave:    { base: 0.3, crece: 0.20, tope: 2.0 },
+  conejo: { base: 0.3, crece: 0.20, tope: 1.5 },
+  otro:   { base: 0.5, crece: 0.80, tope: 8.0 }
+};
+function radioBusquedaKm(tipo, horas) {
+  const p = RADIO_PERFIL[tipo] || RADIO_PERFIL.otro;
+  const dias = Math.max(0, Number(horas) || 0) / 24;
+  return Math.round(Math.min(p.tope, p.base + p.crece * Math.sqrt(dias)) * 10) / 10;
+}
+function actualizarRadioHint() {
+  const el = document.getElementById('radio-hint-lost');
+  const tipo = document.getElementById('tipo-lost').value;
+  const horas = document.getElementById('perdido-hace-lost').value;
+  if (!tipo || !horas) { el.textContent = ''; return; }
+  const km = radioBusquedaKm(tipo, horas);
+  el.textContent = `🔍 Con esos datos, te sugerimos buscar (y avisaremos) en un radio de ~${km} km.`;
+}
+
 /* ============ Capa de mapa con proveedores de respaldo ============ */
 // Algunas redes, bloqueadores o países bloquean un proveedor de tiles concreto
 // y el mapa queda gris. Si el proveedor principal falla varias veces seguidas,
@@ -497,6 +520,10 @@ async function handleSubmit(estado, key) {
     fd.append('color', color); fd.append('raza', raza); fd.append('collar', collar);
     fd.append('descripcion', desc); fd.append('nombre_mascota', nombre);
     fd.append('lat', loc.lat); fd.append('lng', loc.lng);
+    if (estado === 'perdido') {
+      const horas = document.getElementById('perdido-hace-lost').value;
+      if (horas) fd.append('perdido_hace_horas', horas);
+    }
     if (photoFile[key]) fd.append('foto', photoFile[key], 'foto.jpg');
 
     const { report } = await api('/api/reports', { method: 'POST', isForm: true, body: fd });
@@ -516,6 +543,8 @@ async function handleSubmit(estado, key) {
 }
 document.getElementById('form-found').addEventListener('submit', e => { e.preventDefault(); handleSubmit('encontrado', 'found'); });
 document.getElementById('form-lost').addEventListener('submit', e => { e.preventDefault(); handleSubmit('perdido', 'lost'); });
+document.getElementById('tipo-lost').addEventListener('change', actualizarRadioHint);
+document.getElementById('perdido-hace-lost').addEventListener('change', actualizarRadioHint);
 
 /* ============ Home: lista y mapa ============ */
 async function fetchReports() {
@@ -535,7 +564,7 @@ function reportCard(r) {
           <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}${r.raza ? ' · ' + esc(r.raza) : ''}</h4>
           <span class="tag ${r.estado === 'perdido' ? 'lost' : 'found'}">${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'}</span>
         </div>
-        <div class="report-meta">${r.sexo !== 'desconocido' ? ({ macho: 'Macho', hembra: 'Hembra' })[r.sexo] + ' · ' : ''}${r.collar ? 'Collar ' + esc(r.collar) + ' · ' : ''}${timeAgo(r.created_at)}</div>
+        <div class="report-meta">${r.sexo !== 'desconocido' ? ({ macho: 'Macho', hembra: 'Hembra' })[r.sexo] + ' · ' : ''}${r.collar ? 'Collar ' + esc(r.collar) + ' · ' : ''}${timeAgo(r.created_at)}${r.radio_km ? ' · 🔍 ~' + esc(r.radio_km) + ' km' : ''}</div>
         ${r.descripcion ? `<div class="report-meta">${esc(r.descripcion)}</div>` : ''}
         <div class="report-actions">
           ${r.es_mio
@@ -783,6 +812,7 @@ async function renderInbox() {
           <button data-action="open-chat" data-id="${esc(r.id)}">Conversaciones</button>
           <button data-action="resolve" data-id="${esc(r.id)}" data-resolved="${r.resolved ? 'false' : 'true'}">${r.resolved ? 'Reabrir' : 'Marcar resuelto'}</button>
           <button data-action="edit" data-id="${esc(r.id)}">Editar</button>
+          <button data-action="poster" data-id="${esc(r.id)}">Cartel</button>
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
           <button data-action="delete" data-id="${esc(r.id)}">Eliminar</button>
         </div>
@@ -794,6 +824,7 @@ document.getElementById('inbox-list').addEventListener('click', async e => {
   const id = btn.dataset.id;
   const action = btn.dataset.action;
   if (action === 'share') return shareReport(id);
+  if (action === 'poster') return window.open((API_BASE || '') + `/api/reports/${id}/poster`, '_blank');
   if (action === 'resolve') {
     if (btn.dataset.resolved === 'true') return abrirModalReunion(id);
     try {
@@ -1001,6 +1032,39 @@ document.getElementById('btn-reunion-save').addEventListener('click', async () =
   finally { btn.disabled = false; }
 });
 
+/* ============ Alertas por zona ============ */
+async function actualizarBotonZona() {
+  try {
+    const { zone } = await api('/api/push/zone');
+    const b = document.getElementById('btn-zone');
+    b.textContent = zone
+      ? '🔔 Alertas de zona activadas (toca para desactivar)'
+      : '🔔 Activar alertas de mi zona';
+  } catch (e) { /* ignore */ }
+}
+document.getElementById('btn-zone').addEventListener('click', async () => {
+  try {
+    const { zone } = await api('/api/push/zone');
+    if (zone) {
+      if (!confirm('¿Desactivar las alertas de mascotas perdidas cerca de tu zona?')) return;
+      await api('/api/push/zone', { method: 'DELETE' });
+      toast('Alertas de zona desactivadas.');
+      actualizarBotonZona();
+      return;
+    }
+    const loc = await getCurrentLocOrNull() || userLoc;
+    await api('/api/push/zone', { method: 'POST', body: { lat: loc.lat, lng: loc.lng } });
+    toast('Listo: avisaremos aquí cuando se pierda una mascota cerca.');
+    // Las alertas llegan por notificación push: recordar activarlas si faltan.
+    if (config.pushEnabled && 'serviceWorker' in navigator && 'PushManager' in window) {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) toast('Tip: activa también las notificaciones (🔔 arriba).');
+    }
+    actualizarBotonZona();
+  } catch (ex) { toast(ex.message); }
+});
+
 /* ============ Verificación de correo ============ */
 function actualizarBannerVerificacion() {
   const b = document.getElementById('verify-banner');
@@ -1109,6 +1173,7 @@ function startApp() {
   locateUser();
   actualizarBannerVerificacion();
   mostrarTabAdmin();
+  actualizarBotonZona();
   renderList().then(renderListMap).then(() => abrirDeepLink()).catch(() => {});
   actualizarBadgeChats();
   actualizarBotonPush();

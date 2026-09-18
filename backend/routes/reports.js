@@ -1,11 +1,13 @@
 const express = require('express');
 const multer = require('multer');
+const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 const { body, validationResult, param } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
+const { radioBusquedaKm } = require('../busqueda');
 const { requireAuth, optionalAuth, requireVerified } = require('../middleware/auth');
 const { keyPorIp } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
@@ -78,6 +80,8 @@ function publicReport(r, me) {
     foto_url: r.foto_url || null,
     resolved: !!r.resolved,
     es_mio: !!me && r.user_id === me,
+    radio_km: r.radio_km === null || r.radio_km === undefined ? null : Number(r.radio_km),
+    perdido_hace_horas: r.perdido_hace_horas === null || r.perdido_hace_horas === undefined ? null : Number(r.perdido_hace_horas),
     lat: r.lat_public, lng: r.lng_public,
     created_at: Number(r.created_at)
   };
@@ -98,6 +102,27 @@ async function contarUltimas24h(sql, userId) {
   return r.rows[0].n;
 }
 
+// Avisa a quienes pidieron alertas de su zona cuando se pierde una mascota
+// cerca. El radio sale de busqueda.js (cuánto se aleja según el tiempo).
+async function notificarZona(reportId, tipo, color, lat, lng, radioKm, excluirUserId) {
+  const dLat = radioKm / 111.32;
+  const dLng = radioKm / (111.32 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)));
+  const rows = (await db.query(
+    `SELECT user_id, lat, lng FROM zone_alerts
+      WHERE lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4`,
+    [lat - dLat, lat + dLat, lng - dLng, lng + dLng]
+  )).rows;
+  const destinatarios = rows
+    .filter(r => r.user_id !== excluirUserId)
+    .filter(r => haversine(lat, lng, Number(r.lat), Number(r.lng)) <= radioKm);
+  await Promise.all(destinatarios.map(r => push.sendToUser(r.user_id, {
+    title: '🐾 Se perdió una mascota cerca de ti',
+    body: `Un ${tipo} ${color} se perdió en tu zona. Toca para ver el aviso.`,
+    report_id: reportId,
+    tag: 'zona-' + reportId
+  }).catch(() => {})));
+}
+
 /* ---------- Crear aviso (requiere sesión) ---------- */
 router.post('/', requireAuth, requireVerified, createLimiter, upload.single('foto'),
   body('estado').isIn(['perdido', 'encontrado']),
@@ -110,6 +135,7 @@ router.post('/', requireAuth, requireVerified, createLimiter, upload.single('fot
   body('nombre_mascota').optional().trim().isLength({ max: 60 }),
   body('lat').isFloat({ min: -90, max: 90 }),
   body('lng').isFloat({ min: -180, max: 180 }),
+  body('perdido_hace_horas').optional({ values: 'falsy' }).isInt({ min: 0, max: 8760 }),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
@@ -123,6 +149,11 @@ router.post('/', requireAuth, requireVerified, createLimiter, upload.single('fot
       const pub = jitter(lat, lng);
       const id = uuidv4();
 
+      // Radio sugerido de búsqueda/alerta, según cuánto lleva perdida la mascota.
+      const horasPerdido = estado === 'perdido' && req.body.perdido_hace_horas !== undefined
+        ? parseInt(req.body.perdido_hace_horas, 10) : null;
+      const radioKm = horasPerdido === null ? null : radioBusquedaKm(tipo, horasPerdido);
+
       let fotoUrl = null;
       if (req.file) {
         const tipoReal = tipoImagenReal(req.file.buffer);
@@ -132,12 +163,17 @@ router.post('/', requireAuth, requireVerified, createLimiter, upload.single('fot
 
       await db.query(
         `INSERT INTO reports
-          (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16)`,
+          (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18)`,
         [id, req.userId, estado, tipo, sexo, color, raza || null, collar || null,
           descripcion || null, nombre_mascota || null, fotoUrl,
-          lat, lng, pub.lat, pub.lng, Date.now()]
+          lat, lng, pub.lat, pub.lng, Date.now(), horasPerdido, radioKm]
       );
+
+      // Avisar a las zonas suscritas (no bloquea la respuesta si falla).
+      if (estado === 'perdido' && radioKm) {
+        notificarZona(id, tipo, color, lat, lng, radioKm, req.userId).catch(() => {});
+      }
 
       const result = await db.query('SELECT * FROM reports WHERE id = $1', [id]);
       res.status(201).json({ report: publicReport(result.rows[0], req.userId) });
@@ -265,6 +301,86 @@ router.get('/reunions', optionalAuth, infoLimiter, async (req, res, next) => {
         resolved_at: r.resolved_at ? Number(r.resolved_at) : null
       }))
     });
+  } catch (err) { next(err); }
+});
+
+/* ---------- Cartel imprimible con QR ---------- */
+// Página lista para imprimir (o guardar como PDF) con la foto, los datos y un
+// QR que lleva directo al aviso. Pensada para pegar en el barrio.
+function escHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+router.get('/:id/poster', optionalAuth, param('id').isUUID(), async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).send('Identificador inválido.');
+
+    const report = await findReport(req.params.id);
+    if (!report) return res.status(404).send('Aviso no encontrado.');
+    if (!report.active && report.user_id !== req.userId) return res.status(404).send('Aviso no encontrado.');
+
+    const appUrl = (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '')
+      || `${req.protocol}://${req.get('host')}`;
+    const enlace = `${appUrl}/?r=${report.id}`;
+    const qr = await QRCode.toDataURL(enlace, { margin: 1, width: 360 });
+    const foto = report.foto_url
+      ? (/^https?:\/\//.test(report.foto_url) ? report.foto_url : appUrl + report.foto_url)
+      : null;
+
+    const perdido = report.estado === 'perdido';
+    const titulo = perdido ? 'SE BUSCA' : 'ENCONTRADO';
+    const color = perdido ? '#D98A2B' : '#3F8361';
+    const nombre = report.nombre_mascota || '';
+
+    res.type('html').send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartel · Rastro</title>
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f2efe7;color:#1B2A2F;padding:18px;}
+  .hoja{max-width:640px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.14);}
+  .cab{background:${color};color:#fff;text-align:center;padding:18px 16px;}
+  .cab h1{margin:0;font-size:40px;letter-spacing:2px;}
+  .cab p{margin:6px 0 0;font-size:15px;opacity:.95;}
+  .cuerpo{padding:20px;}
+  .foto{width:100%;max-height:420px;object-fit:cover;border-radius:12px;background:#e4ded0;display:block;}
+  .sinfoto{width:100%;height:220px;border-radius:12px;background:#e4ded0;display:flex;align-items:center;justify-content:center;font-size:64px;}
+  .datos{margin-top:16px;}
+  .dato{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #eee;font-size:16px;}
+  .dato b{color:#41565B;font-weight:600;}
+  .qr{display:flex;align-items:center;gap:16px;margin-top:18px;padding-top:16px;border-top:2px dashed #ddd;}
+  .qr img{width:130px;height:130px;}
+  .qr div{font-size:14px;color:#41565B;line-height:1.5;}
+  .pie{margin-top:16px;font-size:13px;color:#6b7a7d;text-align:center;}
+  .nota{max-width:640px;margin:12px auto 0;font-size:12.5px;color:#6b7a7d;text-align:center;}
+  @media print{ body{background:#fff;padding:0;} .hoja{box-shadow:none;border-radius:0;max-width:100%;} .nota{display:none;} }
+</style></head><body>
+<div class="hoja">
+  <div class="cab"><h1>${titulo}</h1><p>${nombre ? escHtml(nombre) + ' · ' : ''}Ayúdame a volver a casa 🐾</p></div>
+  <div class="cuerpo">
+    ${foto ? `<img class="foto" src="${escHtml(foto)}" alt="Foto">` : `<div class="sinfoto">🐾</div>`}
+    <div class="datos">
+      ${nombre ? `<div class="dato"><b>Nombre</b><span>${escHtml(nombre)}</span></div>` : ''}
+      <div class="dato"><b>Tipo</b><span>${escHtml(report.tipo)}</span></div>
+      <div class="dato"><b>Color</b><span>${escHtml(report.color)}</span></div>
+      ${report.raza ? `<div class="dato"><b>Raza</b><span>${escHtml(report.raza)}</span></div>` : ''}
+      ${report.sexo && report.sexo !== 'desconocido' ? `<div class="dato"><b>Sexo</b><span>${escHtml(report.sexo)}</span></div>` : ''}
+      ${report.collar ? `<div class="dato"><b>Collar</b><span>${escHtml(report.collar)}</span></div>` : ''}
+      ${report.descripcion ? `<div class="dato"><b>Descripción</b><span>${escHtml(report.descripcion)}</span></div>` : ''}
+    </div>
+    <div class="qr">
+      <img src="${qr}" alt="Código QR">
+      <div><b>Escanea el código con la cámara del celular</b><br>Ahí puedes ver el aviso completo y escribirme dentro de la app, sin compartir mi teléfono ni mi correo.</div>
+    </div>
+    <div class="pie">Publicado en Rastro · el contacto se hace dentro de la app</div>
+  </div>
+</div>
+<p class="nota">Para guardarlo: usa Imprimir → "Guardar como PDF".</p>
+</body></html>`);
   } catch (err) { next(err); }
 });
 

@@ -46,4 +46,38 @@ router.post('/unsubscribe', requireAuth,
   }
 );
 
+/* ---------- Alertas por zona ---------- */
+// El usuario guarda un punto (su barrio) y recibe avisos de mascotas perdidas
+// cerca. El radio lo decide el servidor según el tiempo que lleve perdida.
+router.get('/zone', requireAuth, async (req, res, next) => {
+  try {
+    const r = await db.query('SELECT lat, lng FROM zone_alerts WHERE user_id = $1', [req.userId]);
+    res.json({ zone: r.rows[0] ? { lat: Number(r.rows[0].lat), lng: Number(r.rows[0].lng) } : null });
+  } catch (err) { next(err); }
+});
+
+router.post('/zone', requireAuth,
+  body('lat').isFloat({ min: -90, max: 90 }),
+  body('lng').isFloat({ min: -180, max: 180 }),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ error: 'Ubicación inválida.' });
+      await db.query(
+        `INSERT INTO zone_alerts (user_id, lat, lng, created_at) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (user_id) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng`,
+        [req.userId, parseFloat(req.body.lat), parseFloat(req.body.lng), Date.now()]
+      );
+      res.status(201).json({ ok: true });
+    } catch (err) { next(err); }
+  }
+);
+
+router.delete('/zone', requireAuth, async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM zone_alerts WHERE user_id = $1', [req.userId]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
