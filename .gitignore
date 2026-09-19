@@ -14,5 +14,11 @@ Thumbs.db
 # Arnés de pruebas local (Postgres embebido, scripts de ataque, etc.)
 .audit/
 
+# Artefactos del arnés determinístico (se regeneran en cada corrida)
+backend/coverage/
+backend/reports/
+backend/.stryker-tmp/
+.husky/_/
+
 # Documento de trabajo con estado del despliegue
 ESTADO_DESPLIEGUE_Y_ACCESOS.md

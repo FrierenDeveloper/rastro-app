@@ -1,0 +1,12 @@
+# Lo que Prettier NO debe formatear ni revisar (rutas desde la raíz).
+**/node_modules/
+backend/coverage/
+backend/reports/
+backend/.stryker-tmp/
+backend/uploads/
+.audit/
+
+# Archivos generados, de terceros o de datos.
+package-lock.json
+*.min.js
+*.pdf
