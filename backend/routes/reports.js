@@ -787,17 +787,26 @@ router.post(
         return res.status(404).json({ error: 'Aviso no encontrado.' });
 
       let reunionFoto = report.reunion_foto_url;
+      let fotoNueva = null;
       if (req.file) {
         const tipoReal = tipoImagenReal(req.file.buffer);
         if (!tipoReal) return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
-        if (reunionFoto) await storage.deletePhoto(reunionFoto);
-        reunionFoto = await storage.savePhoto(req.file.buffer, tipoReal);
+        // Guardar SIEMPRE antes de borrar: si esto falla, la foto anterior (la
+        // que la base sigue referenciando) tiene que seguir viva. Antes se
+        // borraba primero, así que un fallo del almacenamiento dejaba el
+        // reencuentro anterior perdido y sin foto nueva.
+        fotoNueva = await storage.savePhoto(req.file.buffer, tipoReal);
+        reunionFoto = fotoNueva;
       }
 
       await db.query(
         'UPDATE reports SET resolved = TRUE, resolved_at = $1, reunion_foto_url = $2, reunion_nota = $3 WHERE id = $4',
         [Date.now(), reunionFoto || null, req.body.nota || null, report.id]
       );
+      // La anterior solo se borra cuando la base ya aceptó el cambio: si el
+      // UPDATE falla, la fila sigue apuntando a la foto vieja y hay que
+      // conservarla (la nueva quedaría huérfana, que es menos grave).
+      if (fotoNueva && report.reunion_foto_url) await storage.deletePhoto(report.reunion_foto_url);
       const updated = await findReport(report.id);
       res.json({ report: publicReport(updated, req.userId) });
     } catch (err) {
@@ -895,7 +904,9 @@ router.delete('/:id', requireAuth, param('id').isUUID(), async (req, res, next) 
     const report = await findReport(req.params.id);
     if (!report || report.user_id !== req.userId)
       return res.status(404).json({ error: 'Aviso no encontrado.' });
-    await db.query('UPDATE reports SET active = FALSE WHERE id = $1', [req.params.id]);
+    // Con el id de la fila, igual que PATCH /:id: el texto de la URL puede venir
+    // con otro formato (mayúsculas) y findReport ya devolvió el id real.
+    await db.query('UPDATE reports SET active = FALSE WHERE id = $1', [report.id]);
     await storage.deletePhoto(report.foto_url);
     if (report.reunion_foto_url) await storage.deletePhoto(report.reunion_foto_url);
     res.json({ ok: true });

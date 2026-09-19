@@ -8,20 +8,17 @@
 // se sustituyen con los dobles de ./helpers/aislar.js, que va PRIMERO.
 //
 // HALLAZGOS (no se arreglan desde aquí):
-//   1) POST /:id/reunion borra la foto del reencuentro ANTERIOR antes de guardar
-//      la nueva. Si el guardado falla, la respuesta es 500 y la foto vieja ya no
-//      existe: se pierde el reencuentro previo. Se comprueba en la prueba
-//      "si guardar la foto falla...".
-//   2) DELETE /:id usa `req.params.id` en el UPDATE mientras el resto de la
-//      ruta trabaja con `report.id`. Funciona porque findReport ya validó el
-//      parámetro, pero es una inconsistencia (se afirma el comportamiento real
-//      en la prueba con el UUID en mayúsculas).
-//   3) requireVerified compara `email_verified === false`: un valor falsy que no
+//   1) requireVerified compara `email_verified === false`: un valor falsy que no
 //      sea el booleano `false` (por ejemplo 0) NO bloquea la petición. Hoy no se
 //      dispara con Postgres (la columna es boolean), pero queda documentado con
 //      una prueba que afirma el comportamiento actual.
-//   4) PATCH /:id devuelve 404 (no 403) cuando el aviso es de otro usuario, y
+//   2) PATCH /:id devuelve 404 (no 403) cuando el aviso es de otro usuario, y
 //      DELETE /:id también: el mensaje no distingue "no existe" de "no es tuyo".
+//
+// ARREGLADO (eran hallazgos de este archivo; ahora se prueba el contrato nuevo):
+//   * POST /:id/reunion guarda la foto NUEVA antes de borrar la anterior, y solo
+//     borra la anterior cuando la base ya aceptó el cambio.
+//   * DELETE /:id usa el id de la fila devuelta (report.id), no el texto de la URL.
 vi.hoisted(() => {
   // flagLimiter lee su cupo al cargar el router: se fija aquí para que la prueba
   // del límite no dependa de variables del entorno.
@@ -735,9 +732,15 @@ describe('POST /api/reports/:id/reunion — marcar el reencuentro', () => {
     expect(storage.savePhoto).toHaveBeenCalledWith(BYTES_WEBP, 'image/webp');
   });
 
-  it('borra la foto de reencuentro anterior antes de guardar la nueva', async () => {
-    montarBase({ fila: aviso({ reunion_foto_url: '/uploads/vieja.jpg' }) });
+  it('guarda la nueva foto, actualiza la base y solo entonces borra la anterior', async () => {
     const eventos = [];
+    montarBase({
+      fila: aviso({ reunion_foto_url: '/uploads/vieja.jpg' }),
+      resto: sql => {
+        if (sql === SQL_REUNION) eventos.push('actualizar');
+        return { rows: [] };
+      }
+    });
     storage.deletePhoto.mockImplementation(async url => eventos.push('borrar:' + url));
     storage.savePhoto.mockImplementation(async (_buf, tipo) => {
       eventos.push('guardar:' + tipo);
@@ -750,8 +753,10 @@ describe('POST /api/reports/:id/reunion — marcar el reencuentro', () => {
     });
 
     expect(res.status).toBe(200);
-    // Rama verdadera de `if (reunionFoto)`: se borra la anterior y luego se guarda.
-    expect(eventos).toStrictEqual(['borrar:/uploads/vieja.jpg', 'guardar:image/jpeg']);
+    // El orden importa: guardar -> actualizar -> borrar. Si el guardado falla, la
+    // foto anterior (la que la base sigue referenciando) no se toca; si falla el
+    // UPDATE, tampoco.
+    expect(eventos).toStrictEqual(['guardar:image/jpeg', 'actualizar', 'borrar:/uploads/vieja.jpg']);
     expect(storage.deletePhoto).toHaveBeenCalledTimes(1);
     expect(storage.savePhoto).toHaveBeenCalledTimes(1);
     expect(db.query.mock.calls[2][1]).toStrictEqual([AHORA, '/uploads/nueva.jpg', null, UUID]);
@@ -772,7 +777,7 @@ describe('POST /api/reports/:id/reunion — marcar el reencuentro', () => {
     expect(sqls()).toStrictEqual([SQL_TOKEN, SQL_AVISO]);
   });
 
-  it('HALLAZGO: si guardar la foto falla responde 500 y la foto anterior ya se borró', async () => {
+  it('si guardar la foto falla responde 500 y la foto anterior no se toca', async () => {
     montarBase({ fila: aviso({ reunion_foto_url: '/uploads/vieja.jpg' }) });
     storage.savePhoto.mockRejectedValue(new Error('almacenamiento caído'));
 
@@ -782,8 +787,26 @@ describe('POST /api/reports/:id/reunion — marcar el reencuentro', () => {
     });
 
     expect(res.status).toBe(500);
-    expect(storage.deletePhoto).toHaveBeenCalledWith('/uploads/vieja.jpg');
+    expect(storage.deletePhoto).not.toHaveBeenCalled();
     expect(sqls()).not.toContain(SQL_REUNION);
+  });
+
+  it('si la base falla al actualizar, la foto anterior tampoco se borra', async () => {
+    montarBase({
+      fila: aviso({ reunion_foto_url: '/uploads/vieja.jpg' }),
+      resto: () => {
+        throw new Error('base caída');
+      }
+    });
+
+    const res = await reunion().attach('foto', BYTES_JPEG, {
+      filename: 'reunion.jpg',
+      contentType: 'image/jpeg'
+    });
+
+    expect(res.status).toBe(500);
+    expect(storage.savePhoto).toHaveBeenCalledTimes(1);
+    expect(storage.deletePhoto).not.toHaveBeenCalled();
   });
 });
 
@@ -1141,14 +1164,17 @@ describe('DELETE /api/reports/:id — dar de baja un aviso propio', () => {
     expect(storage.deletePhoto).not.toHaveBeenCalled();
   });
 
-  it('da de baja el aviso usando el id de la URL y borra su foto', async () => {
+  it('da de baja el aviso usando el id de la fila, no el texto de la URL', async () => {
     montarBase();
 
+    // La URL va en mayúsculas y la base devuelve el id normalizado: el UPDATE
+    // debe usar el id de la fila (igual que hace PATCH /:id).
     const res = await borrar(UUID_MAYUS);
 
     expect(res.status).toBe(200);
     expect(res.body).toStrictEqual({ ok: true });
-    expect(db.query.mock.calls[2]).toStrictEqual([SQL_OCULTAR, [UUID_MAYUS]]);
+    expect(db.query.mock.calls[1]).toStrictEqual([SQL_AVISO, [UUID_MAYUS]]);
+    expect(db.query.mock.calls[2]).toStrictEqual([SQL_OCULTAR, [UUID]]);
     expect(storage.deletePhoto).toHaveBeenCalledTimes(1);
     expect(storage.deletePhoto).toHaveBeenCalledWith('/uploads/foto.jpg');
   });
