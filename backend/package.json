@@ -18,7 +18,7 @@
     "test:mutation": "stryker run",
     "test:mutation:changed": "node scripts/mutation-changed.cjs",
     "verify": "npm run format:check && npm run lint:quiet && npm run test:coverage",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
