@@ -4,7 +4,7 @@
 // Solo las cuentas cuyo correo figure en la variable ADMIN_EMAILS (separados
 // por coma) pueden entrar. Si la variable está vacía, el panel queda cerrado.
 const express = require('express');
-const { param } = require('express-validator');
+const { param, validationResult } = require('express-validator');
 const db = require('../db');
 const storage = require('../storage');
 const { requireAuth } = require('../middleware/auth');
@@ -51,6 +51,10 @@ function adminReport(r) {
 }
 
 /* ---------- Avisos reportados ---------- */
+// `param('id').isUUID()` solo deja el error anotado en la request: hay que
+// leerlo con validationResult y cortar antes de tocar la base. Sin esto, un id
+// que no es UUID llegaba tal cual al SQL (en Postgres, error 22P02 -> 500 en vez
+// del 400 que anuncia la validación).
 router.get('/flagged', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const result = await db.query(
@@ -69,6 +73,9 @@ router.get('/flagged', requireAuth, requireAdmin, async (req, res, next) => {
 /* ---------- Ocultar / restaurar un aviso ---------- */
 router.post('/reports/:id/hide', requireAuth, requireAdmin, param('id').isUUID(), async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
+
     await db.query('UPDATE reports SET active = FALSE WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
@@ -83,6 +90,9 @@ router.post(
   param('id').isUUID(),
   async (req, res, next) => {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
+
       await db.query('UPDATE reports SET active = TRUE, flags = 0 WHERE id = $1', [req.params.id]);
       await db.query('DELETE FROM report_flags WHERE report_id = $1', [req.params.id]);
       res.json({ ok: true });
@@ -95,6 +105,9 @@ router.post(
 /* ---------- Eliminar un aviso (y su foto) ---------- */
 router.delete('/reports/:id', requireAuth, requireAdmin, param('id').isUUID(), async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
+
     const r = (
       await db.query('SELECT foto_url, reunion_foto_url FROM reports WHERE id = $1', [req.params.id])
     ).rows[0];

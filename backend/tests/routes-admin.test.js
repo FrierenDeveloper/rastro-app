@@ -5,17 +5,14 @@
 // pruebas vía `vitest related`) y sus dependencias (db, storage) se sustituyen
 // con los dobles de ./helpers/aislar.js, que se importa ANTES.
 //
-// HALLAZGO (bug real de producción; NO se arregla desde aquí):
-// los tres endpoints con parámetro (`POST /reports/:id/hide`,
-// `POST /reports/:id/unhide` y `DELETE /reports/:id`) declaran
-// `param('id').isUUID()` pero NUNCA llaman a `validationResult(req)`. Con
-// express-validator eso significa que el error de formato solo queda anotado en
-// la request: el handler se ejecuta igual y el id inválido llega tal cual a la
-// consulta SQL. Contra Postgres de verdad eso termina en un error 22P02
-// ("invalid input syntax for type uuid") que el panel devuelve como 500, no como
-// el 400 que anuncia la validación. Las pruebas de abajo afirman el
-// comportamiento REAL de hoy (el id inválido llega a la base) para que, el día
-// que alguien añada el `validationResult`, salten y haya que actualizarlas.
+// El `:id` de los tres endpoints con parámetro (`POST /reports/:id/hide`,
+// `POST /reports/:id/unhide` y `DELETE /reports/:id`) se valida con
+// express-validator ANTES del handler. Antes ese error de formato solo quedaba
+// anotado en la request: el handler se ejecutaba igual y el id inválido llegaba
+// tal cual a la consulta SQL (contra Postgres de verdad, error 22P02 → 500).
+// Ahora un id que no es UUID responde 400 con JSON y no toca la base. Las
+// pruebas de abajo fijan ese contrato y también el ORDEN de los middlewares:
+// primero la sesión (401), después los permisos (403) y al final el formato.
 vi.hoisted(() => {
   // admin.js lee ADMIN_EMAILS AL CARGARSE, y vi.hoisted corre antes que los
   // imports: así el router importado estáticamente ya ve la lista buena.
@@ -291,22 +288,50 @@ describe('POST /reports/:id/hide', () => {
     expect(db.query).toHaveBeenCalledWith('UPDATE reports SET active = FALSE WHERE id = $1', [UUID]);
   });
 
-  it('un id con formato inválido NO responde 400: llega igual a la base (bug)', async () => {
+  it('un id con formato inválido responde 400 y no toca la base', async () => {
     prepararBase();
     const res = await conToken(pedir(app).post('/api/admin/reports/no-soy-un-uuid/hide'));
 
-    expect(res.status).toBe(200);
-    expect(db.query).toHaveBeenCalledWith('UPDATE reports SET active = FALSE WHERE id = $1', [
-      'no-soy-un-uuid'
-    ]);
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'Identificador inválido.' });
+    // Solo las consultas de los middlewares: token_version y el correo.
+    expect(db.query.mock.calls.map(c => c[0])).toStrictEqual([SQL_TOKEN, SQL_EMAIL]);
   });
 
-  it('un id literalmente "null" tampoco se valida', async () => {
+  it('un id literalmente "null" tampoco es un UUID', async () => {
     prepararBase();
     const res = await conToken(pedir(app).post('/api/admin/reports/null/hide'));
 
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'Identificador inválido.' });
+    expect(db.query.mock.calls.map(c => c[0])).toStrictEqual([SQL_TOKEN, SQL_EMAIL]);
+  });
+
+  it('un UUID en mayúsculas sí es válido y llega a la base', async () => {
+    prepararBase();
+    const res = await conToken(pedir(app).post(`/api/admin/reports/${UUID.toUpperCase()}/hide`));
+
     expect(res.status).toBe(200);
-    expect(db.query).toHaveBeenCalledWith('UPDATE reports SET active = FALSE WHERE id = $1', ['null']);
+    expect(db.query).toHaveBeenCalledWith('UPDATE reports SET active = FALSE WHERE id = $1', [
+      UUID.toUpperCase()
+    ]);
+  });
+
+  it('sin permisos de administrador el 403 manda sobre el 400 del formato', async () => {
+    prepararBase({ email: 'curiosa@test.local' });
+    const res = await conToken(pedir(app).post('/api/admin/reports/no-soy-un-uuid/hide'), OTRO);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(SIN_PERMISOS);
+    expect(db.query.mock.calls.map(c => c[0])).toStrictEqual([SQL_TOKEN, SQL_EMAIL]);
+  });
+
+  it('sin cabecera Authorization un id inválido responde 401 y no consulta nada', async () => {
+    const res = await pedir(app).post('/api/admin/reports/no-soy-un-uuid/hide');
+
+    expect(res.status).toBe(401);
+    expect(res.body).toStrictEqual(NO_AUTENTICADO);
+    expect(db.query).not.toHaveBeenCalled();
   });
 
   it('un fallo de la base responde 500 y no confirma nada', async () => {
@@ -366,15 +391,13 @@ describe('POST /reports/:id/unhide', () => {
     expect(db.query).not.toHaveBeenCalledWith('DELETE FROM report_flags WHERE report_id = $1', [UUID]);
   });
 
-  it('un id inválido también se cuela hasta la base (bug)', async () => {
+  it('un id inválido responde 400 sin reactivar nada ni limpiar reportes', async () => {
     prepararBase();
     const res = await conToken(pedir(app).post('/api/admin/reports/1-2-3/unhide'));
 
-    expect(res.status).toBe(200);
-    expect(db.query).toHaveBeenCalledWith('UPDATE reports SET active = TRUE, flags = 0 WHERE id = $1', [
-      '1-2-3'
-    ]);
-    expect(db.query).toHaveBeenCalledWith('DELETE FROM report_flags WHERE report_id = $1', ['1-2-3']);
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'Identificador inválido.' });
+    expect(db.query.mock.calls.map(c => c[0])).toStrictEqual([SQL_TOKEN, SQL_EMAIL]);
   });
 });
 
@@ -453,13 +476,14 @@ describe('DELETE /reports/:id', () => {
     expect(storage.deletePhoto).toHaveBeenCalledWith('/uploads/a.jpg');
   });
 
-  it('un id inválido se cuela hasta la base también al borrar (bug)', async () => {
+  it('un id inválido responde 400 sin leer ni borrar nada', async () => {
     prepararBase();
     const res = await conToken(pedir(app).delete('/api/admin/reports/xxx'));
 
-    expect(res.status).toBe(200);
-    expect(db.query).toHaveBeenCalledWith(SQL_FOTOS, ['xxx']);
-    expect(db.query).toHaveBeenCalledWith(SQL_BORRAR, ['xxx']);
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'Identificador inválido.' });
+    expect(storage.deletePhoto).not.toHaveBeenCalled();
+    expect(db.query.mock.calls.map(c => c[0])).toStrictEqual([SQL_TOKEN, SQL_EMAIL]);
   });
 });
 
