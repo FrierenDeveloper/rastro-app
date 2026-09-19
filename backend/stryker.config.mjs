@@ -48,10 +48,14 @@ export default {
   reporters: ['clear-text', 'progress', 'html', 'json'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },
   jsonReporter: { fileName: 'reports/mutation/mutation.json' },
+  // El score REAL (corrida estricta: estáticos incluidos y coverageAnalysis
+  // 'all') es 95,88%; la métrica rápida da 92,78%. Un break de 80 no protegía
+  // nada: cualquier regresión grave pasaba inadvertida. A 90 queda margen sobre
+  // el número que ve el CI, que corre con perTest.
   thresholds: {
-    high: 90,
-    low: 80,
-    break: 80
+    high: 95,
+    low: 90,
+    break: 90
   },
   timeoutMS: 20000,
   // Hilos en paralelo. La máquina de desarrollo (Ryzen 5 5600X) tiene 6 núcleos

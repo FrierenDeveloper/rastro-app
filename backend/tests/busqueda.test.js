@@ -197,3 +197,25 @@ describe('sugerenciaBusqueda: bordes exactos de los umbrales', () => {
     expect(s.texto).toBe('Busca en un radio de unos 3.17 km a la redonda.');
   });
 });
+
+// Las FUENTES son los estudios que se le enseñan al usuario como respaldo del
+// consejo. Antes solo se comprobaba `toHaveLength(FUENTES.length)`, que es una
+// prueba que se compara CONSIGO MISMA: mutar la constante a [] seguía dando 0
+// contra 0 y pasaba. Por eso sobrevivían los 13 mutantes de la tabla (la lista y
+// los tres textos de cada estudio). Aquí se mira el contenido de verdad.
+describe('FUENTES: los estudios que respaldan el consejo', () => {
+  it('son tres y cada uno trae cita, enlace y dato con texto real', () => {
+    expect(FUENTES).toHaveLength(3);
+
+    for (const fuente of FUENTES) {
+      expect(fuente.cita.length).toBeGreaterThan(10);
+      expect(fuente.url).toMatch(/^https?:\/\//);
+      expect(fuente.dato.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('la sugerencia devuelve esas mismas fuentes, sin copiarlas ni recortarlas', () => {
+    expect(sugerenciaBusqueda('gato', 6).fuentes).toBe(FUENTES);
+    expect(sugerenciaBusqueda('perro', 200).fuentes).toBe(FUENTES);
+  });
+});
