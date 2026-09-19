@@ -279,7 +279,11 @@ async function api(path, { method = 'GET', body = null, isForm = false, auth = t
   }
   if (!res.ok) {
     if (res.status === 401 && auth && token) logout();
-    throw new Error(data.error || 'Ocurrió un error.');
+    // El código viaja con el error: quien llama necesita distinguir "el token no
+    // vale" (401) de "la petición se cayó" (red, 500...).
+    const error = new Error(data.error || 'Ocurrió un error.');
+    error.status = res.status;
+    throw error;
   }
   return data;
 }
@@ -1978,6 +1982,25 @@ function abrirTabDeLaUrl(params) {
   if (boton) boton.click();
 }
 
+// Comprueba el token guardado antes de entrar. Solo se cierra sesión si el
+// servidor responde 401, que es lo único que significa "este token no vale": un
+// fallo de red o el arranque en frío de Render (el servicio se duerme y la
+// primera petición puede tardar o caerse) NO debe borrar la sesión. Antes
+// cualquier fallo mandaba al login y borraba el token, así que bastaba abrir la
+// app con mala conexión para tener que escribir la contraseña otra vez.
+async function validarSesion(intentos = 2) {
+  for (let i = 0; i < intentos; i++) {
+    try {
+      const data = await api('/api/auth/me');
+      return { user: data.user };
+    } catch (e) {
+      if (e && e.status === 401) return { caducada: true };
+      if (i < intentos - 1) await new Promise(r => setTimeout(r, 1200));
+    }
+  }
+  return { transitorio: true };
+}
+
 (async function bootstrap() {
   initTema();
   await loadConfig();
@@ -1993,17 +2016,17 @@ function abrirTabDeLaUrl(params) {
   }
 
   if (token) {
-    try {
-      const data = await api('/api/auth/me');
-      me = data.user;
+    const sesion = await validarSesion();
+    if (!sesion.caducada) {
+      me = sesion.user || null;
       showApp();
       startApp();
       abrirTabDeLaUrl(params);
+      if (sesion.transitorio) toast('No pudimos confirmar tu sesión. Revisa tu conexión.');
       return;
-    } catch (e) {
-      /* token inválido: volvemos al login */ token = null;
-      localStorage.removeItem('rastro_token');
     }
+    /* token inválido: volvemos al login */ token = null;
+    localStorage.removeItem('rastro_token');
   }
   showAuth();
 })();
