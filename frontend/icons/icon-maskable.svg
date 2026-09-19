@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Icono "maskable": Android le aplica su propia mascara (circulo, gota,
+       squircle...), asi que el fondo va a sangre y el dibujo se encoge al 80%
+       central para que ningun recorte se coma las huellas. El icono normal
+       (icon.svg) mantiene las esquinas redondeadas y el dibujo a tamano
+       completo. -->
+  <rect width="24" height="24" fill="#f5f2eb" />
+  <g fill="#6f8f7b" transform="translate(12 12) scale(0.8) translate(-12 -12)">
+    <g transform="translate(15.6 15.6) rotate(-8) scale(1.12) translate(-6.3 -6.1)">
+      <ellipse cx="4.1" cy="4.8" rx="1.1" ry="1.4" />
+      <ellipse cx="6.3" cy="3.4" rx="1.15" ry="1.55" />
+      <ellipse cx="8.6" cy="4.6" rx="1.05" ry="1.35" />
+      <ellipse cx="6.5" cy="8.1" rx="2.6" ry="2.2" />
+    </g>
+    <g opacity="0.5" transform="translate(7.4 7) rotate(14) scale(-0.68 0.68) translate(-6.3 -6.1)">
+      <ellipse cx="4.1" cy="4.8" rx="1.1" ry="1.4" />
+      <ellipse cx="6.3" cy="3.4" rx="1.15" ry="1.55" />
+      <ellipse cx="8.6" cy="4.6" rx="1.05" ry="1.35" />
+      <ellipse cx="6.5" cy="8.1" rx="2.6" ry="2.2" />
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Política de privacidad — Rastro</title>
+    <meta name="theme-color" id="meta-theme" content="#f5f2eb" />
+    <link rel="icon" type="image/svg+xml" href="../icons/icon.svg" />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body class="legal">
+    <!-- Página pública de la política de privacidad: la exige Google Play y, en
+         general, cualquiera que quiera saber qué se hace con sus datos. Se sirve
+         como archivo estático (frontend/privacidad/index.html), así que no
+         depende de la sesión ni de la base de datos. -->
+    <main class="legal-doc">
+      <a class="legal-volver" href="/">← Volver a Rastro</a>
+      <h1>Política de privacidad de Rastro</h1>
+      <p class="legal-fecha">Última actualización: 19 de septiembre de 2026</p>
+
+      <h2>1. Quiénes somos</h2>
+      <p>
+        Rastro es un proyecto sin fines de lucro para ayudar a reunir animales perdidos con sus familias. El
+        responsable del tratamiento de los datos es el proyecto Rastro. Puedes escribirnos a
+        <a href="mailto:atoferatofedev@gmail.com">atoferatofedev@gmail.com</a>.
+      </p>
+
+      <h2>2. Qué datos recolectamos</h2>
+      <div class="legal-tabla-caja">
+        <table class="legal-tabla">
+          <thead>
+            <tr>
+              <th>Dato</th>
+              <th>Para qué lo usamos</th>
+              <th>¿Se muestra a otros usuarios?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Correo electrónico</td>
+              <td>Crear tu cuenta e iniciar sesión</td>
+              <td>No</td>
+            </tr>
+            <tr>
+              <td>Contraseña</td>
+              <td>Se guarda <b>cifrada</b> (nunca en texto plano), solo para autenticarte</td>
+              <td>No</td>
+            </tr>
+            <tr>
+              <td>Teléfono (opcional)</td>
+              <td>Contacto de respaldo asociado a tu cuenta</td>
+              <td>No</td>
+            </tr>
+            <tr>
+              <td>Fotos que subes</td>
+              <td>Mostrar el aviso de animal perdido o encontrado</td>
+              <td>Sí, la foto que decides subir</td>
+            </tr>
+            <tr>
+              <td>Ubicación GPS</td>
+              <td>Ubicar el aviso en el mapa y calcular coincidencias cercanas</td>
+              <td>
+                Solo una versión <b>aproximada</b> (difuminada ~300 m); la ubicación exacta nunca se muestra
+                públicamente
+              </td>
+            </tr>
+            <tr>
+              <td>Mensajes dentro de la app</td>
+              <td>Permitir que dos usuarios coordinen la devolución de un animal</td>
+              <td>Solo lo ve la persona destinataria del mensaje</td>
+            </tr>
+            <tr>
+              <td>Características del animal (tipo, color, raza, sexo, collar, descripción)</td>
+              <td>Mostrar el aviso y calcular coincidencias</td>
+              <td>Sí, es contenido público del aviso</td>
+            </tr>
+            <tr>
+              <td>Suscripción a notificaciones push (identificador del dispositivo)</td>
+              <td>Enviarte un aviso cuando alguien te escribe</td>
+              <td>No</td>
+            </tr>
+            <tr>
+              <td>Cuenta de Google (solo si eliges ese acceso)</td>
+              <td>Iniciar sesión sin contraseña</td>
+              <td>No</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>No vendemos datos personales a terceros ni los usamos con fines publicitarios.</p>
+
+      <h2>3. Base legal y finalidad</h2>
+      <p>
+        Los datos se recolectan únicamente para el propósito de la app: ayudar a reunir animales perdidos con
+        sus familias. El tratamiento se basa en tu consentimiento al crear una cuenta y publicar un aviso.
+      </p>
+
+      <h2>4. Ubicación (dato sensible)</h2>
+      <p>Rastro solicita acceso a tu ubicación para:</p>
+      <ul>
+        <li>Sugerir el punto donde encontraste o perdiste un animal.</li>
+        <li>Calcular qué avisos están cerca de un punto dado.</li>
+      </ul>
+      <p>
+        La ubicación exacta que guardas al publicar un aviso <b>solo es visible para ti</b> (en «Mis avisos»).
+        A todo el resto de usuarios se les muestra una versión aproximada, desplazada aleatoriamente unos 300
+        metros, para no revelar la ubicación exacta de tu casa o del lugar donde viste al animal.
+      </p>
+
+      <h2>5. Con quién compartimos datos</h2>
+      <ul>
+        <li><b>No compartimos</b> tus datos personales con terceros para fines comerciales.</li>
+        <li>
+          Los datos se almacenan en Render (servidor) y Supabase (base de datos y almacenamiento de las
+          fotos), que actúan como encargados técnicos del tratamiento.
+        </li>
+        <li>
+          Si activas las notificaciones push, el navegador entrega el mensaje a través del servicio de
+          notificaciones del sistema (por ejemplo, el de Google en Android/Chrome). Ese servicio no recibe el
+          contenido más allá del texto del aviso.
+        </li>
+        <li>
+          Los correos de confirmación de cuenta y de recuperación de contraseña se envían con un proveedor de
+          correo transaccional (Resend), que solo ve tu dirección y el texto del mensaje.
+        </li>
+        <li>
+          Si usas «Iniciar sesión con Google», Google verifica tu identidad; nosotros solo recibimos tu correo
+          para crear o vincular tu cuenta.
+        </li>
+        <li>
+          Cuando buscas una dirección, el texto que escribes se envía a Photon (geocodificador basado en
+          OpenStreetMap) solo para convertirla en coordenadas. No se envía ningún dato de tu cuenta. Los
+          resultados se limitan a Chile.
+        </li>
+      </ul>
+
+      <h2>6. Cuánto tiempo guardamos los datos</h2>
+      <p>
+        Mientras tu cuenta esté activa. Puedes eliminar avisos individuales o tu cuenta completa en cualquier
+        momento desde «Opciones → Privacidad → Eliminar mi cuenta y mis datos». Al eliminar tu cuenta, se
+        eliminan también tus avisos, fotos y mensajes.
+      </p>
+
+      <h2>7. Tus derechos</h2>
+      <p>
+        Puedes acceder a tus datos, corregirlos, eliminarlos (tú mismo/a desde la app) y retirar tu
+        consentimiento dejando de usar la app y eliminando tu cuenta. Para solicitudes adicionales, escríbenos
+        a <a href="mailto:atoferatofedev@gmail.com">atoferatofedev@gmail.com</a>.
+      </p>
+
+      <h2>8. Menores de edad</h2>
+      <p>
+        Rastro no está dirigido a menores de 13 años. Si detectamos una cuenta de un menor de esa edad, la
+        eliminaremos.
+      </p>
+
+      <h2>9. Seguridad</h2>
+      <p>
+        Usamos contraseñas cifradas (bcrypt), comunicación cifrada (HTTPS) en producción, control de acceso
+        por sesión (JWT) y límites de velocidad para prevenir abuso. Ningún sistema es 100 % infalible; si
+        detectas una vulnerabilidad, repórtala a
+        <a href="mailto:atoferatofedev@gmail.com">atoferatofedev@gmail.com</a>.
+      </p>
+
+      <h2>10. Cambios a esta política</h2>
+      <p>
+        Podemos actualizar esta política. Publicaremos la fecha de la última actualización al inicio del
+        documento.
+      </p>
+    </main>
+
+    <script>
+      // Misma preferencia de tema que la app (claro por defecto, oscuro si el
+      // sistema lo pide), reutilizando el bloque de variables de styles.css.
+      const guardado = localStorage.getItem('rastro_tema');
+      const prefiereOscuro = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (guardado === 'dark' || (!guardado && prefiereOscuro)) {
+        document.body.classList.add('theme-dark');
+      }
+    </script>
+  </body>
+</html>

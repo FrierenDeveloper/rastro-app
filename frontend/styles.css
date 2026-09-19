@@ -884,6 +884,83 @@ input[type='file'] {
   margin-top: 0;
 }
 
+/* ---------- Página legal (política de privacidad pública) ---------- */
+.legal {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.legal-doc {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: 26px 20px calc(48px + env(safe-area-inset-bottom));
+  font-size: 15px;
+  line-height: 1.65;
+}
+.legal-doc h1 {
+  font-size: 26px;
+  margin: 14px 0 4px;
+}
+.legal-doc h2 {
+  font-size: 17px;
+  margin: 26px 0 6px;
+  color: var(--green-ink);
+}
+.legal-doc p,
+.legal-doc ul {
+  margin: 8px 0;
+}
+.legal-doc ul {
+  padding-left: 20px;
+}
+.legal-doc li {
+  margin: 5px 0;
+}
+.legal-doc a {
+  color: var(--green-ink);
+}
+.legal-volver {
+  display: inline-block;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-decoration: none;
+}
+.legal-volver:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+.legal-fecha {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+/* La tabla de datos es ancha: en celular se desliza en horizontal en vez de
+   apretujar las tres columnas. */
+.legal-tabla-caja {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.legal-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.legal-tabla th,
+.legal-tabla td {
+  border: 1px solid var(--line);
+  padding: 7px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+.legal-tabla th {
+  background: var(--paper-2);
+  font-weight: 600;
+}
+
 .toast {
   position: fixed;
   bottom: calc(18px + env(safe-area-inset-bottom));
