@@ -13,6 +13,14 @@
 // Ahora un id que no es UUID responde 400 con JSON y no toca la base. Las
 // pruebas de abajo fijan ese contrato y también el ORDEN de los middlewares:
 // primero la sesión (401), después los permisos (403) y al final el formato.
+//
+// MUTANTES INMATABLES DE ESTE ARCHIVO (no perder tiempo con ellos): el
+// condicional `(process.env.ADMIN_EMAILS || '')` de la línea 14 mutado a `true` o
+// `false` deja `(true).split(',')`, que lanza TypeError AL CARGAR el módulo. Con
+// el módulo roto el archivo de pruebas ni se colecta (0 pruebas ejecutadas), así
+// que Stryker no puede verlo morir y lo cuenta como superviviente. Comprobado
+// mutándolo a mano: la suite falla al importar. Son 2 de los 112 mutantes de
+// admin.js, que por eso se queda en 98,21% y no en 100%.
 vi.hoisted(() => {
   // admin.js lee ADMIN_EMAILS AL CARGARSE, y vi.hoisted corre antes que los
   // imports: así el router importado estáticamente ya ve la lista buena.
@@ -585,6 +593,20 @@ describe('carga del módulo sin ADMIN_EMAILS', () => {
 
     expect(res.status).toBe(403);
     expect(res.body).toStrictEqual(SIN_PERMISOS);
+
+    aviso.mockRestore();
+  });
+
+  // La otra cara del aviso: con la lista configurada NO debe avisar. Sin esta
+  // comprobación sobrevive el mutante que convierte `if (!ADMIN_EMAILS.length)`
+  // en `if (true)`: avisaría siempre y ninguna prueba lo notaba.
+  it('con la lista configurada no avisa por consola', () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    process.env.ADMIN_EMAILS = LISTA_ADMIN;
+    olvidar(RUTAS.routesAdmin);
+    requerir(RUTAS.routesAdmin);
+
+    expect(aviso).not.toHaveBeenCalled();
 
     aviso.mockRestore();
   });

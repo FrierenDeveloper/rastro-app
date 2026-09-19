@@ -38,15 +38,13 @@ import path from 'node:path';
 export default {
   testRunner: 'vitest',
   // Solo se mutan los archivos que la ley considera lógica/servicios/endpoints.
-  mutate: [
-    'busqueda.js',
-    'db.js',
-    'storage.js',
-    'push.js',
-    'mailer.js',
-    'middleware/**/*.js',
-    'routes/**/*.js'
-  ],
+  // Con STRYKER_MUTAR se limita a un subconjunto (separado por comas) para
+  // iterar en segundos mientras se matan los mutantes de un archivo concreto:
+  //   STRYKER_MUTAR=routes/admin.js npm run test:mutation
+  // (El CLI de Stryker ignora --mutate; por eso se hace desde aquí.)
+  mutate: process.env.STRYKER_MUTAR
+    ? process.env.STRYKER_MUTAR.split(',')
+    : ['busqueda.js', 'db.js', 'storage.js', 'push.js', 'mailer.js', 'middleware/**/*.js', 'routes/**/*.js'],
   reporters: ['clear-text', 'progress', 'html', 'json'],
   htmlReporter: { fileName: 'reports/mutation/index.html' },
   jsonReporter: { fileName: 'reports/mutation/mutation.json' },
