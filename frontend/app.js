@@ -66,8 +66,8 @@ function consejoBusqueda(tipo, horas) {
   }
   if (tipo === 'perro') {
     return horas <= 24
-      ? 'Los perros se recuperan sobre todo porque alguien los encuentra: refugios, veterinarias y carteles en el barrio rinden más que caminar kilómetros.'
-      : 'A estas alturas lo que más rinde es la difusión (refugios, veterinarias, carteles y redes del barrio): más de un tercio de los perros recuperados apareció en un refugio.';
+      ? 'Los perros se recuperan sobre todo porque alguien los encuentra: veterinarias, carteles y redes del barrio rinden más que caminar kilómetros.'
+      : 'A estas alturas lo que más rinde es la difusión (veterinarias, carteles y redes del barrio): avisar a mucha gente cubre más terreno que caminar sin rumbo.';
   }
   return 'Empieza por la zona cercana y avisa a los vecinos; después amplía hacia donde haya más gente.';
 }
@@ -501,6 +501,42 @@ function initGoogle() {
 
 document.getElementById('btn-logout').addEventListener('click', logout);
 
+/* ============ Menú de opciones (panel lateral) ============ */
+// Los botones conservan sus id, así que sus listeners (tema, instalar, push,
+// cerrar sesión) siguen funcionando aunque ahora vivan dentro del panel.
+function abrirMenu() {
+  const drawer = document.getElementById('options-drawer');
+  drawer.classList.remove('hidden');
+  const btn = document.getElementById('btn-menu');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  const cerrar = document.getElementById('btn-drawer-close');
+  if (cerrar) cerrar.focus();
+}
+function cerrarMenu() {
+  const drawer = document.getElementById('options-drawer');
+  if (drawer.classList.contains('hidden')) return;
+  drawer.classList.add('hidden');
+  const btn = document.getElementById('btn-menu');
+  if (btn) {
+    btn.setAttribute('aria-expanded', 'false');
+    btn.focus();
+  }
+}
+document.getElementById('btn-menu').addEventListener('click', abrirMenu);
+document.getElementById('btn-drawer-close').addEventListener('click', cerrarMenu);
+document.querySelector('.drawer-scrim').addEventListener('click', cerrarMenu);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('options-drawer').classList.contains('hidden')) return;
+  cerrarMenu();
+});
+// Elegir una opción cierra el panel; el tema se queda abierto para poder
+// alternarlo un par de veces sin volver a abrirlo.
+document.querySelectorAll('.drawer-item').forEach(item => {
+  if (item.id === 'btn-theme') return;
+  item.addEventListener('click', cerrarMenu);
+});
+
 document.getElementById('btn-delete-account').addEventListener('click', async () => {
   if (
     !confirm(
@@ -639,13 +675,24 @@ function pintarMarcadorUsuario() {
   }
 }
 
+// Estado de la ubicación en la cabecera. La patita GPS brilla cuando hay punto
+// (data-estado="ok"), queda tenue mientras busca y se apaga si el navegador no
+// geolocaliza o el usuario niega el permiso. El detalle se lee en Opciones.
+function marcarUbicacion(estado, texto) {
+  const badge = document.getElementById('gps-badge');
+  const fila = document.getElementById('opt-ubicacion');
+  const label = document.getElementById('opt-ubicacion-texto');
+  if (badge) badge.dataset.estado = estado;
+  if (fila) fila.dataset.estado = estado;
+  if (label) label.textContent = texto;
+}
+
 function aplicarUbicacion(lat, lng, accuracy, { deCache = false } = {}) {
   userLoc = { lat, lng };
   ultimaUbicacion = { lat, lng, accuracy: accuracy || 0 };
   ubicacion.ultima = { lat, lng, accuracy: accuracy || 0, ts: Date.now() };
   if (!deCache) guardarUbicacion();
-  const chip = document.getElementById('loc-chip');
-  if (chip) chip.textContent = 'Ubicación detectada';
+  marcarUbicacion('ok', 'Ubicación activa');
   pintarMarcadorUsuario();
   // Solo movemos los mapas de "Encontré/Perdí" en la primera lectura y si el
   // usuario no eligió una ubicación a mano.
@@ -666,9 +713,8 @@ function aplicarUbicacion(lat, lng, accuracy, { deCache = false } = {}) {
 // Pide UNA posición. Por defecto con precisión de red (rápida y suficiente);
 // alta precisión solo si el usuario la pide a propósito.
 function pedirUbicacion({ altaPrecision = false } = {}) {
-  const chip = document.getElementById('loc-chip');
   if (!navigator.geolocation) {
-    if (chip) chip.textContent = 'Santiago (ubicación manual)';
+    marcarUbicacion('manual', 'Santiago (ubicación manual)');
     return Promise.resolve(null);
   }
   if (ubicacion.pidiendo) return Promise.resolve(null);
@@ -682,7 +728,10 @@ function pedirUbicacion({ altaPrecision = false } = {}) {
       },
       () => {
         ubicacion.pidiendo = false;
-        if (chip && !ubicacion.ultima) chip.textContent = 'Santiago (toca el mapa para ajustar)';
+        if (!ubicacion.ultima) {
+          marcarUbicacion('sin', 'Sin ubicación: toca el mapa para ajustar el punto');
+          toast('No pudimos leer tu ubicación. Toca el mapa para ajustarla.');
+        }
         resolve(null);
       },
       altaPrecision
@@ -1420,6 +1469,8 @@ async function actualizarBotonPush() {
     const sub = await reg.pushManager.getSubscription();
     btn.classList.toggle('active', !!sub);
     btn.title = sub ? 'Notificaciones activadas (toca para desactivar)' : 'Activar notificaciones';
+    const label = document.getElementById('push-label');
+    if (label) label.textContent = sub ? 'Notificaciones activadas' : 'Activar notificaciones';
   } catch (e) {
     /* ignore */
   }
@@ -1455,11 +1506,12 @@ document.getElementById('btn-push').addEventListener('click', async () => {
 function aplicarTema(tema) {
   const oscuro = tema === 'dark';
   document.body.classList.toggle('theme-dark', oscuro);
+  // El icono vive en su propio hueco dentro del botón del menú: reemplazar el
+  // innerHTML del botón borraría su etiqueta "Modo claro / oscuro".
+  const icono = document.getElementById('theme-ico');
+  if (icono) icono.innerHTML = ico(oscuro ? 'sun' : 'moon');
   const btn = document.getElementById('btn-theme');
-  if (btn) {
-    btn.innerHTML = ico(oscuro ? 'sun' : 'moon');
-    btn.title = oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
-  }
+  if (btn) btn.title = oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
   // La barra del sistema (Android) sigue al tema elegido.
   const meta = document.getElementById('meta-theme');
   if (meta) meta.content = oscuro ? '#14181a' : '#f5f2eb';
@@ -1502,6 +1554,22 @@ document.getElementById('btn-install').addEventListener('click', async () => {
   btn.classList.add('hidden');
 });
 
+/* ============ Privacidad ============ */
+// El modal está fuera de #app: se abre tanto desde el menú de Opciones como
+// desde el enlace de la pantalla de acceso, así que sirve con y sin sesión.
+function abrirPrivacidad() {
+  document.getElementById('privacy-modal').classList.remove('hidden');
+}
+function cerrarPrivacidad() {
+  document.getElementById('privacy-modal').classList.add('hidden');
+}
+document.getElementById('btn-privacy').addEventListener('click', abrirPrivacidad);
+document.getElementById('btn-privacy-close').addEventListener('click', cerrarPrivacidad);
+document.getElementById('link-privacy').addEventListener('click', e => {
+  e.preventDefault();
+  abrirPrivacidad();
+});
+
 /* ============ Consejos ============ */
 document
   .getElementById('btn-tips')
@@ -1511,30 +1579,73 @@ document
   .addEventListener('click', () => document.getElementById('tips-modal').classList.add('hidden'));
 
 /* ============ Onboarding (solo la primera vez) ============ */
+const ONBOARD_PASOS = 3;
+
 function initOnboarding() {
   if (localStorage.getItem('rastro_onboard') === '1') return;
   const modal = document.getElementById('onboarding');
+  const track = document.getElementById('onboard-track');
   modal.classList.remove('hidden');
-  const total = 3;
   let step = 0;
-  const mostrar = () => {
-    modal
-      .querySelectorAll('.onboard-step')
-      .forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
+  const pintar = () => {
+    track.style.transform = `translateX(${-100 * step}%)`;
     modal.querySelectorAll('.onboard-dots i').forEach((d, i) => d.classList.toggle('active', i === step));
-    document.getElementById('btn-onboard-next').textContent = step === total - 1 ? 'Empezar' : 'Siguiente';
+    document.getElementById('btn-onboard-next').textContent =
+      step === ONBOARD_PASOS - 1 ? 'Empezar' : 'Siguiente';
+  };
+  const ir = nuevo => {
+    step = Math.min(Math.max(nuevo, 0), ONBOARD_PASOS - 1);
+    pintar();
   };
   const cerrar = () => {
     localStorage.setItem('rastro_onboard', '1');
     modal.classList.add('hidden');
   };
   document.getElementById('btn-onboard-next').onclick = () => {
-    if (step === total - 1) return cerrar();
-    step++;
-    mostrar();
+    if (step === ONBOARD_PASOS - 1) return cerrar();
+    ir(step + 1);
   };
   document.getElementById('btn-onboard-skip').onclick = cerrar;
-  mostrar();
+  activarSwipeOnboarding(track, ir, () => step);
+  pintar();
+}
+
+// Arrastre del carril (dedo o ratón) y flechas del teclado. El umbral es
+// relativo al ancho: en pantallas chicas no hace falta arrastrar tanto.
+function activarSwipeOnboarding(track, ir, pasoActual) {
+  let x0 = null;
+  let dx = 0;
+  const pintarArrastre = () => {
+    track.style.transform = `translateX(calc(${-100 * pasoActual()}% + ${dx}px))`;
+  };
+  const soltar = () => {
+    if (x0 === null) return;
+    track.style.transition = '';
+    const umbral = Math.max(36, track.clientWidth * 0.18);
+    if (dx <= -umbral) ir(pasoActual() + 1);
+    else if (dx >= umbral) ir(pasoActual() - 1);
+    else pintarArrastre();
+    x0 = null;
+    dx = 0;
+  };
+  track.addEventListener('pointerdown', e => {
+    x0 = e.clientX;
+    dx = 0;
+    track.style.transition = 'none';
+    track.setPointerCapture(e.pointerId);
+  });
+  track.addEventListener('pointermove', e => {
+    if (x0 === null) return;
+    dx = e.clientX - x0;
+    pintarArrastre();
+  });
+  track.addEventListener('pointerup', soltar);
+  track.addEventListener('pointercancel', soltar);
+  document.addEventListener('keydown', e => {
+    if (document.getElementById('onboarding').classList.contains('hidden')) return;
+    if (e.key === 'ArrowRight') ir(pasoActual() + 1);
+    if (e.key === 'ArrowLeft') ir(pasoActual() - 1);
+  });
 }
 
 /* ============ Muro de reencuentros ============ */

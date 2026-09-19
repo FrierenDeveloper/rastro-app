@@ -158,6 +158,39 @@
         <path d="M5 19c0-8 5-13 14-13 0 9-5 13-12 13H5Z" />
         <path d="M8 16c1.6-3.2 4-5.6 7.4-7.2" />
       </symbol>
+      <!-- Marca de la cabecera: la patita con la señal del GPS al lado. Va
+           rellena como el resto de la marca, y el "brillo" lo pone el CSS (halo
+           + drop-shadow), no el dibujo: así se apaga solo con
+           prefers-reduced-motion. -->
+      <symbol id="i-paw-gps" viewBox="0 0 24 24">
+        <use
+          href="#i-paw"
+          fill="currentColor"
+          stroke="none"
+          transform="translate(6.4 16.2) scale(0.78) translate(-12 -12.5)"
+        />
+        <path
+          d="M17 3.5A3.5 3.5 0 0 1 20.5 7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+        />
+        <path
+          d="M17 0.5A6.5 6.5 0 0 1 23.5 7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+        />
+        <circle cx="17" cy="7" r="1.6" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24">
+        <path d="M4 7.5h16M4 12h16M4 16.5h16" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="M6.8 6.8l10.4 10.4M17.2 6.8L6.8 17.2" />
+      </symbol>
     </svg>
 
     <!-- ===================== RESET SCREEN ===================== -->
@@ -256,6 +289,9 @@
           Tu correo y teléfono nunca se muestran públicamente. Solo se usan para que otros usuarios puedan
           escribirte dentro de la app.
         </p>
+        <p class="link-note">
+          <a href="#" id="link-privacy">Privacidad: qué se ve y qué no</a>
+        </p>
       </div>
     </div>
 
@@ -263,27 +299,25 @@
     <div id="app" class="hidden">
       <header>
         <div class="brand">
-          <svg class="brand-logo sm" aria-hidden="true"><use href="#i-logo-min" /></svg>
+          <!-- La patita GPS sustituye al antiguo chip "Ubicación detectada": el
+               brillo cuenta el estado y el detalle se lee en el menú de
+               Opciones. app.js cambia data-estado (buscando / ok / manual /
+               sin). -->
+          <span class="gps-badge" id="gps-badge" data-estado="buscando">
+            <span class="gps-halo" aria-hidden="true"></span>
+            <svg class="brand-logo sm" aria-hidden="true"><use href="#i-paw-gps" /></svg>
+          </span>
           <h1>Rastro</h1>
-        </div>
-        <p>Ayuda a los animales de tu barrio a volver a casa</p>
-        <div class="header-row">
-          <span class="loc-chip">
-            <svg class="ic" aria-hidden="true"><use href="#i-pin" /></svg>
-            <span id="loc-chip">Ubicándote…</span>
-          </span>
-          <span class="header-actions">
-            <button class="icon-btn dark hidden" id="btn-install" title="Instalar la app">
-              <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
-            </button>
-            <button class="icon-btn dark" id="btn-theme" title="Modo claro / oscuro">
-              <svg class="ic" aria-hidden="true"><use href="#i-moon" /></svg>
-            </button>
-            <button class="icon-btn dark hidden" id="btn-push" title="Activar notificaciones">
-              <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>
-            </button>
-            <button class="logout-btn" id="btn-logout">Cerrar sesión</button>
-          </span>
+          <button
+            class="icon-btn dark menu-btn"
+            id="btn-menu"
+            title="Opciones"
+            aria-label="Abrir opciones"
+            aria-expanded="false"
+            aria-controls="options-drawer"
+          >
+            <svg class="ic" aria-hidden="true"><use href="#i-menu" /></svg>
+          </button>
         </div>
       </header>
 
@@ -628,20 +662,50 @@
         <!-- INBOX / MIS AVISOS -->
         <section class="view" id="view-inbox">
           <div id="inbox-list"></div>
-          <div class="danger-zone">
-            <p class="loc-note">
-              Si ya no quieres usar Rastro, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos, tus
-              fotos y tus mensajes de forma permanente.
-            </p>
-            <button id="btn-delete-account">Eliminar mi cuenta y mis datos</button>
-          </div>
         </section>
       </main>
+    </div>
 
-      <footer class="note">
-        Los avisos publicados aquí son visibles para todas las personas que usan esta app. Tu contacto directo
-        nunca se muestra: la comunicación ocurre dentro de la app.
-      </footer>
+    <!-- ===================== OPCIONES (panel lateral) =====================
+         Aquí viven los botones que antes estaban sueltos en la cabecera. Los id
+         se conservan (btn-theme, btn-install, btn-push, btn-logout) para que la
+         lógica de app.js siga enganchada igual. -->
+    <div id="options-drawer" class="drawer hidden">
+      <div class="drawer-scrim" data-drawer-close></div>
+      <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+        <div class="drawer-head">
+          <h2 id="drawer-title" class="serif">Opciones</h2>
+          <button class="icon-btn cerrar" id="btn-drawer-close" aria-label="Cerrar opciones">
+            <svg class="ic" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
+        </div>
+
+        <p class="drawer-loc" id="opt-ubicacion" data-estado="buscando">
+          <svg class="ic" aria-hidden="true"><use href="#i-pin" /></svg>
+          <span id="opt-ubicacion-texto">Ubicándote…</span>
+        </p>
+
+        <button class="drawer-item" id="btn-theme">
+          <span class="drawer-ico" id="theme-ico"></span>
+          <span>Modo claro / oscuro</span>
+        </button>
+        <button class="drawer-item hidden" id="btn-install">
+          <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
+          <span>Instalar la app</span>
+        </button>
+        <button class="drawer-item hidden" id="btn-push">
+          <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>
+          <span id="push-label">Activar notificaciones</span>
+        </button>
+        <button class="drawer-item" id="btn-privacy">
+          <svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>
+          <span>Privacidad</span>
+        </button>
+        <button class="drawer-item danger" id="btn-logout">
+          <svg class="ic" aria-hidden="true"><use href="#i-user" /></svg>
+          <span>Cerrar sesión</span>
+        </button>
+      </aside>
     </div>
 
     <!-- ===================== EDIT MODAL ===================== -->
@@ -722,13 +786,13 @@
         <ul class="tips-list">
           <li><b>Publica rápido.</b> Las primeras 24 horas son las más importantes.</li>
           <li>
-            <b>Busca de noche y de madrugada.</b> Con menos ruido, los animales asustados se mueven y
-            responden más.
+            <b>Busca de noche, cuando hay menos ruido:</b> los animales asustados se mueven y responden más.
+            Evita la madrugada y no vayas solo: avisa a alguien, lleva linterna y mantente atento a tu
+            entorno.
           </li>
           <li><b>Deja una prenda con tu olor</b> y agua (no comida) cerca de donde se perdió.</li>
           <li><b>Pega carteles</b> en un radio de 1 km. Usa el botón “Cartel” de tu aviso.</li>
           <li><b>Pregunta a vecinos, conserjes y veterinarias.</b> Muchos avisos se resuelven así.</li>
-          <li><b>Revisa refugios y redes locales</b> cada día, no solo Rastro.</li>
           <li><b>No persigas al animal.</b> Si está asustado, siéntate y llámalo con calma.</li>
         </ul>
         <div class="modal-actions">
@@ -739,37 +803,88 @@
       </div>
     </div>
 
+    <!-- ===================== PRIVACIDAD =====================
+         Vive fuera de #app a propósito: se abre desde el menú de Opciones (con
+         sesión) y desde el enlace de la pantalla de acceso (sin sesión). Aquí
+         vive también el borrado de cuenta, que antes estaba en "Avisos". -->
+    <div id="privacy-modal" class="modal hidden">
+      <div class="modal-box">
+        <h3>
+          <svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>Privacidad
+        </h3>
+        <p class="sub">Qué se ve, qué no y qué puedes hacer con tus datos.</p>
+
+        <h4 class="priv-title">Lo que ve la gente</h4>
+        <p class="loc-note">
+          Los avisos publicados aquí son visibles para todas las personas que usan esta app. Tu contacto
+          directo nunca se muestra: la comunicación ocurre dentro de la app.
+        </p>
+
+        <h4 class="priv-title">Tus datos de contacto</h4>
+        <p class="loc-note">
+          Tu correo y teléfono nunca se muestran públicamente. Solo se usan para que otros usuarios puedan
+          escribirte dentro de la app.
+        </p>
+
+        <h4 class="priv-title">Tu ubicación</h4>
+        <p class="loc-note">La ubicación exacta solo la ves tú: los demás ven un punto aproximado.</p>
+
+        <div class="danger-zone">
+          <h4 class="priv-title">Eliminar tu cuenta</h4>
+          <p class="loc-note">
+            Si ya no quieres usar Rastro, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos, tus
+            fotos y tus mensajes de forma permanente.
+          </p>
+          <button id="btn-delete-account">Eliminar mi cuenta y mis datos</button>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="submit-btn auth" id="btn-privacy-close" style="margin-top: 0">
+            Entendido
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===================== ONBOARDING ===================== -->
     <div id="onboarding" class="modal hidden">
       <div class="modal-box onboard">
-        <div class="onboard-step" data-step="0">
-          <div class="onboard-emoji">
-            <svg class="ic" aria-hidden="true"><use href="#i-logo-min" /></svg>
+        <!-- Los tres pasos van en un carril que se arrastra con el dedo (o con
+             las flechas del teclado). El carril toma el alto del paso más alto,
+             así el cartel no salta de tamaño al deslizar. -->
+        <div class="onboard-viewport">
+          <div class="onboard-track" id="onboard-track">
+            <div class="onboard-step" data-step="0">
+              <div class="onboard-emoji">
+                <svg class="ic" aria-hidden="true"><use href="#i-logo-min" /></svg>
+              </div>
+              <h3>Bienvenido a Rastro</h3>
+              <p class="sub">
+                El mapa de mascotas perdidas y encontradas de tu barrio. Publica un aviso o ayuda a alguien a
+                reencontrarse con su mascota.
+              </p>
+            </div>
+            <div class="onboard-step" data-step="1">
+              <div class="onboard-emoji">
+                <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>
+              </div>
+              <h3>Publica en 30 segundos</h3>
+              <p class="sub">
+                Saca una foto, marca el punto en el mapa y listo. Mientras más datos, más fácil es
+                reconocerla.
+              </p>
+            </div>
+            <div class="onboard-step" data-step="2">
+              <div class="onboard-emoji">
+                <svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>
+              </div>
+              <h3>Tu privacidad, protegida</h3>
+              <p class="sub">
+                Tu teléfono y correo nunca se muestran: todo pasa por el chat de la app. Y la ubicación exacta
+                solo la ves tú; los demás ven un punto aproximado.
+              </p>
+            </div>
           </div>
-          <h3>Bienvenido a Rastro</h3>
-          <p class="sub">
-            El mapa de mascotas perdidas y encontradas de tu barrio. Publica un aviso o ayuda a alguien a
-            reencontrarse con su mascota.
-          </p>
-        </div>
-        <div class="onboard-step hidden" data-step="1">
-          <div class="onboard-emoji">
-            <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>
-          </div>
-          <h3>Publica en 30 segundos</h3>
-          <p class="sub">
-            Saca una foto, marca el punto en el mapa y listo. Mientras más datos, más fácil es reconocerla.
-          </p>
-        </div>
-        <div class="onboard-step hidden" data-step="2">
-          <div class="onboard-emoji">
-            <svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>
-          </div>
-          <h3>Tu privacidad, protegida</h3>
-          <p class="sub">
-            Tu teléfono y correo nunca se muestran: todo pasa por el chat de la app. Y la ubicación exacta
-            solo la ves tú; los demás ven un punto aproximado.
-          </p>
         </div>
         <div class="onboard-dots"><i class="active"></i><i></i><i></i></div>
         <div class="modal-actions">

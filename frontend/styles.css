@@ -290,7 +290,7 @@ header {
   backdrop-filter: saturate(140%) blur(14px);
   -webkit-backdrop-filter: saturate(140%) blur(14px);
   color: var(--ink);
-  padding: 18px 20px 16px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--line);
   border-bottom-left-radius: var(--r-xl);
   border-bottom-right-radius: var(--r-xl);
@@ -306,54 +306,68 @@ header h1 {
   font-weight: 600;
   letter-spacing: -0.015em;
 }
-header p {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--ink-soft);
-  font-weight: 400;
-  max-width: 34ch;
+/* El botón de opciones se va al extremo derecho de la cabecera. */
+.menu-btn {
+  margin-left: auto;
 }
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-.loc-chip {
+
+/* --- Patita GPS: el brillo cuenta el estado de la ubicación. El texto que
+       antes iba en el chip ahora se lee dentro del menú de Opciones. --- */
+.gps-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  padding: 6px 12px;
-  border-radius: var(--r-pill);
-  font-size: 12px;
-  color: var(--ink-soft);
-  min-width: 0;
-}
-.loc-chip > .ic {
-  color: var(--green);
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   flex: none;
 }
-.loc-chip > span {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.gps-badge .brand-logo {
+  position: relative;
+  transition: color var(--ease);
 }
-.logout-btn {
-  background: none;
-  border: none;
-  color: var(--ink-soft);
-  font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-  padding: 0;
+.gps-halo {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--green-soft) 0%, transparent 70%);
+  opacity: 0;
 }
-.logout-btn:hover {
-  color: var(--ink);
+.gps-badge[data-estado='buscando'] .brand-logo {
+  color: var(--green);
+  opacity: 0.65;
+}
+.gps-badge[data-estado='buscando'] .gps-halo,
+.gps-badge[data-estado='ok'] .gps-halo {
+  animation: latido 2.6s ease-in-out infinite;
+}
+.gps-badge[data-estado='ok'] .brand-logo {
+  color: var(--green);
+  animation: brillo 2.6s ease-in-out infinite;
+}
+.gps-badge[data-estado='manual'] .brand-logo,
+.gps-badge[data-estado='sin'] .brand-logo {
+  color: var(--ink-faint);
+}
+@keyframes latido {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+}
+@keyframes brillo {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    filter: drop-shadow(0 0 5px var(--green));
+  }
 }
 
 nav.tabs {
@@ -857,13 +871,19 @@ input[type='file'] {
   background: var(--rust-soft);
 }
 
-footer.note {
-  font-size: 11.5px;
-  color: var(--ink-soft);
-  text-align: center;
-  padding: 10px 24px 26px;
-  line-height: 1.6;
+/* ---------- Privacidad ---------- */
+.priv-title {
+  margin: 18px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-ink);
 }
+.danger-zone .priv-title {
+  margin-top: 0;
+}
+
 .toast {
   position: fixed;
   bottom: calc(18px + env(safe-area-inset-bottom));
@@ -936,12 +956,7 @@ footer.note {
   align-items: center;
 }
 
-/* ---------- Header: acciones ---------- */
-.header-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
+/* ---------- Botones redondos (cabecera y modales) ---------- */
 .icon-btn.dark {
   display: inline-flex;
   align-items: center;
@@ -1189,6 +1204,130 @@ footer.note {
   border-color: var(--ink-faint);
 }
 
+/* ---------- Panel lateral de opciones ---------- */
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-ventana);
+}
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(42, 49, 47, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: aparecer 180ms ease;
+}
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(320px, 86vw);
+  padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  border-radius: var(--r-xl) 0 0 var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  animation: entrar-derecha 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes entrar-derecha {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.drawer-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.drawer-head .icon-btn.cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 16px;
+  cursor: pointer;
+}
+.drawer-head .icon-btn.cerrar:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 12px 10px;
+  background: none;
+  border: none;
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.drawer-item:hover {
+  background: var(--paper-2);
+}
+.drawer-item .ic,
+.drawer-ico {
+  color: var(--green-ink);
+  flex: none;
+}
+.drawer-item.active .ic {
+  color: var(--green);
+}
+.drawer-item.danger,
+.drawer-item.danger .ic {
+  color: var(--rust-ink);
+}
+.drawer-ico {
+  display: inline-flex;
+  width: 1.15em;
+  height: 1.15em;
+}
+.drawer-loc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.drawer-loc[data-estado='manual'] {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+.drawer-loc[data-estado='sin'] {
+  background: var(--rust-soft);
+  color: var(--rust-ink);
+}
+
 /* ---------- Buscador de direcciones ---------- */
 .addr-search {
   position: relative;
@@ -1309,6 +1448,28 @@ footer.note {
   text-align: center;
   max-width: 400px;
 }
+/* Ventana del carril: oculta los pasos vecinos sin recortar el alto del cartel
+   (el alto lo marca el paso más alto, así no salta al deslizar). */
+.onboard-viewport {
+  overflow: hidden;
+}
+.onboard-track {
+  display: flex;
+  align-items: stretch;
+  transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Deja el gesto vertical (scroll) al navegador y se queda el horizontal. */
+  touch-action: pan-y;
+}
+.onboard-step {
+  flex: 0 0 100%;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.onboard-step h3 {
+  display: block;
+}
 .onboard-emoji {
   display: flex;
   align-items: center;
@@ -1328,6 +1489,10 @@ footer.note {
 .onboard .sub {
   font-size: 14px;
   line-height: 1.6;
+  /* Que el texto se encuadre: ancho de lectura corto y sin líneas viudas. */
+  max-width: 30ch;
+  margin: 0 auto;
+  text-wrap: pretty;
 }
 .onboard-dots {
   display: flex;
