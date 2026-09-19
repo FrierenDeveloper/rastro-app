@@ -16,10 +16,12 @@
 // devolver la fila.
 //
 // HALLAZGOS (comportamiento real de hoy; NO se arregla desde aquí):
-//   1. Una foto con un mimetype que multer no permite (p. ej. text/plain) no
-//      produce un 400 con mensaje, sino un error que sube al manejador de
-//      errores: la respuesta es un 500 sin cuerpo JSON. El cliente no se entera
-//      de que el problema era el formato.
+//   1. Una foto con un mimetype que multer no permite (p. ej. text/plain) la
+//      corta el fileFilter y el manejador central de server.js la traduce a un
+//      400 con JSON ('Formato de imagen no permitido.'). Ese 400 lo pone
+//      server.js, NO el router: montado sin manejador de errores la respuesta
+//      era un 500 en HTML (lo que este archivo medía antes). El manejador se
+//      replica abajo para no medir una app que no existe en producción.
 //   2. Una imagen con el mimetype permitido pero con bytes que no son de
 //      imagen responde 400 ('El archivo no es una imagen válida.') DESPUÉS de
 //      haber pasado por los validadores: el mensaje no distingue entre "no
@@ -31,6 +33,21 @@ import { db, storage, push, crearApp, pedir, tokenPara } from './helpers/aislar.
 import reportsRouter from '../routes/reports.js';
 
 const app = crearApp({ '/api/reports': reportsRouter });
+
+// Copia literal del manejador de errores de server.js (líneas 184-197): es el
+// que convierte el error del fileFilter de multer en un 400 con JSON.
+app.use((err, req, res, _next) => {
+  if (err && err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'La foto es demasiado grande (máximo 5 MB).' });
+    }
+    return res.status(400).json({ error: 'No se pudo procesar la imagen subida.' });
+  }
+  if (err && err.message === 'Formato de imagen no permitido.') {
+    return res.status(400).json({ error: err.message });
+  }
+  res.status(err.status || 500).json({ error: 'Ocurrió un error en el servidor.' });
+});
 
 const SUB = 'duena-1';
 const OTRO = 'curioso-2';
@@ -765,7 +782,7 @@ describe('POST /api/reports/ · foto (multer + magic bytes)', () => {
     expect(storage.savePhoto).toHaveBeenCalledWith(GRANDE, 'image/jpeg');
   });
 
-  it('un mimetype no permitido lo corta el filtro de multer (500 sin JSON)', async () => {
+  it('un mimetype no permitido lo corta el filtro de multer con un 400 en JSON', async () => {
     base();
     const res = await crearConFoto(AVISO, {
       buffer: Buffer.from('hola'),
@@ -773,9 +790,8 @@ describe('POST /api/reports/ · foto (multer + magic bytes)', () => {
       tipo: 'text/plain'
     });
 
-    expect(res.status).toBe(500);
-    // El error del fileFilter llega al manejador de errores con su mensaje.
-    expect(res.text).toContain('Formato de imagen no permitido.');
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'Formato de imagen no permitido.' });
     expect(storage.savePhoto).not.toHaveBeenCalled();
     expect(creados).toHaveLength(0);
   });
@@ -790,7 +806,8 @@ describe('POST /api/reports/ · foto (multer + magic bytes)', () => {
     base();
     const res = await crearConFoto(AVISO, { buffer: JPEG, nombre, tipo });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'Formato de imagen no permitido.' });
     expect(storage.savePhoto).not.toHaveBeenCalled();
     expect(creados).toHaveLength(0);
   });
