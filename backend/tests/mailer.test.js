@@ -24,6 +24,7 @@ const CORREO = {
 
 let registro;
 let aviso;
+let fallo;
 
 // Recarga el módulo con el entorno pedido (undefined = variable ausente).
 function cargarMailer({ apiKey, from, nodeEnv = 'test' } = {}) {
@@ -40,6 +41,7 @@ function cargarMailer({ apiKey, from, nodeEnv = 'test' } = {}) {
 beforeEach(() => {
   registro = vi.spyOn(console, 'log').mockImplementation(() => {});
   aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  fallo = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -87,6 +89,7 @@ describe('sin clave, fuera de producción', () => {
       '  Enlace de recuperación: https://rastro.cl/reset?token=abc'
     ]);
     expect(aviso).not.toHaveBeenCalled();
+    expect(fallo).not.toHaveBeenCalled();
     expect(falso).not.toHaveBeenCalled();
   });
 
@@ -94,33 +97,40 @@ describe('sin clave, fuera de producción', () => {
     await mailer.sendMail(CORREO);
 
     expect(registro).toHaveBeenCalledTimes(4);
+    expect(fallo).not.toHaveBeenCalled();
   });
 });
 
 describe('sin clave, en producción', () => {
-  it('sólo avisa por consola y nunca imprime el contenido del correo', async () => {
+  it('falla de forma visible: error en consola, ok:false y sin imprimir el correo', async () => {
     const falso = vi.fn();
     vi.stubGlobal('fetch', falso);
     const mailerProduccion = cargarMailer({ nodeEnv: 'production' });
 
-    await expect(mailerProduccion.sendMail(CORREO)).resolves.toEqual({ skipped: true });
+    await expect(mailerProduccion.sendMail(CORREO)).resolves.toEqual({
+      ok: false,
+      skipped: true,
+      error: 'Sin proveedor de correo configurado.'
+    });
 
-    expect(aviso).toHaveBeenCalledTimes(1);
-    expect(aviso).toHaveBeenCalledWith(
+    expect(fallo).toHaveBeenCalledTimes(1);
+    expect(fallo).toHaveBeenCalledWith(
       '[mailer] RESEND_API_KEY no configurada: no se envió el correo a ana@ejemplo.cl.'
     );
+    expect(aviso).not.toHaveBeenCalled();
     expect(registro).not.toHaveBeenCalled();
-    const salida = [...registro.mock.calls, ...aviso.mock.calls].flat().join(' ');
+    const salida = [...registro.mock.calls, ...aviso.mock.calls, ...fallo.mock.calls].flat().join(' ');
     expect(salida).not.toContain('token=abc');
     expect(falso).not.toHaveBeenCalled();
   });
 
-  it('en cualquier otro entorno que no sea producción sí imprime', async () => {
+  it('en cualquier otro entorno que no sea producción sí imprime y no marca ok:false', async () => {
     const mailerStaging = cargarMailer({ nodeEnv: 'staging' });
 
-    await mailerStaging.sendMail(CORREO);
+    await expect(mailerStaging.sendMail(CORREO)).resolves.toEqual({ skipped: true });
 
     expect(aviso).not.toHaveBeenCalled();
+    expect(fallo).not.toHaveBeenCalled();
     expect(registro).toHaveBeenCalledTimes(4);
   });
 });
@@ -155,6 +165,20 @@ describe('con clave (Resend)', () => {
     expect(respuesta.json).toHaveBeenCalledTimes(1);
     expect(registro).not.toHaveBeenCalled();
     expect(aviso).not.toHaveBeenCalled();
+    expect(fallo).not.toHaveBeenCalled();
+  });
+
+  it('en producción con clave sí envía por Resend y no marca ok:false', async () => {
+    const respuesta = { ok: true, status: 200, json: vi.fn().mockResolvedValue({ id: 'correo-3' }) };
+    const falso = vi.fn().mockResolvedValue(respuesta);
+    vi.stubGlobal('fetch', falso);
+    const mailerProduccion = cargarMailer({ apiKey: 're_abc123', nodeEnv: 'production' });
+
+    await expect(mailerProduccion.sendMail(CORREO)).resolves.toEqual({ id: 'correo-3' });
+
+    expect(falso).toHaveBeenCalledTimes(1);
+    expect(fallo).not.toHaveBeenCalled();
+    expect(registro).not.toHaveBeenCalled();
   });
 
   it('usa el remitente por defecto cuando MAIL_FROM no está configurado', async () => {
