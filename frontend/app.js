@@ -14,8 +14,11 @@ let userLoc = { lat: -33.4489, lng: -70.6693 }; // Santiago, Chile (fallback)
 let photoFile = { found: null, lost: null, reunion: null };
 let pickedLoc = { found: null, lost: null };
 let listMap, clusterGroup, mapFound, mapLost, markerFound, markerLost;
-let userMarker = null, userAccuracy = null, destinoMarker = null;
-let ultimaUbicacion = null, primeraUbicacion = true;
+let userMarker = null,
+  userAccuracy = null,
+  destinoMarker = null;
+let ultimaUbicacion = null,
+  primeraUbicacion = true;
 let pickedManual = { found: false, lost: false };
 let allReports = [];
 let myReports = [];
@@ -34,11 +37,11 @@ const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', ot
 //   - perro: radio típico ~400 m (Ignatius 2015, citando a Lord et al. 2007)
 // Lo que crece con el tiempo es una modelización nuestra (raíz del tiempo).
 const RADIO_PERFIL = {
-  gato:   { base: 0.05, crece: 0.25, tope: 1.5 },
-  perro:  { base: 0.40, crece: 1.60, tope: 15.0 },
-  ave:    { base: 0.30, crece: 2.00, tope: 30.0 },
+  gato: { base: 0.05, crece: 0.25, tope: 1.5 },
+  perro: { base: 0.4, crece: 1.6, tope: 15.0 },
+  ave: { base: 0.3, crece: 2.0, tope: 30.0 },
   conejo: { base: 0.15, crece: 0.35, tope: 2.0 },
-  otro:   { base: 0.30, crece: 1.00, tope: 10.0 }
+  otro: { base: 0.3, crece: 1.0, tope: 10.0 }
 };
 function radioBusquedaKm(tipo, horas) {
   const p = RADIO_PERFIL[tipo] || RADIO_PERFIL.otro;
@@ -70,8 +73,14 @@ function consejoBusqueda(tipo, horas) {
 // en oscuro sin duplicar el gráfico.
 // Eje X = horas (0 a 72), eje Y = radio sugerido. Marca el punto del usuario.
 function graficoRadioSVG(tipo, horasUsuario) {
-  const W = 320, H = 150, ML = 46, MR = 10, MT = 16, MB = 24;
-  const ancho = W - ML - MR, alto = H - MT - MB;
+  const W = 320,
+    H = 150,
+    ML = 46,
+    MR = 10,
+    MT = 16,
+    MB = 24;
+  const ancho = W - ML - MR,
+    alto = H - MT - MB;
   const horasMax = 72;
   const puntos = [];
   for (let i = 0; i <= 36; i++) {
@@ -83,16 +92,25 @@ function graficoRadioSVG(tipo, horasUsuario) {
   const y = km => MT + alto - (km / kmMax) * alto;
 
   const linea = puntos.map((p, i) => `${i ? 'L' : 'M'}${x(p.h).toFixed(1)},${y(p.km).toFixed(1)}`).join(' ');
-  const area = `M${x(0)},${y(0)} ` + puntos.map(p => `L${x(p.h).toFixed(1)},${y(p.km).toFixed(1)}`).join(' ') + ` L${x(horasMax)},${y(0)} Z`;
+  const area =
+    `M${x(0)},${y(0)} ` +
+    puntos.map(p => `L${x(p.h).toFixed(1)},${y(p.km).toFixed(1)}`).join(' ') +
+    ` L${x(horasMax)},${y(0)} Z`;
 
-  const marcasX = [0, 24, 48, 72].map(h =>
-    `<line x1="${x(h).toFixed(1)}" y1="${MT + alto}" x2="${x(h).toFixed(1)}" y2="${MT + alto + 4}" stroke="var(--line)"/>
+  const marcasX = [0, 24, 48, 72]
+    .map(
+      h =>
+        `<line x1="${x(h).toFixed(1)}" y1="${MT + alto}" x2="${x(h).toFixed(1)}" y2="${MT + alto + 4}" stroke="var(--line)"/>
      <text x="${x(h).toFixed(1)}" y="${H - 6}" font-size="9" text-anchor="middle" fill="var(--ink-soft)">${h === 0 ? 'ahora' : h + ' h'}</text>`
-  ).join('');
-  const marcasY = [0, kmMax / 2, kmMax].map(km =>
-    `<line x1="${ML - 4}" y1="${y(km).toFixed(1)}" x2="${ML}" y2="${y(km).toFixed(1)}" stroke="var(--line)"/>
+    )
+    .join('');
+  const marcasY = [0, kmMax / 2, kmMax]
+    .map(
+      km =>
+        `<line x1="${ML - 4}" y1="${y(km).toFixed(1)}" x2="${ML}" y2="${y(km).toFixed(1)}" stroke="var(--line)"/>
      <text x="${ML - 6}" y="${(y(km) + 3).toFixed(1)}" font-size="9" text-anchor="end" fill="var(--ink-soft)">${fmtRadio(km)}</text>`
-  ).join('');
+    )
+    .join('');
 
   const hUser = Math.min(horasMax, Math.max(0, Number(horasUsuario) || 0));
   const kmUser = radioBusquedaKm(tipo, hUser);
@@ -122,8 +140,9 @@ function actualizarRadioHint() {
   }
   const km = radioBusquedaKm(tipo, horas);
   if (el) {
-    el.innerHTML = `🔍 Te sugerimos revisar <b>${fmtRadio(km)}</b> a la redonda y avisaremos a las personas con alertas de zona dentro de ese radio.`
-      + `<br><span class="hint-suave">${consejoBusqueda(tipo, horas)}</span>`;
+    el.innerHTML =
+      `🔍 Te sugerimos revisar <b>${fmtRadio(km)}</b> a la redonda y avisaremos a las personas con alertas de zona dentro de ese radio.` +
+      `<br><span class="hint-suave">${consejoBusqueda(tipo, horas)}</span>`;
   }
   if (cont) {
     cont.innerHTML = `<div class="chart-card">
@@ -141,7 +160,11 @@ function actualizarRadioHint() {
 // Nota: CARTO y Stadia ya exigen API key (devuelven tiles con marca de agua),
 // por eso no se usan aquí.
 const TILE_PROVIDERS = [
-  { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', attribution: '© Esri', maxZoom: 19 },
+  {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: '© Esri',
+    maxZoom: 19
+  },
   { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '© OpenStreetMap', maxZoom: 19 },
   { url: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png', attribution: '© OpenTopoMap', maxZoom: 17 }
 ];
@@ -177,16 +200,23 @@ function agregarCapaTiles(map) {
 function esc(v) {
   if (v === null || v === undefined) return '';
   return String(v)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 function toast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
+  t.textContent = msg;
+  t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2400);
 }
 function timeAgo(ts) {
-  const diff = Date.now() - ts, m = Math.floor(diff / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  const diff = Date.now() - ts,
+    m = Math.floor(diff / 60000),
+    h = Math.floor(m / 60),
+    d = Math.floor(h / 24);
   if (d > 0) return `hace ${d} día${d > 1 ? 's' : ''}`;
   if (h > 0) return `hace ${h} hora${h > 1 ? 's' : ''}`;
   if (m > 0) return `hace ${m} min`;
@@ -198,11 +228,19 @@ function compressImage(file) {
     reader.onload = e => {
       const img = new Image();
       img.onload = () => {
-        let w = img.width, h = img.height; const max = 800;
-        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
-        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        let w = img.width,
+          h = img.height;
+        const max = 800;
+        if (w > h && w > max) {
+          h = Math.round((h * max) / w);
+          w = max;
+        } else if (h >= w && h > max) {
+          w = Math.round((w * max) / h);
+          h = max;
+        }
         const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
+        canvas.width = w;
+        canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.75);
       };
@@ -218,10 +256,16 @@ async function api(path, { method = 'GET', body = null, isForm = false, auth = t
   if (auth && token) headers['Authorization'] = 'Bearer ' + token;
   if (body && !isForm) headers['Content-Type'] = 'application/json';
   const res = await fetch(API_BASE + path, {
-    method, headers, body: isForm ? body : (body ? JSON.stringify(body) : undefined)
+    method,
+    headers,
+    body: isForm ? body : body ? JSON.stringify(body) : undefined
   });
   let data = {};
-  try { data = await res.json(); } catch (e) { /* respuesta vacía */ }
+  try {
+    data = await res.json();
+  } catch (e) {
+    /* respuesta vacía */
+  }
   if (!res.ok) {
     if (res.status === 401 && auth && token) logout();
     throw new Error(data.error || 'Ocurrió un error.');
@@ -229,7 +273,7 @@ async function api(path, { method = 'GET', body = null, isForm = false, auth = t
   return data;
 }
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
@@ -245,7 +289,9 @@ function fotoSrc(u) {
 async function loadConfig() {
   try {
     config = await api('/api/config', { auth: false });
-  } catch (e) { /* usa valores por defecto */ }
+  } catch (e) {
+    /* usa valores por defecto */
+  }
   if (config.pushEnabled) document.getElementById('btn-push').classList.remove('hidden');
   if (config.googleClientId) initGoogle();
 }
@@ -261,9 +307,13 @@ function showApp() {
   document.getElementById('app').classList.remove('hidden');
 }
 function logout() {
-  token = null; me = null;
+  token = null;
+  me = null;
   localStorage.removeItem('rastro_token');
-  if (currentConv.poll) { clearInterval(currentConv.poll); currentConv.poll = null; }
+  if (currentConv.poll) {
+    clearInterval(currentConv.poll);
+    currentConv.poll = null;
+  }
   ubicacion.detener();
   showAuth();
 }
@@ -297,37 +347,54 @@ document.getElementById('link-back-login').addEventListener('click', e => {
 
 document.getElementById('form-login').addEventListener('submit', async e => {
   e.preventDefault();
-  const err = document.getElementById('login-error'); err.classList.remove('show');
+  const err = document.getElementById('login-error');
+  err.classList.remove('show');
   try {
     const data = await api('/api/auth/login', {
-      method: 'POST', auth: false, body: {
+      method: 'POST',
+      auth: false,
+      body: {
         email: document.getElementById('login-email').value.trim(),
         password: document.getElementById('login-password').value
       }
     });
     onAuthSuccess(data.token);
-  } catch (ex) { err.textContent = ex.message; err.classList.add('show'); }
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('show');
+  }
 });
 
 document.getElementById('form-forgot').addEventListener('submit', async e => {
   e.preventDefault();
-  const err = document.getElementById('forgot-error'); const okEl = document.getElementById('forgot-ok');
-  err.classList.remove('show'); okEl.classList.remove('show');
+  const err = document.getElementById('forgot-error');
+  const okEl = document.getElementById('forgot-ok');
+  err.classList.remove('show');
+  okEl.classList.remove('show');
   try {
     const data = await api('/api/auth/forgot', {
-      method: 'POST', auth: false, body: { email: document.getElementById('forgot-email').value.trim() }
+      method: 'POST',
+      auth: false,
+      body: { email: document.getElementById('forgot-email').value.trim() }
     });
-    okEl.textContent = data.message; okEl.classList.add('show');
-  } catch (ex) { err.textContent = ex.message; err.classList.add('show'); }
+    okEl.textContent = data.message;
+    okEl.classList.add('show');
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('show');
+  }
 });
 
 document.getElementById('form-register').addEventListener('submit', async e => {
   e.preventDefault();
-  const err = document.getElementById('register-error'); err.classList.remove('show');
+  const err = document.getElementById('register-error');
+  err.classList.remove('show');
   try {
     const { challenge } = await api('/api/auth/challenge', { auth: false });
     const data = await api('/api/auth/register', {
-      method: 'POST', auth: false, body: {
+      method: 'POST',
+      auth: false,
+      body: {
         email: document.getElementById('register-email').value.trim(),
         password: document.getElementById('register-password').value,
         phone: document.getElementById('register-phone').value.trim(),
@@ -336,22 +403,38 @@ document.getElementById('form-register').addEventListener('submit', async e => {
       }
     });
     onAuthSuccess(data.token);
-  } catch (ex) { err.textContent = ex.message; err.classList.add('show'); }
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('show');
+  }
 });
 
 document.getElementById('form-reset').addEventListener('submit', async e => {
   e.preventDefault();
-  const err = document.getElementById('reset-error'); err.classList.remove('show');
+  const err = document.getElementById('reset-error');
+  err.classList.remove('show');
   const tok = new URLSearchParams(location.search).get('reset');
   try {
-    await api('/api/auth/reset', { method: 'POST', auth: false, body: { token: tok, password: document.getElementById('reset-password').value } });
+    await api('/api/auth/reset', {
+      method: 'POST',
+      auth: false,
+      body: { token: tok, password: document.getElementById('reset-password').value }
+    });
     toast('Contraseña actualizada. Inicia sesión.');
     history.replaceState(null, '', location.pathname);
     showAuth();
-  } catch (ex) { err.textContent = ex.message; err.classList.add('show'); }
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('show');
+  }
 });
 
-const NOTAS_PW = { 1: 'Débil: agrega mayúsculas, números o símbolos.', 2: 'Aceptable.', 3: 'Buena.', 4: 'Excelente.' };
+const NOTAS_PW = {
+  1: 'Débil: agrega mayúsculas, números o símbolos.',
+  2: 'Aceptable.',
+  3: 'Buena.',
+  4: 'Excelente.'
+};
 function fuerzaPassword(pw) {
   let score = 1;
   if (pw.length >= 12) score++;
@@ -391,12 +474,22 @@ function initGoogle() {
       client_id: config.googleClientId,
       callback: async resp => {
         try {
-          const data = await api('/api/auth/google', { method: 'POST', auth: false, body: { credential: resp.credential } });
+          const data = await api('/api/auth/google', {
+            method: 'POST',
+            auth: false,
+            body: { credential: resp.credential }
+          });
           onAuthSuccess(data.token);
-        } catch (ex) { toast(ex.message); }
+        } catch (ex) {
+          toast(ex.message);
+        }
       }
     });
-    google.accounts.id.renderButton(document.querySelector('.g_id_signin'), { theme: 'outline', size: 'large', width: 300 });
+    google.accounts.id.renderButton(document.querySelector('.g_id_signin'), {
+      theme: 'outline',
+      size: 'large',
+      width: 300
+    });
   };
   start();
 }
@@ -404,12 +497,19 @@ function initGoogle() {
 document.getElementById('btn-logout').addEventListener('click', logout);
 
 document.getElementById('btn-delete-account').addEventListener('click', async () => {
-  if (!confirm('Esto eliminará tu cuenta, tus avisos, tus fotos y tus mensajes de forma permanente. ¿Continuar?')) return;
+  if (
+    !confirm(
+      'Esto eliminará tu cuenta, tus avisos, tus fotos y tus mensajes de forma permanente. ¿Continuar?'
+    )
+  )
+    return;
   try {
     await api('/api/auth/me', { method: 'DELETE' });
     toast('Cuenta eliminada.');
     logout();
-  } catch (ex) { toast(ex.message); }
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 
 /* ============ Tabs ============ */
@@ -419,13 +519,31 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'home') { setTimeout(() => listMap && listMap.invalidateSize(), 50); renderList().then(renderListMap).catch(() => {}); }
-    if (btn.dataset.tab === 'found') { asegurarPicker('found'); }
-    if (btn.dataset.tab === 'lost') { asegurarPicker('lost'); }
-    if (btn.dataset.tab === 'chats') { cerrarConversacion(); renderThreads(); }
-    if (btn.dataset.tab === 'exitos') { renderReunions(); }
-    if (btn.dataset.tab === 'admin') { renderAdmin(); }
-    if (btn.dataset.tab === 'inbox') { renderInbox(); }
+    if (btn.dataset.tab === 'home') {
+      setTimeout(() => listMap && listMap.invalidateSize(), 50);
+      renderList()
+        .then(renderListMap)
+        .catch(() => {});
+    }
+    if (btn.dataset.tab === 'found') {
+      asegurarPicker('found');
+    }
+    if (btn.dataset.tab === 'lost') {
+      asegurarPicker('lost');
+    }
+    if (btn.dataset.tab === 'chats') {
+      cerrarConversacion();
+      renderThreads();
+    }
+    if (btn.dataset.tab === 'exitos') {
+      renderReunions();
+    }
+    if (btn.dataset.tab === 'admin') {
+      renderAdmin();
+    }
+    if (btn.dataset.tab === 'inbox') {
+      renderInbox();
+    }
   });
 });
 
@@ -449,8 +567,8 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 const UBICACION_CLAVE = 'rastro_ubicacion';
 const UBICACION_MAX_MS = 5 * 60 * 1000; // a partir de 5 min se considera vieja
 const ubicacion = {
-  ultima: null,      // { lat, lng, accuracy, ts }
-  watchId: null,     // solo si el usuario activa el seguimiento a propósito
+  ultima: null, // { lat, lng, accuracy, ts }
+  watchId: null, // solo si el usuario activa el seguimiento a propósito
   pidiendo: false,
   // Al cerrar sesión: se corta cualquier seguimiento y se olvida la ubicación.
   detener() {
@@ -459,14 +577,20 @@ const ubicacion = {
     }
     this.watchId = null;
     this.ultima = null;
-    try { localStorage.removeItem(UBICACION_CLAVE); } catch (e) { /* no crítico */ }
+    try {
+      localStorage.removeItem(UBICACION_CLAVE);
+    } catch (e) {
+      /* no crítico */
+    }
   }
 };
 
 function guardarUbicacion() {
   try {
     if (ubicacion.ultima) localStorage.setItem(UBICACION_CLAVE, JSON.stringify(ubicacion.ultima));
-  } catch (e) { /* modo privado o sin espacio: no es crítico */ }
+  } catch (e) {
+    /* modo privado o sin espacio: no es crítico */
+  }
 }
 function leerUbicacionGuardada() {
   try {
@@ -475,10 +599,12 @@ function leerUbicacionGuardada() {
     const u = JSON.parse(crudo);
     if (typeof u.lat !== 'number' || typeof u.lng !== 'number') return null;
     return u;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }
 function ubicacionVieja() {
-  return !ubicacion.ultima || (Date.now() - ubicacion.ultima.ts) > UBICACION_MAX_MS;
+  return !ubicacion.ultima || Date.now() - ubicacion.ultima.ts > UBICACION_MAX_MS;
 }
 
 // Marcador azul "estás aquí" (con el círculo de precisión) en el mapa principal.
@@ -486,8 +612,21 @@ function pintarMarcadorUsuario() {
   if (!listMap || !ultimaUbicacion) return;
   const { lat, lng, accuracy } = ultimaUbicacion;
   if (!userMarker) {
-    userAccuracy = L.circle([lat, lng], { radius: accuracy || 0, color: '#2B7DE9', weight: 1, fillColor: '#2B7DE9', fillOpacity: 0.12, interactive: false }).addTo(listMap);
-    userMarker = L.circleMarker([lat, lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#2B7DE9', fillOpacity: 1 }).addTo(listMap);
+    userAccuracy = L.circle([lat, lng], {
+      radius: accuracy || 0,
+      color: '#2B7DE9',
+      weight: 1,
+      fillColor: '#2B7DE9',
+      fillOpacity: 0.12,
+      interactive: false
+    }).addTo(listMap);
+    userMarker = L.circleMarker([lat, lng], {
+      radius: 7,
+      color: '#fff',
+      weight: 2,
+      fillColor: '#2B7DE9',
+      fillOpacity: 1
+    }).addTo(listMap);
     userMarker.bindPopup('Estás aquí');
   } else {
     userMarker.setLatLng([lat, lng]);
@@ -563,7 +702,10 @@ function locateUser() {
 //     para no dejar el GPS encendido en segundo plano.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    if (estaSiguiendo()) { seguirUbicacion(false); actualizarBotonSeguir(); }
+    if (estaSiguiendo()) {
+      seguirUbicacion(false);
+      actualizarBotonSeguir();
+    }
     return;
   }
   if (token && ubicacionVieja()) pedirUbicacion();
@@ -596,7 +738,9 @@ function seguirUbicacion(activar) {
   }
   return false;
 }
-function estaSiguiendo() { return ubicacion.watchId !== null; }
+function estaSiguiendo() {
+  return ubicacion.watchId !== null;
+}
 
 // Refleja en el botón si el seguimiento está activo.
 function actualizarBotonSeguir() {
@@ -615,8 +759,16 @@ function initPicker(elId, key) {
   agregarCapaTiles(map);
   const marker = L.marker([userLoc.lat, userLoc.lng], { draggable: true }).addTo(map);
   pickedLoc[key] = { ...userLoc };
-  marker.on('dragend', () => { const p = marker.getLatLng(); pickedLoc[key] = { lat: p.lat, lng: p.lng }; pickedManual[key] = true; });
-  map.on('click', e => { marker.setLatLng(e.latlng); pickedLoc[key] = { lat: e.latlng.lat, lng: e.latlng.lng }; pickedManual[key] = true; });
+  marker.on('dragend', () => {
+    const p = marker.getLatLng();
+    pickedLoc[key] = { lat: p.lat, lng: p.lng };
+    pickedManual[key] = true;
+  });
+  map.on('click', e => {
+    marker.setLatLng(e.latlng);
+    pickedLoc[key] = { lat: e.latlng.lat, lng: e.latlng.lng };
+    pickedManual[key] = true;
+  });
   return { map, marker };
 }
 
@@ -638,7 +790,11 @@ function initAddressSearch(inputId, resultsId, onPick) {
   input.addEventListener('input', () => {
     clearTimeout(timer);
     const q = input.value.trim();
-    if (q.length < 3) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    if (q.length < 3) {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      return;
+    }
     timer = setTimeout(async () => {
       try {
         const { results } = await api('/api/geocode?q=' + encodeURIComponent(q));
@@ -647,11 +803,17 @@ function initAddressSearch(inputId, resultsId, onPick) {
           box.classList.remove('hidden');
           return;
         }
-        box.innerHTML = results.map(r =>
-          `<div class="addr-item" data-lat="${r.lat}" data-lng="${r.lng}" data-label="${esc(r.label)}">${esc(r.label)}</div>`
-        ).join('');
+        box.innerHTML = results
+          .map(
+            r =>
+              `<div class="addr-item" data-lat="${r.lat}" data-lng="${r.lng}" data-label="${esc(r.label)}">${esc(r.label)}</div>`
+          )
+          .join('');
         box.classList.remove('hidden');
-      } catch (e) { box.classList.add('hidden'); box.innerHTML = ''; }
+      } catch (e) {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+      }
     }, 350);
   });
   box.addEventListener('click', e => {
@@ -680,19 +842,26 @@ function initPhotoZone(zoneId, inputId, key) {
       const blob = await compressImage(input.files[0]);
       photoFile[key] = blob;
       mostrarPreviewFoto(zone, input, URL.createObjectURL(blob));
-    } catch (e) { toast('No se pudo procesar la foto.'); }
+    } catch (e) {
+      toast('No se pudo procesar la foto.');
+    }
   });
 }
 // Cambia el contenido visible de la zona sin tocar el <input>, para no perder
 // (ni duplicar) los listeners que ya están conectados.
 function mostrarPreviewFoto(zone, input, url) {
-  Array.from(zone.children).forEach(ch => { if (ch !== input) ch.remove(); });
+  Array.from(zone.children).forEach(ch => {
+    if (ch !== input) ch.remove();
+  });
   const img = document.createElement('img');
-  img.src = url; img.alt = 'Foto del animal';
+  img.src = url;
+  img.alt = 'Foto del animal';
   zone.appendChild(img);
 }
 function limpiarZonaFoto(zone, input) {
-  Array.from(zone.children).forEach(ch => { if (ch !== input) ch.remove(); });
+  Array.from(zone.children).forEach(ch => {
+    if (ch !== input) ch.remove();
+  });
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.innerHTML = '<b>📷</b>Toca para tomar o subir una foto';
@@ -710,7 +879,10 @@ function resetForm(key) {
 }
 function renderMatchBanner(containerId, matches) {
   const el = document.getElementById(containerId);
-  if (matches.length === 0) { el.innerHTML = ''; return; }
+  if (matches.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
   el.innerHTML = `<div class="match-banner">
     <h3>🐾 ${matches.length} posible${matches.length > 1 ? 's' : ''} coincidencia${matches.length > 1 ? 's' : ''} cerca</h3>
     <p>Mismo tipo de animal, color parecido y a menos de 5 km. Ábrelo desde "Mapa" para contactar dentro de la app.</p>
@@ -719,20 +891,35 @@ function renderMatchBanner(containerId, matches) {
 }
 async function handleSubmit(estado, key) {
   const get = id => document.getElementById(id + '-' + key).value.trim();
-  const tipo = get('tipo'), sexo = get('sexo'), color = get('color'), raza = get('raza'),
-        collar = get('collar'), desc = get('desc'), nombre = key === 'lost' ? get('nombre') : '';
-  if (!tipo || !color) { toast('Completa los campos obligatorios (*).'); return; }
+  const tipo = get('tipo'),
+    sexo = get('sexo'),
+    color = get('color'),
+    raza = get('raza'),
+    collar = get('collar'),
+    desc = get('desc'),
+    nombre = key === 'lost' ? get('nombre') : '';
+  if (!tipo || !color) {
+    toast('Completa los campos obligatorios (*).');
+    return;
+  }
 
   const loc = pickedLoc[key] || userLoc;
   const btn = document.querySelector(`#form-${key} .submit-btn`);
-  btn.disabled = true; btn.textContent = 'Publicando…';
+  btn.disabled = true;
+  btn.textContent = 'Publicando…';
 
   try {
     const fd = new FormData();
-    fd.append('estado', estado); fd.append('tipo', tipo); fd.append('sexo', sexo);
-    fd.append('color', color); fd.append('raza', raza); fd.append('collar', collar);
-    fd.append('descripcion', desc); fd.append('nombre_mascota', nombre);
-    fd.append('lat', loc.lat); fd.append('lng', loc.lng);
+    fd.append('estado', estado);
+    fd.append('tipo', tipo);
+    fd.append('sexo', sexo);
+    fd.append('color', color);
+    fd.append('raza', raza);
+    fd.append('collar', collar);
+    fd.append('descripcion', desc);
+    fd.append('nombre_mascota', nombre);
+    fd.append('lat', loc.lat);
+    fd.append('lng', loc.lng);
     if (estado === 'perdido') {
       const horas = document.getElementById('perdido-hace-lost').value;
       if (horas) fd.append('perdido_hace_horas', horas);
@@ -745,17 +932,28 @@ async function handleSubmit(estado, key) {
     try {
       const { matches } = await api(`/api/reports/${report.id}/matches`);
       renderMatchBanner('match-area-' + key, matches);
-    } catch (e) { /* el aviso ya se publicó; las coincidencias son un extra */ }
-    renderList().then(renderListMap).catch(() => {});
+    } catch (e) {
+      /* el aviso ya se publicó; las coincidencias son un extra */
+    }
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
   } catch (ex) {
     toast(ex.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = estado === 'encontrado' ? 'Publicar aviso de animal encontrado' : 'Publicar aviso de mascota perdida';
+    btn.textContent =
+      estado === 'encontrado' ? 'Publicar aviso de animal encontrado' : 'Publicar aviso de mascota perdida';
   }
 }
-document.getElementById('form-found').addEventListener('submit', e => { e.preventDefault(); handleSubmit('encontrado', 'found'); });
-document.getElementById('form-lost').addEventListener('submit', e => { e.preventDefault(); handleSubmit('perdido', 'lost'); });
+document.getElementById('form-found').addEventListener('submit', e => {
+  e.preventDefault();
+  handleSubmit('encontrado', 'found');
+});
+document.getElementById('form-lost').addEventListener('submit', e => {
+  e.preventDefault();
+  handleSubmit('perdido', 'lost');
+});
 document.getElementById('tipo-lost').addEventListener('change', actualizarRadioHint);
 document.getElementById('perdido-hace-lost').addEventListener('change', actualizarRadioHint);
 
@@ -764,7 +962,10 @@ async function fetchReports() {
   const tipo = document.getElementById('filter-tipo').value;
   const estado = document.getElementById('filter-estado').value;
   const q = (document.getElementById('search-text').value || '').trim();
-  const qs = new URLSearchParams(); if (tipo) qs.set('tipo', tipo); if (estado) qs.set('estado', estado); if (q) qs.set('q', q);
+  const qs = new URLSearchParams();
+  if (tipo) qs.set('tipo', tipo);
+  if (estado) qs.set('estado', estado);
+  if (q) qs.set('q', q);
   const { reports } = await api('/api/reports?' + qs.toString());
   allReports = reports.sort((a, b) => b.created_at - a.created_at);
 }
@@ -777,12 +978,14 @@ function reportCard(r) {
           <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}${r.raza ? ' · ' + esc(r.raza) : ''}</h4>
           <span class="tag ${r.estado === 'perdido' ? 'lost' : 'found'}">${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'}</span>
         </div>
-        <div class="report-meta">${r.sexo !== 'desconocido' ? ({ macho: 'Macho', hembra: 'Hembra' })[r.sexo] + ' · ' : ''}${r.collar ? 'Collar ' + esc(r.collar) + ' · ' : ''}${timeAgo(r.created_at)}${r.radio_km ? ' · 🔍 ~' + esc(r.radio_km) + ' km' : ''}</div>
+        <div class="report-meta">${r.sexo !== 'desconocido' ? { macho: 'Macho', hembra: 'Hembra' }[r.sexo] + ' · ' : ''}${r.collar ? 'Collar ' + esc(r.collar) + ' · ' : ''}${timeAgo(r.created_at)}${r.radio_km ? ' · 🔍 ~' + esc(r.radio_km) + ' km' : ''}</div>
         ${r.descripcion ? `<div class="report-meta">${esc(r.descripcion)}</div>` : ''}
         <div class="report-actions">
-          ${r.es_mio
-            ? `<button data-action="matches" data-id="${esc(r.id)}">Coincidencias</button>`
-            : `<button data-action="contact" data-id="${esc(r.id)}">Contactar</button><button data-action="flag" data-id="${esc(r.id)}">Reportar</button>`}
+          ${
+            r.es_mio
+              ? `<button data-action="matches" data-id="${esc(r.id)}">Coincidencias</button>`
+              : `<button data-action="contact" data-id="${esc(r.id)}">Contactar</button><button data-action="flag" data-id="${esc(r.id)}">Reportar</button>`
+          }
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
         </div>
         <div class="matches-box" id="matches-${esc(r.id)}" style="display:none;"></div>
@@ -806,13 +1009,18 @@ async function renderList() {
 
 async function toggleMatches(id) {
   const box = document.getElementById('matches-' + id);
-  if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  if (box.style.display === 'block') {
+    box.style.display = 'none';
+    return;
+  }
   box.style.display = 'block';
   box.innerHTML = '<span class="none">Buscando…</span>';
   try {
     const { matches } = await api(`/api/reports/${id}/matches`);
     box.innerHTML = matches.length
-      ? matches.map(m => `<div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`).join('')
+      ? matches
+          .map(m => `<div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`)
+          .join('')
       : `<span class="none">Sin coincidencias por ahora.</span>`;
   } catch (ex) {
     box.innerHTML = `<span class="none">${esc(ex.message)}</span>`;
@@ -826,7 +1034,8 @@ async function getCurrentLocOrNull() {
   return new Promise(resolve => {
     navigator.geolocation.getCurrentPosition(
       p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => resolve(null), { timeout: 6000 }
+      () => resolve(null),
+      { timeout: 6000 }
     );
   });
 }
@@ -837,7 +1046,10 @@ async function sendContact(id) {
   const body = { mensaje: ta.value.trim() };
   if (card.querySelector('.contact-loc').checked) {
     const loc = await getCurrentLocOrNull();
-    if (loc) { body.lat = loc.lat; body.lng = loc.lng; }
+    if (loc) {
+      body.lat = loc.lat;
+      body.lng = loc.lng;
+    }
   }
   try {
     await api(`/api/reports/${id}/messages`, { method: 'POST', body });
@@ -845,32 +1057,58 @@ async function sendContact(id) {
     ta.value = '';
     document.getElementById('contact-' + id).classList.add('hidden');
     actualizarBadgeChats();
-  } catch (ex) { toast(ex.message); }
+  } catch (ex) {
+    toast(ex.message);
+  }
 }
 async function shareReport(id) {
   const url = location.origin + '/?r=' + id;
   const shareData = { title: 'Rastro', text: 'Mira este aviso de mascota en Rastro', url };
   if (navigator.share) {
-    try { await navigator.share(shareData); } catch (e) { /* cancelado */ }
+    try {
+      await navigator.share(shareData);
+    } catch (e) {
+      /* cancelado */
+    }
   } else {
-    try { await navigator.clipboard.writeText(url); toast('Enlace copiado.'); } catch (e) { toast(url); }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('Enlace copiado.');
+    } catch (e) {
+      toast(url);
+    }
   }
 }
 async function flagReport(id) {
   if (!confirm('¿Reportar este aviso como inapropiado?')) return;
-  try { const r = await api(`/api/reports/${id}/flag`, { method: 'POST' }); toast(r.message); }
-  catch (ex) { toast(ex.message); }
+  try {
+    const r = await api(`/api/reports/${id}/flag`, { method: 'POST' });
+    toast(r.message);
+  } catch (ex) {
+    toast(ex.message);
+  }
 }
 
 document.getElementById('reports-list').addEventListener('click', e => {
-  const btn = e.target.closest('[data-action]'); if (!btn) return;
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
   const id = btn.dataset.id;
   switch (btn.dataset.action) {
-    case 'matches': toggleMatches(id); break;
-    case 'contact': toggleContact(id); break;
-    case 'send': sendContact(id); break;
-    case 'share': shareReport(id); break;
-    case 'flag': flagReport(id); break;
+    case 'matches':
+      toggleMatches(id);
+      break;
+    case 'contact':
+      toggleContact(id);
+      break;
+    case 'send':
+      sendContact(id);
+      break;
+    case 'share':
+      shareReport(id);
+      break;
+    case 'flag':
+      flagReport(id);
+      break;
   }
 });
 
@@ -886,20 +1124,40 @@ async function renderListMap() {
   clusterGroup.clearLayers();
   allReports.forEach(r => {
     const color = r.estado === 'perdido' ? '#D98A2B' : '#3F8361';
-    const marker = L.circleMarker([r.lat, r.lng], { radius: 9, fillColor: color, fillOpacity: 0.9, color: '#fff', weight: 2 });
-    marker.bindPopup(`<b>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}</b><br>${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'} · ${timeAgo(r.created_at)}`);
+    const marker = L.circleMarker([r.lat, r.lng], {
+      radius: 9,
+      fillColor: color,
+      fillOpacity: 0.9,
+      color: '#fff',
+      weight: 2
+    });
+    marker.bindPopup(
+      `<b>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}</b><br>${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'} · ${timeAgo(r.created_at)}`
+    );
     clusterGroup.addLayer(marker);
   });
 }
 
-document.getElementById('filter-tipo').addEventListener('change', () => { renderList().then(renderListMap); });
-document.getElementById('filter-estado').addEventListener('change', () => { renderList().then(renderListMap); });
+document.getElementById('filter-tipo').addEventListener('change', () => {
+  renderList().then(renderListMap);
+});
+document.getElementById('filter-estado').addEventListener('change', () => {
+  renderList().then(renderListMap);
+});
 let searchTimer = null;
 document.getElementById('search-text').addEventListener('input', () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { renderList().then(renderListMap).catch(() => {}); }, 350);
+  searchTimer = setTimeout(() => {
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
+  }, 350);
 });
-document.getElementById('btn-refresh').addEventListener('click', async () => { await renderList(); await renderListMap(); toast('Lista actualizada.'); });
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  await renderList();
+  await renderListMap();
+  toast('Lista actualizada.');
+});
 // "Mapa" y "Lista" cambian lo que se ve en la pantalla principal: el mapa
 // arriba (con el listado debajo) o solo el listado de avisos.
 function mostrarVistaHome(conMapa) {
@@ -913,12 +1171,16 @@ document.getElementById('btn-view-list').addEventListener('click', () => mostrar
 
 /* ============ Chats ============ */
 function actualizarBadgeChats() {
-  api('/api/reports/threads').then(({ threads }) => {
-    const total = threads.reduce((s, t) => s + t.unread, 0);
-    const b = document.getElementById('badge-chats');
-    if (total > 0) { b.textContent = total; b.classList.remove('hidden'); }
-    else b.classList.add('hidden');
-  }).catch(() => {});
+  api('/api/reports/threads')
+    .then(({ threads }) => {
+      const total = threads.reduce((s, t) => s + t.unread, 0);
+      const b = document.getElementById('badge-chats');
+      if (total > 0) {
+        b.textContent = total;
+        b.classList.remove('hidden');
+      } else b.classList.add('hidden');
+    })
+    .catch(() => {});
 }
 async function renderThreads() {
   const el = document.getElementById('threads-list');
@@ -927,12 +1189,17 @@ async function renderThreads() {
     const { threads } = await api('/api/reports/threads');
     const total = threads.reduce((s, t) => s + t.unread, 0);
     const b = document.getElementById('badge-chats');
-    if (total > 0) { b.textContent = total; b.classList.remove('hidden'); } else b.classList.add('hidden');
+    if (total > 0) {
+      b.textContent = total;
+      b.classList.remove('hidden');
+    } else b.classList.add('hidden');
     if (threads.length === 0) {
       el.innerHTML = `<div class="empty-state"><div class="big">💬</div>No tienes conversaciones todavía.<br>Escribe desde el mapa para contactar a alguien.</div>`;
       return;
     }
-    el.innerHTML = threads.map(t => `
+    el.innerHTML = threads
+      .map(
+        t => `
       <div class="thread" data-action="open" data-report="${esc(t.report_id)}" data-peer="${esc(t.peer_id)}" data-mio="${t.es_mio}">
         <div class="thread-ic">${TIPO_ICON[t.tipo] || '🐾'}</div>
         <div class="thread-body">
@@ -943,18 +1210,23 @@ async function renderThreads() {
           <div class="report-meta">${t.es_mio ? 'Tu aviso (' + (t.estado === 'perdido' ? 'perdido' : 'encontrado') + ')' : 'Escribiste sobre su aviso'} · ${timeAgo(t.last_at)}</div>
           <div class="thread-last">${esc(t.last_message || '')}</div>
         </div>
-      </div>`).join('');
+      </div>`
+      )
+      .join('');
   } catch (ex) {
     el.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
   }
 }
 document.getElementById('threads-list').addEventListener('click', e => {
-  const t = e.target.closest('[data-action="open"]'); if (!t) return;
+  const t = e.target.closest('[data-action="open"]');
+  if (!t) return;
   openConversation(t.dataset.report, t.dataset.peer, t.dataset.mio === 'true');
 });
 
 async function openConversation(reportId, peerId, esMio) {
-  currentConv.reportId = reportId; currentConv.peerId = peerId; currentConv.esMio = esMio;
+  currentConv.reportId = reportId;
+  currentConv.peerId = peerId;
+  currentConv.esMio = esMio;
   document.getElementById('threads-list').classList.add('hidden');
   document.getElementById('conversation').classList.remove('hidden');
   await loadConversation();
@@ -962,26 +1234,38 @@ async function openConversation(reportId, peerId, esMio) {
   currentConv.poll = setInterval(loadConversation, 15000);
 }
 function cerrarConversacion() {
-  if (currentConv.poll) { clearInterval(currentConv.poll); currentConv.poll = null; }
-  currentConv.reportId = null; currentConv.peerId = null;
+  if (currentConv.poll) {
+    clearInterval(currentConv.poll);
+    currentConv.poll = null;
+  }
+  currentConv.reportId = null;
+  currentConv.peerId = null;
   document.getElementById('conversation').classList.add('hidden');
   document.getElementById('threads-list').classList.remove('hidden');
 }
-document.getElementById('btn-conv-back').addEventListener('click', () => { cerrarConversacion(); renderThreads(); });
+document.getElementById('btn-conv-back').addEventListener('click', () => {
+  cerrarConversacion();
+  renderThreads();
+});
 
 async function loadConversation() {
   if (!currentConv.reportId || !currentConv.peerId) return;
   const box = document.getElementById('conv-msgs');
   try {
     const data = await api(`/api/reports/${currentConv.reportId}/threads/${currentConv.peerId}`);
-    document.getElementById('conv-title').textContent = `${data.peer_label} · ${TIPO_ICON[data.tipo] || '🐾'} ${data.color}`;
+    document.getElementById('conv-title').textContent =
+      `${data.peer_label} · ${TIPO_ICON[data.tipo] || '🐾'} ${data.color}`;
     box.innerHTML = data.messages.length
-      ? data.messages.map(m => `
+      ? data.messages
+          .map(
+            m => `
         <div class="msg ${m.mio ? 'mine' : 'theirs'}">
           <div class="msg-text">${esc(m.mensaje)}</div>
           ${m.lat !== null ? `<a class="msg-loc" href="https://www.openstreetmap.org/?mlat=${m.lat}&mlon=${m.lng}#map=16/${m.lat}/${m.lng}" target="_blank" rel="noopener">📍 ubicación compartida</a>` : ''}
           <div class="when">${timeAgo(m.created_at)}</div>
-        </div>`).join('')
+        </div>`
+          )
+          .join('')
       : '<p class="loc-note">Aún no hay mensajes.</p>';
     box.scrollTop = box.scrollHeight;
   } catch (ex) {
@@ -994,14 +1278,19 @@ document.getElementById('btn-conv-send').addEventListener('click', async () => {
   const body = { mensaje: ta.value.trim(), to_user_id: currentConv.peerId };
   if (document.getElementById('conv-attach-loc').checked) {
     const loc = await getCurrentLocOrNull();
-    if (loc) { body.lat = loc.lat; body.lng = loc.lng; }
+    if (loc) {
+      body.lat = loc.lat;
+      body.lng = loc.lng;
+    }
   }
   try {
     await api(`/api/reports/${currentConv.reportId}/messages`, { method: 'POST', body });
     ta.value = '';
     document.getElementById('conv-attach-loc').checked = false;
     await loadConversation();
-  } catch (ex) { toast(ex.message); }
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 
 /* ============ Mis avisos / inbox ============ */
@@ -1014,7 +1303,9 @@ async function renderInbox() {
       el.innerHTML = `<div class="empty-state"><div class="big">📭</div>Todavía no has publicado avisos.</div>`;
       return;
     }
-    el.innerHTML = reports.map(r => `
+    el.innerHTML = reports
+      .map(
+        r => `
       <div class="inbox-item" data-id="${esc(r.id)}">
         <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)} · ${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'}
           ${r.resolved ? '<span class="tag resolved">Resuelto</span>' : ''}
@@ -1029,11 +1320,16 @@ async function renderInbox() {
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
           <button data-action="delete" data-id="${esc(r.id)}">Eliminar</button>
         </div>
-      </div>`).join('');
-  } catch (ex) { el.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`; }
+      </div>`
+      )
+      .join('');
+  } catch (ex) {
+    el.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
 }
 document.getElementById('inbox-list').addEventListener('click', async e => {
-  const btn = e.target.closest('[data-action]'); if (!btn) return;
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
   if (action === 'share') return shareReport(id);
@@ -1044,15 +1340,26 @@ document.getElementById('inbox-list').addEventListener('click', async e => {
       await api(`/api/reports/${id}/resolve`, { method: 'POST', body: { resolved: false } });
       toast('Aviso reabierto.');
       renderInbox();
-    } catch (ex) { toast(ex.message); }
+    } catch (ex) {
+      toast(ex.message);
+    }
   }
   if (action === 'delete') {
     if (!confirm('¿Eliminar este aviso? Se borrará su foto de forma permanente.')) return;
-    try { await api(`/api/reports/${id}`, { method: 'DELETE' }); toast('Aviso eliminado.'); renderInbox(); renderList().then(renderListMap).catch(() => {}); }
-    catch (ex) { toast(ex.message); }
+    try {
+      await api(`/api/reports/${id}`, { method: 'DELETE' });
+      toast('Aviso eliminado.');
+      renderInbox();
+      renderList()
+        .then(renderListMap)
+        .catch(() => {});
+    } catch (ex) {
+      toast(ex.message);
+    }
   }
   if (action === 'edit') {
-    const r = myReports.find(x => x.id === id); if (!r) return;
+    const r = myReports.find(x => x.id === id);
+    if (!r) return;
     editingId = id;
     document.getElementById('edit-tipo').value = r.tipo;
     document.getElementById('edit-sexo').value = r.sexo;
@@ -1067,7 +1374,9 @@ document.getElementById('inbox-list').addEventListener('click', async e => {
     document.querySelector('nav.tabs button[data-tab="chats"]').click();
   }
 });
-document.getElementById('btn-edit-cancel').addEventListener('click', () => document.getElementById('edit-modal').classList.add('hidden'));
+document
+  .getElementById('btn-edit-cancel')
+  .addEventListener('click', () => document.getElementById('edit-modal').classList.add('hidden'));
 document.getElementById('form-edit').addEventListener('submit', async e => {
   e.preventDefault();
   if (!editingId) return;
@@ -1084,25 +1393,36 @@ document.getElementById('form-edit').addEventListener('submit', async e => {
     await api(`/api/reports/${editingId}`, { method: 'PATCH', body });
     document.getElementById('edit-modal').classList.add('hidden');
     toast('Aviso actualizado.');
-    renderInbox(); renderList().then(renderListMap).catch(() => {});
-  } catch (ex) { toast(ex.message); }
+    renderInbox();
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 
 /* ============ Notificaciones push ============ */
 async function actualizarBotonPush() {
   const btn = document.getElementById('btn-push');
-  if (!config.pushEnabled || !('serviceWorker' in navigator) || !('PushManager' in window)) { btn.classList.add('hidden'); return; }
+  if (!config.pushEnabled || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    btn.classList.add('hidden');
+    return;
+  }
   btn.classList.remove('hidden');
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     btn.classList.toggle('active', !!sub);
     btn.title = sub ? 'Notificaciones activadas (toca para desactivar)' : 'Activar notificaciones';
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 document.getElementById('btn-push').addEventListener('click', async () => {
   if (!config.pushEnabled) return toast('Notificaciones no configuradas en el servidor.');
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast('Este dispositivo no soporta notificaciones.');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window))
+    return toast('Este dispositivo no soporta notificaciones.');
   try {
     const reg = await navigator.serviceWorker.ready;
     const existing = await reg.pushManager.getSubscription();
@@ -1113,12 +1433,17 @@ document.getElementById('btn-push').addEventListener('click', async () => {
     } else {
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') return toast('No diste permiso para las notificaciones.');
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey) });
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey)
+      });
       await api('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
       toast('Notificaciones activadas.');
     }
     actualizarBotonPush();
-  } catch (ex) { toast(ex.message || 'No se pudieron cambiar las notificaciones.'); }
+  } catch (ex) {
+    toast(ex.message || 'No se pudieron cambiar las notificaciones.');
+  }
 });
 
 /* ============ Tema claro / oscuro ============ */
@@ -1151,16 +1476,27 @@ window.addEventListener('appinstalled', () => {
 });
 document.getElementById('btn-install').addEventListener('click', async () => {
   const btn = document.getElementById('btn-install');
-  if (!deferredInstall) { btn.classList.add('hidden'); return; }
+  if (!deferredInstall) {
+    btn.classList.add('hidden');
+    return;
+  }
   deferredInstall.prompt();
-  try { await deferredInstall.userChoice; } catch (e) { /* ignore */ }
+  try {
+    await deferredInstall.userChoice;
+  } catch (e) {
+    /* ignore */
+  }
   deferredInstall = null;
   btn.classList.add('hidden');
 });
 
 /* ============ Consejos ============ */
-document.getElementById('btn-tips').addEventListener('click', () => document.getElementById('tips-modal').classList.remove('hidden'));
-document.getElementById('btn-tips-close').addEventListener('click', () => document.getElementById('tips-modal').classList.add('hidden'));
+document
+  .getElementById('btn-tips')
+  .addEventListener('click', () => document.getElementById('tips-modal').classList.remove('hidden'));
+document
+  .getElementById('btn-tips-close')
+  .addEventListener('click', () => document.getElementById('tips-modal').classList.add('hidden'));
 
 /* ============ Onboarding (solo la primera vez) ============ */
 function initOnboarding() {
@@ -1170,12 +1506,21 @@ function initOnboarding() {
   const total = 3;
   let step = 0;
   const mostrar = () => {
-    modal.querySelectorAll('.onboard-step').forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
+    modal
+      .querySelectorAll('.onboard-step')
+      .forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
     modal.querySelectorAll('.onboard-dots i').forEach((d, i) => d.classList.toggle('active', i === step));
     document.getElementById('btn-onboard-next').textContent = step === total - 1 ? 'Empezar' : 'Siguiente';
   };
-  const cerrar = () => { localStorage.setItem('rastro_onboard', '1'); modal.classList.add('hidden'); };
-  document.getElementById('btn-onboard-next').onclick = () => { if (step === total - 1) return cerrar(); step++; mostrar(); };
+  const cerrar = () => {
+    localStorage.setItem('rastro_onboard', '1');
+    modal.classList.add('hidden');
+  };
+  document.getElementById('btn-onboard-next').onclick = () => {
+    if (step === total - 1) return cerrar();
+    step++;
+    mostrar();
+  };
   document.getElementById('btn-onboard-skip').onclick = cerrar;
   mostrar();
 }
@@ -1187,14 +1532,17 @@ async function renderReunions() {
   grid.innerHTML = '<div class="empty-state">Cargando…</div>';
   try {
     const { reunions, total } = await api('/api/reports/reunions');
-    totalEl.innerHTML = total > 0
-      ? `💚 <b>${total}</b> mascota${total > 1 ? 's' : ''} reunida${total > 1 ? 's' : ''} con su familia`
-      : '';
+    totalEl.innerHTML =
+      total > 0
+        ? `💚 <b>${total}</b> mascota${total > 1 ? 's' : ''} reunida${total > 1 ? 's' : ''} con su familia`
+        : '';
     if (!reunions.length) {
       grid.innerHTML = `<div class="empty-state"><div class="big">🐾</div>Todavía no hay reencuentros.<br>Cuando una mascota vuelva a casa, aparecerá aquí.</div>`;
       return;
     }
-    grid.innerHTML = reunions.map(r => `
+    grid.innerHTML = reunions
+      .map(
+        r => `
       <div class="reunion-card">
         ${r.foto_url ? `<img src="${esc(fotoSrc(r.foto_url))}" alt="" loading="lazy">` : `<div class="reunion-ph">${TIPO_ICON[r.tipo] || '🐾'}</div>`}
         <div class="reunion-body">
@@ -1202,7 +1550,9 @@ async function renderReunions() {
           ${r.resolved_at ? `<div class="report-meta">${timeAgo(r.resolved_at)}</div>` : ''}
           ${r.nota ? `<p class="reunion-nota">“${esc(r.nota)}”</p>` : ''}
         </div>
-      </div>`).join('');
+      </div>`
+      )
+      .join('');
   } catch (ex) {
     grid.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
   }
@@ -1225,8 +1575,13 @@ document.getElementById('btn-reunion-cancel').addEventListener('click', async ()
     await api(`/api/reports/${reunionReportId}/resolve`, { method: 'POST', body: { resolved: true } });
     toast('Aviso marcado como resuelto.');
     document.getElementById('reunion-modal').classList.add('hidden');
-    renderInbox(); renderList().then(renderListMap).catch(() => {});
-  } catch (ex) { toast(ex.message); }
+    renderInbox();
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 document.getElementById('btn-reunion-save').addEventListener('click', async () => {
   if (!reunionReportId) return;
@@ -1240,9 +1595,15 @@ document.getElementById('btn-reunion-save').addEventListener('click', async () =
     await api(`/api/reports/${reunionReportId}/reunion`, { method: 'POST', isForm: true, body: fd });
     toast('¡Gracias por compartirlo! 🎉');
     document.getElementById('reunion-modal').classList.add('hidden');
-    renderInbox(); renderList().then(renderListMap).catch(() => {});
-  } catch (ex) { toast(ex.message); }
-  finally { btn.disabled = false; }
+    renderInbox();
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
+  } catch (ex) {
+    toast(ex.message);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 /* ============ Alertas por zona ============ */
@@ -1253,7 +1614,9 @@ async function actualizarBotonZona() {
     b.textContent = zone
       ? '🔔 Alertas de zona activadas (toca para desactivar)'
       : '🔔 Activar alertas de mi zona';
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 document.getElementById('btn-zone').addEventListener('click', async () => {
   try {
@@ -1265,7 +1628,7 @@ document.getElementById('btn-zone').addEventListener('click', async () => {
       actualizarBotonZona();
       return;
     }
-    const loc = await getCurrentLocOrNull() || userLoc;
+    const loc = (await getCurrentLocOrNull()) || userLoc;
     await api('/api/push/zone', { method: 'POST', body: { lat: loc.lat, lng: loc.lng } });
     toast('Listo: avisaremos aquí cuando se pierda una mascota cerca.');
     // Las alertas llegan por notificación push: recordar activarlas si faltan.
@@ -1275,7 +1638,9 @@ document.getElementById('btn-zone').addEventListener('click', async () => {
       if (!sub) toast('Tip: activa también las notificaciones (🔔 arriba).');
     }
     actualizarBotonZona();
-  } catch (ex) { toast(ex.message); }
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 
 /* ============ Verificación de correo ============ */
@@ -1290,7 +1655,9 @@ document.getElementById('btn-resend-verify').addEventListener('click', async () 
     toast(r.message);
     if (me) me.email_verified = true;
     actualizarBannerVerificacion();
-  } catch (ex) { toast(ex.message); }
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 
 /* ============ Panel de administración ============ */
@@ -1304,33 +1671,51 @@ async function renderAdmin() {
   users.innerHTML = '';
   try {
     const { reports } = await api('/api/admin/flagged');
-    flagged.innerHTML = reports.length ? reports.map(r => `
+    flagged.innerHTML = reports.length
+      ? reports
+          .map(
+            r => `
       <div class="inbox-item">
         <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)} ${r.active ? '' : '<span class="tag resolved">Oculto</span>'} <span class="unread-dot">${r.flags}</span></h4>
         <div class="report-meta">${esc(r.owner_email || '')} · ${timeAgo(r.created_at)}</div>
         ${r.descripcion ? `<div class="report-meta">${esc(r.descripcion)}</div>` : ''}
         <div class="report-actions">
-          ${r.active
-            ? `<button data-admin="hide" data-id="${esc(r.id)}">Ocultar</button>`
-            : `<button data-admin="unhide" data-id="${esc(r.id)}">Restaurar</button>`}
+          ${
+            r.active
+              ? `<button data-admin="hide" data-id="${esc(r.id)}">Ocultar</button>`
+              : `<button data-admin="unhide" data-id="${esc(r.id)}">Restaurar</button>`
+          }
           <button data-admin="ver" data-id="${esc(r.id)}">Compartir</button>
           <button data-admin="delete" data-id="${esc(r.id)}">Eliminar</button>
         </div>
-      </div>`).join('') : '<div class="empty-state">No hay avisos reportados. 🎉</div>';
-  } catch (ex) { flagged.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`; }
+      </div>`
+          )
+          .join('')
+      : '<div class="empty-state">No hay avisos reportados. 🎉</div>';
+  } catch (ex) {
+    flagged.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
 
   try {
     const { users: us } = await api('/api/admin/users');
-    users.innerHTML = us.map(u => `
+    users.innerHTML = us
+      .map(
+        u => `
       <div class="inbox-item">
         <h4>${esc(u.email)}</h4>
         <div class="report-meta">${timeAgo(u.created_at)} · ${u.reports} aviso(s) · ${u.email_verified ? 'verificado' : 'sin verificar'}</div>
-      </div>`).join('');
-  } catch (ex) { users.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`; }
+      </div>`
+      )
+      .join('');
+  } catch (ex) {
+    users.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
 }
 document.getElementById('admin-flagged').addEventListener('click', async e => {
-  const btn = e.target.closest('[data-admin]'); if (!btn) return;
-  const id = btn.dataset.id, acc = btn.dataset.admin;
+  const btn = e.target.closest('[data-admin]');
+  if (!btn) return;
+  const id = btn.dataset.id,
+    acc = btn.dataset.admin;
   try {
     if (acc === 'ver') return shareReport(id);
     if (acc === 'hide') await api(`/api/admin/reports/${id}/hide`, { method: 'POST' });
@@ -1341,7 +1726,9 @@ document.getElementById('admin-flagged').addEventListener('click', async e => {
     }
     toast('Hecho.');
     renderAdmin();
-  } catch (ex) { toast(ex.message); }
+  } catch (ex) {
+    toast(ex.message);
+  }
 });
 
 /* ============ Arranque ============ */
@@ -1353,8 +1740,13 @@ let pickersIniciados = { found: false, lost: false };
 function asegurarPicker(key) {
   if (!pickersIniciados[key]) {
     const p = initPicker('map-' + key, key);
-    if (key === 'found') { mapFound = p.map; markerFound = p.marker; }
-    else { mapLost = p.map; markerLost = p.marker; }
+    if (key === 'found') {
+      mapFound = p.map;
+      markerFound = p.marker;
+    } else {
+      mapLost = p.map;
+      markerLost = p.marker;
+    }
     pickersIniciados[key] = true;
   }
   const m = key === 'found' ? mapFound : mapLost;
@@ -1378,7 +1770,10 @@ function startApp() {
       // Este botón SÍ pide ubicación fresca (el usuario la está pidiendo a
       // propósito): con GPS para que el punto quede fino.
       const pos = await pedirUbicacion({ altaPrecision: true });
-      if (!navigator.geolocation) { if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 15); return; }
+      if (!navigator.geolocation) {
+        if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 15);
+        return;
+      }
       const centro = pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : userLoc;
       if (listMap) listMap.setView([centro.lat, centro.lng], 15);
     });
@@ -1392,7 +1787,11 @@ function startApp() {
       btnSeguir.addEventListener('click', () => {
         const activo = seguirUbicacion(!estaSiguiendo());
         actualizarBotonSeguir();
-        toast(activo ? 'Siguiendo tu ubicación. Se apagará solo en 10 minutos.' : 'Dejamos de seguir tu ubicación.');
+        toast(
+          activo
+            ? 'Siguiendo tu ubicación. Se apagará solo en 10 minutos.'
+            : 'Dejamos de seguir tu ubicación.'
+        );
       });
       actualizarBotonSeguir();
     }
@@ -1402,7 +1801,10 @@ function startApp() {
   actualizarBannerVerificacion();
   mostrarTabAdmin();
   actualizarBotonZona();
-  renderList().then(renderListMap).then(() => abrirDeepLink()).catch(() => {});
+  renderList()
+    .then(renderListMap)
+    .then(() => abrirDeepLink())
+    .catch(() => {});
   actualizarBadgeChats();
   actualizarBotonPush();
 }
@@ -1430,7 +1832,9 @@ async function abrirDeepLink() {
   if (!card) return;
   card.scrollIntoView({ behavior: 'smooth', block: 'center' });
   card.style.outline = '3px solid var(--rust)';
-  setTimeout(() => { card.style.outline = ''; }, 3000);
+  setTimeout(() => {
+    card.style.outline = '';
+  }, 3000);
 }
 
 /* ============ Bootstrap ============ */
@@ -1456,7 +1860,10 @@ async function abrirDeepLink() {
       startApp();
       if (params.get('tab') === 'chats') document.querySelector('nav.tabs button[data-tab="chats"]').click();
       return;
-    } catch (e) { /* token inválido: volvemos al login */ token = null; localStorage.removeItem('rastro_token'); }
+    } catch (e) {
+      /* token inválido: volvemos al login */ token = null;
+      localStorage.removeItem('rastro_token');
+    }
   }
   showAuth();
 })();

@@ -13,7 +13,10 @@ const pool = new Pool({
 let fallos = 0;
 function ok(cond, msg) {
   if (cond) console.log('  ok  - ' + msg);
-  else { fallos++; console.log('  FALLA - ' + msg); }
+  else {
+    fallos++;
+    console.log('  FALLA - ' + msg);
+  }
 }
 
 async function req(path, { method = 'GET', token, body, form } = {}) {
@@ -21,14 +24,23 @@ async function req(path, { method = 'GET', token, body, form } = {}) {
   if (token) headers.Authorization = 'Bearer ' + token;
   let payload;
   if (form) payload = form;
-  else if (body) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+  else if (body) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(body);
+  }
   const res = await fetch(BASE + path, { method, headers, body: payload });
   let data = {};
-  try { data = await res.json(); } catch (e) { /* vacío */ }
+  try {
+    data = await res.json();
+  } catch (e) {
+    /* vacío */
+  }
   return { status: res.status, data };
 }
 
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00]);
+const JPEG = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00
+]);
 
 const CLAVE = 'password12345'; // el mínimo son 10 caracteres
 
@@ -59,7 +71,10 @@ async function crearAviso(token, campos, fotoBytes) {
   ok(nf.status === 404, 'ruta /api desconocida responde 404 JSON');
 
   console.log('== captcha del registro ==');
-  const sinCaptcha = await req('/api/auth/register', { method: 'POST', body: { email: `sc${s}@x.com`, password: CLAVE } });
+  const sinCaptcha = await req('/api/auth/register', {
+    method: 'POST',
+    body: { email: `sc${s}@x.com`, password: CLAVE }
+  });
   ok(sinCaptcha.status === 400, 'registro sin captcha -> 400');
 
   console.log('== registro ==');
@@ -69,21 +84,44 @@ async function crearAviso(token, campos, fotoBytes) {
   ok(a.status === 201 && b.status === 201 && c.status === 201, 'registro de 3 usuarios');
   const dupAlias = await registrar(`a${s}+otro@x.com`);
   ok(dupAlias.status === 409, 'un "+alias" del mismo buzón no crea otra cuenta');
-  let ta = a.data.token, tb = b.data.token;
+  let ta = a.data.token,
+    tb = b.data.token;
   const tc = c.data.token;
 
   console.log('== avisos + magic bytes ==');
-  const rep = await crearAviso(ta, { estado: 'perdido', tipo: 'perro', sexo: 'macho', color: 'cafe y blanco', lat: '-33.4489', lng: '-70.6693' }, JPEG);
+  const rep = await crearAviso(
+    ta,
+    {
+      estado: 'perdido',
+      tipo: 'perro',
+      sexo: 'macho',
+      color: 'cafe y blanco',
+      lat: '-33.4489',
+      lng: '-70.6693'
+    },
+    JPEG
+  );
   ok(rep.status === 201 && rep.data.report.id, 'crear aviso con imagen válida');
   const rid = rep.data.report && rep.data.report.id;
-  const falso = await crearAviso(ta, { estado: 'perdido', tipo: 'perro', sexo: 'macho', color: 'cafe', lat: '-33.44', lng: '-70.66' }, Buffer.from('no soy una imagen de verdad'));
+  const falso = await crearAviso(
+    ta,
+    { estado: 'perdido', tipo: 'perro', sexo: 'macho', color: 'cafe', lat: '-33.44', lng: '-70.66' },
+    Buffer.from('no soy una imagen de verdad')
+  );
   ok(falso.status === 400, 'rechaza archivo que no es imagen real (magic bytes)');
-  const cand = await crearAviso(tc, { estado: 'encontrado', tipo: 'perro', sexo: 'hembra', color: 'cafe', lat: '-33.45', lng: '-70.67' }, JPEG);
+  const cand = await crearAviso(
+    tc,
+    { estado: 'encontrado', tipo: 'perro', sexo: 'hembra', color: 'cafe', lat: '-33.45', lng: '-70.67' },
+    JPEG
+  );
   ok(cand.status === 201, 'crear aviso candidato');
 
   console.log('== listado + es_mio ==');
   const anon = await req('/api/reports');
-  ok(anon.data.reports.some(r => r.id === rid && r.es_mio === false), 'anónimo ve el aviso con es_mio=false');
+  ok(
+    anon.data.reports.some(r => r.id === rid && r.es_mio === false),
+    'anónimo ve el aviso con es_mio=false'
+  );
   const comoDueno = await req('/api/reports', { token: ta });
   ok(comoDueno.data.reports.find(r => r.id === rid).es_mio === true, 'dueño ve es_mio=true');
 
@@ -93,7 +131,10 @@ async function crearAviso(token, campos, fotoBytes) {
   const ajeno = await req(`/api/reports/${rid}/matches`, { token: tb });
   ok(ajeno.status === 403, 'matches de aviso ajeno -> 403');
   const propio = await req(`/api/reports/${rid}/matches`, { token: ta });
-  ok(propio.status === 200 && propio.data.matches.some(m => m.id === cand.data.report.id), 'dueño ve las coincidencias');
+  ok(
+    propio.status === 200 && propio.data.matches.some(m => m.id === cand.data.report.id),
+    'dueño ve las coincidencias'
+  );
 
   console.log('== geocode (requiere sesión) ==');
   const geoAnon = await req('/api/geocode?q=Providencia');
@@ -102,12 +143,23 @@ async function crearAviso(token, campos, fotoBytes) {
   ok(geo.status === 200 && Array.isArray(geo.data.results), 'geocode con sesión responde');
 
   console.log('== mensajería ==');
-  const m1 = await req(`/api/reports/${rid}/messages`, { method: 'POST', token: tb, body: { mensaje: 'lo vi cerca' } });
+  const m1 = await req(`/api/reports/${rid}/messages`, {
+    method: 'POST',
+    token: tb,
+    body: { mensaje: 'lo vi cerca' }
+  });
   ok(m1.status === 201, 'B escribe al dueño');
   const th = await req('/api/reports/threads', { token: ta });
-  ok(th.data.threads.length === 1 && th.data.threads[0].unread === 1, 'dueño ve 1 conversación con 1 no leído');
+  ok(
+    th.data.threads.length === 1 && th.data.threads[0].unread === 1,
+    'dueño ve 1 conversación con 1 no leído'
+  );
   const peer = th.data.threads[0].peer_id;
-  const rep2 = await req(`/api/reports/${rid}/messages`, { method: 'POST', token: ta, body: { mensaje: 'gracias', to_user_id: peer } });
+  const rep2 = await req(`/api/reports/${rid}/messages`, {
+    method: 'POST',
+    token: ta,
+    body: { mensaje: 'gracias', to_user_id: peer }
+  });
   ok(rep2.status === 201, 'dueño responde');
   const conv = await req(`/api/reports/${rid}/threads/${a.data.user.id}`, { token: tb });
   ok(conv.status === 200 && conv.data.messages.length === 2, 'B lee los 2 mensajes');
@@ -121,13 +173,21 @@ async function crearAviso(token, campos, fotoBytes) {
   ok(flagNuevo.status === 403, 'cuenta nueva no puede reportar (antigüedad)');
 
   console.log('== push ==');
-  const sub = await req('/api/push/subscribe', { method: 'POST', token: tb, body: { endpoint: 'https://example.com/push/' + s, keys: { p256dh: 'abc', auth: 'def' } } });
+  const sub = await req('/api/push/subscribe', {
+    method: 'POST',
+    token: tb,
+    body: { endpoint: 'https://example.com/push/' + s, keys: { p256dh: 'abc', auth: 'def' } }
+  });
   ok(sub.status === 201, 'suscripción push guardada');
   const key = await req('/api/push/public-key');
   ok(key.data.enabled === true && key.data.publicKey.length > 20, 'clave pública VAPID');
 
   console.log('== resolver ==');
-  const resolve = await req(`/api/reports/${rid}/resolve`, { method: 'POST', token: ta, body: { resolved: true } });
+  const resolve = await req(`/api/reports/${rid}/resolve`, {
+    method: 'POST',
+    token: ta,
+    body: { resolved: true }
+  });
   ok(resolve.status === 200, 'marcar resuelto');
   const list2 = await req('/api/reports');
   ok(!list2.data.reports.some(r => r.id === rid), 'resuelto sale del listado');
@@ -135,19 +195,37 @@ async function crearAviso(token, campos, fotoBytes) {
   console.log('== recuperar contraseña + revocación de sesiones ==');
   const forgot = await req('/api/auth/forgot', { method: 'POST', body: { email: b.data.user.email } });
   ok(forgot.status === 200, 'forgot responde genérico');
-  const row = await pool.query('SELECT token FROM password_resets WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [b.data.user.id]);
-  ok(row.rows[0] && /^[0-9a-f]{64}$/.test(row.rows[0].token), 'en la BD se guarda el hash del token, no el token');
+  const row = await pool.query(
+    'SELECT token FROM password_resets WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [b.data.user.id]
+  );
+  ok(
+    row.rows[0] && /^[0-9a-f]{64}$/.test(row.rows[0].token),
+    'en la BD se guarda el hash del token, no el token'
+  );
   // Insertamos un token conocido (hash) para probar el reset sin depender del correo.
   const raw = crypto.randomBytes(32).toString('hex');
   const hash = crypto.createHash('sha256').update(raw).digest('hex');
-  await pool.query('INSERT INTO password_resets (token,user_id,expires_at,used,created_at) VALUES ($1,$2,$3,FALSE,$4)', [hash, b.data.user.id, Date.now() + 3600000, Date.now()]);
-  const badReset = await req('/api/auth/reset', { method: 'POST', body: { token: 'x'.repeat(64), password: 'nuevaclave123' } });
+  await pool.query(
+    'INSERT INTO password_resets (token,user_id,expires_at,used,created_at) VALUES ($1,$2,$3,FALSE,$4)',
+    [hash, b.data.user.id, Date.now() + 3600000, Date.now()]
+  );
+  const badReset = await req('/api/auth/reset', {
+    method: 'POST',
+    body: { token: 'x'.repeat(64), password: 'nuevaclave123' }
+  });
   ok(badReset.status === 400, 'token de reset inválido -> 400');
-  const reset = await req('/api/auth/reset', { method: 'POST', body: { token: raw, password: 'nuevaclave123' } });
+  const reset = await req('/api/auth/reset', {
+    method: 'POST',
+    body: { token: raw, password: 'nuevaclave123' }
+  });
   ok(reset.status === 200, 'reset con token válido -> 200');
   const tbViejo = await req('/api/auth/me', { token: tb });
   ok(tbViejo.status === 401, 'tras el reset se revocan las sesiones anteriores');
-  const relogin = await req('/api/auth/login', { method: 'POST', body: { email: b.data.user.email, password: 'nuevaclave123' } });
+  const relogin = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: b.data.user.email, password: 'nuevaclave123' }
+  });
   ok(relogin.status === 200, 'login con la contraseña nueva');
   if (relogin.data.token) tb = relogin.data.token;
 
@@ -155,7 +233,10 @@ async function crearAviso(token, campos, fotoBytes) {
   // normalizeEmail() solo quita el "+alias" en Gmail/Outlook/Yahoo; en el resto
   // de dominios dos variantes del mismo buzón se guardaban como cuentas
   // distintas (identidades ilimitadas con un solo correo real).
-  const aliasLogin = await req('/api/auth/login', { method: 'POST', body: { email: b.data.user.email.replace('@', '+variante@'), password: 'nuevaclave123' } });
+  const aliasLogin = await req('/api/auth/login', {
+    method: 'POST',
+    body: { email: b.data.user.email.replace('@', '+variante@'), password: 'nuevaclave123' }
+  });
   ok(aliasLogin.status === 200, 'se entra con un "+alias" del mismo buzón');
 
   console.log('== borrado y revocación ==');
@@ -174,4 +255,10 @@ async function crearAviso(token, campos, fotoBytes) {
   console.log(fallos === 0 ? '\nTODO OK' : `\n${fallos} comprobaciones fallaron`);
   await pool.end();
   process.exit(fallos === 0 ? 0 : 1);
-})().catch(async e => { console.error('Error inesperado:', e); try { await pool.end(); } catch (_) {} process.exit(1); });
+})().catch(async e => {
+  console.error('Error inesperado:', e);
+  try {
+    await pool.end();
+  } catch (_) {}
+  process.exit(1);
+});

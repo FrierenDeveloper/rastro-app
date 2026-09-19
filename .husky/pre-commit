@@ -1,45 +1,45 @@
-# Hook de pre-commit — LEY DEL PROYECTO
+# Hook de pre-commit del proyecto (ver AGENTS.md).
 #
-# Impide el commit si el arnés determinístico no pasa. El arnés corre en orden:
-#   1. Formateo   (prettier --check)
-#   2. Linter     (eslint, con las reglas de complejidad y tamaño)
-#   3. Pruebas unitarias con cobertura al 100% en lógica/endpoints
-#   4. Pruebas de mutación (stryker)
+# Hace tres cosas, en este orden:
+#   1. BLOQUEA cambios en archivos de configuración del arnés, salvo que se
+#      invoque con ALLOW_CONFIG=1 (así los umbrales y las reglas no se tocan por
+#      accidente, ni siquiera por un agente).
+#   2. Formato + lint SOLO sobre los archivos que se están commiteando
+#      (lint-staged: rápido).
+#   3. Tests rápidos (sin cobertura).
 #
-# Si no hay Node instalado (por ejemplo en un clon sin dependencias), se avisa y
-# NO se bloquea el commit: no queremos que el hook rompa el flujo a quien no
-# tiene el entorno preparado. Para correrlo a mano: npm run verify:harness
+# Los tests de mutación NO van aquí (tardan demasiado): se corren aparte con
+# `npm run test:mutation` o `npm run test:mutation:changed`, y en GitHub Actions.
 
-set -e
+CONFIG_PROTEGIDA='^(eslint\.config\.|\.prettierrc|\.prettierignore|\.lintstagedrc|vitest\.config\.|jest\.config\.|stryker\.config\.|AGENTS\.md|\.github/workflows/|\.husky/|backend/package\.json|backend/package-lock\.json|package\.json$)'
 
-RAIZ_BACKEND="$(dirname "$0")/../backend"
+ARCHIVOS="$(git diff --cached --name-only)"
 
-if [ ! -d "$RAIZ_BACKEND/node_modules" ]; then
-  echo ""
-  echo "[verify:harness] Aviso: falta 'backend/node_modules'."
-  echo "[verify:harness] Instala las dependencias para activar la validación:"
-  echo "                   cd backend && npm install"
-  echo "[verify:harness] Se permite el commit SIN validar (entorno no preparado)."
-  echo ""
-  exit 0
+if [ -n "$ARCHIVOS" ]; then
+  SOSPECHOSOS="$(echo "$ARCHIVOS" | grep -E "$CONFIG_PROTEGIDA" || true)"
+
+  if [ -n "$SOSPECHOSOS" ]; then
+    if [ "$ALLOW_CONFIG" != "1" ]; then
+      echo ""
+      echo "======================================================================"
+      echo " COMMIT BLOQUEADO: intentas cambiar archivos de CONFIGURACION del arnes:"
+      echo "$SOSPECHOSOS" | sed 's/^/   - /'
+      echo ""
+      echo " Reglas, umbrales de cobertura y workflows NO se cambian a la ligera."
+      echo " Si de verdad quieres cambiarlos, repite el commit asi:"
+      echo "     ALLOW_CONFIG=1 git commit ..."
+      echo "======================================================================"
+      echo ""
+      exit 1
+    fi
+    echo "[pre-commit] ALLOW_CONFIG=1: se permite cambiar configuración."
+  fi
 fi
 
-echo ""
-echo "=== Arnés determinístico (ley del proyecto) ==="
-cd "$RAIZ_BACKEND"
+echo "[pre-commit] 1/2 formato + lint de los archivos modificados..."
+node backend/node_modules/lint-staged/bin/lint-staged.js || exit 1
 
-if npm run verify:harness; then
-  echo ""
-  echo "=== Arnés OK: commit permitido ==="
-  echo ""
-  exit 0
-else
-  echo ""
-  echo "======================================================================"
-  echo " COMMIT BLOQUEADO por el arnés determinístico."
-  echo " Arregla lo que falló arriba y vuelve a intentarlo."
-  echo " NO se permite saltar esta validación (git commit --no-verify)."
-  echo "======================================================================"
-  echo ""
-  exit 1
-fi
+echo "[pre-commit] 2/2 tests rápidos..."
+(cd backend && npx vitest run --reporter=dot) || exit 1
+
+echo "[pre-commit] OK"

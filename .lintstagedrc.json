@@ -1,0 +1,7 @@
+{
+  "*.{js,cjs,mjs}": [
+    "node backend/node_modules/prettier/bin/prettier.cjs --write",
+    "node backend/node_modules/eslint/bin/eslint.js --quiet --fix"
+  ],
+  "*.{json,css,html,md}": ["node backend/node_modules/prettier/bin/prettier.cjs --write"]
+}

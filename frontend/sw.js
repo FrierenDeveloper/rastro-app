@@ -6,7 +6,12 @@ const CACHE = 'rastro-shell-v11';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {}));
+  e.waitUntil(
+    caches
+      .open(CACHE)
+      .then(c => c.addAll(SHELL))
+      .catch(() => {})
+  );
   self.skipWaiting();
 });
 
@@ -36,7 +41,10 @@ self.addEventListener('fetch', e => {
     fetch(e.request)
       .then(res => {
         const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        caches
+          .open(CACHE)
+          .then(c => c.put(e.request, copy))
+          .catch(() => {});
         return res;
       })
       .catch(() => caches.match(e.request))
@@ -46,7 +54,11 @@ self.addEventListener('fetch', e => {
 /* ---------- Notificaciones push ---------- */
 self.addEventListener('push', e => {
   let data = {};
-  try { data = e.data ? e.data.json() : {}; } catch (_) { /* payload no JSON */ }
+  try {
+    data = e.data ? e.data.json() : {};
+  } catch (_) {
+    /* payload no JSON */
+  }
   const title = data.title || 'Rastro';
   const options = {
     body: data.body || 'Tienes novedades en Rastro.',
@@ -64,7 +76,10 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
-        if ('focus' in c) { c.focus(); return; }
+        if ('focus' in c) {
+          c.focus();
+          return;
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })

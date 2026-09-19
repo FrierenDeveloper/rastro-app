@@ -24,61 +24,63 @@ const app = express();
 const trustProxy = process.env.TRUST_PROXY !== undefined ? Number(process.env.TRUST_PROXY) : 1;
 app.set('trust proxy', trustProxy);
 
-app.use(helmet({
-  // OpenStreetMap exige que el navegador envíe un Referer válido; con el
-  // "no-referrer" por defecto de Helmet, OSM bloquea los tiles (403) y el mapa
-  // queda gris. Este valor manda solo el origen en peticiones cross-origin.
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "https://cdnjs.cloudflare.com",  // Leaflet JS
-        "https://unpkg.com",             // Leaflet.markercluster
-        "https://accounts.google.com"    // Google Sign-In
-      ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",              // Leaflet inline styles
-        "https://cdnjs.cloudflare.com", // Leaflet CSS
-        "https://unpkg.com",            // Leaflet.markercluster CSS
-        "https://fonts.googleapis.com"  // Google Fonts CSS
-      ],
-      fontSrc: [
-        "'self'",
-        "https://fonts.gstatic.com"     // Google Fonts archivos
-      ],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "blob:",
-        "https://*.tile.openstreetmap.org",   // Mapa OSM (subdominios)
-        "https://tile.openstreetmap.org",      // Mapa OSM
-        "https://server.arcgisonline.com",     // Tiles Esri
-        "https://*.tile.opentopomap.org",      // Tiles OpenTopoMap (respaldo)
-        "https://cdnjs.cloudflare.com",       // iconos de Leaflet
-        "https://*.supabase.co"               // Fotos en Supabase Storage
-      ],
-      connectSrc: [
-        "'self'",
-        "https://*.supabase.co",        // Supabase API
-        "https://fonts.googleapis.com",
-        "https://fonts.gstatic.com",
-        "https://cdnjs.cloudflare.com",
-        "https://unpkg.com",
-        "https://accounts.google.com"
-      ],
-      frameSrc: [
-        "'self'",
-        "https://accounts.google.com"   // iframe de Google Sign-In
-      ],
-      workerSrc: ["'self'"],
-      manifestSrc: ["'self'"]
+app.use(
+  helmet({
+    // OpenStreetMap exige que el navegador envíe un Referer válido; con el
+    // "no-referrer" por defecto de Helmet, OSM bloquea los tiles (403) y el mapa
+    // queda gris. Este valor manda solo el origen en peticiones cross-origin.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          'https://cdnjs.cloudflare.com', // Leaflet JS
+          'https://unpkg.com', // Leaflet.markercluster
+          'https://accounts.google.com' // Google Sign-In
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'", // Leaflet inline styles
+          'https://cdnjs.cloudflare.com', // Leaflet CSS
+          'https://unpkg.com', // Leaflet.markercluster CSS
+          'https://fonts.googleapis.com' // Google Fonts CSS
+        ],
+        fontSrc: [
+          "'self'",
+          'https://fonts.gstatic.com' // Google Fonts archivos
+        ],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          'https://*.tile.openstreetmap.org', // Mapa OSM (subdominios)
+          'https://tile.openstreetmap.org', // Mapa OSM
+          'https://server.arcgisonline.com', // Tiles Esri
+          'https://*.tile.opentopomap.org', // Tiles OpenTopoMap (respaldo)
+          'https://cdnjs.cloudflare.com', // iconos de Leaflet
+          'https://*.supabase.co' // Fotos en Supabase Storage
+        ],
+        connectSrc: [
+          "'self'",
+          'https://*.supabase.co', // Supabase API
+          'https://fonts.googleapis.com',
+          'https://fonts.gstatic.com',
+          'https://cdnjs.cloudflare.com',
+          'https://unpkg.com',
+          'https://accounts.google.com'
+        ],
+        frameSrc: [
+          "'self'",
+          'https://accounts.google.com' // iframe de Google Sign-In
+        ],
+        workerSrc: ["'self'"],
+        manifestSrc: ["'self'"]
+      }
     }
-  }
-}));
+  })
+);
 
 // El frontend se sirve desde el mismo origen, así que CORS no hace falta.
 // Solo montamos el middleware si defines un dominio explícito: así no se
@@ -88,13 +90,15 @@ if (allowedOrigin === '*') allowedOrigin = '';
 if (allowedOrigin) app.use(cors({ origin: allowedOrigin }));
 
 app.use(express.json({ limit: '1mb' }));
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: keyPorIp
-}));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: keyPorIp
+  })
+);
 
 // Fotos locales (solo se usan si NO configuraste Supabase Storage; ver storage.js).
 app.use('/uploads', express.static(storage.localDir, { maxAge: '7d' }));
@@ -130,7 +134,9 @@ app.get('/api/config', (req, res) => {
 const ANDROID_PACKAGE_NAME = (process.env.ANDROID_PACKAGE_NAME || '').trim();
 const FORMATO_SHA256 = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
 const FINGERPRINTS_CRUDOS = (process.env.ANDROID_SHA256_CERT_FINGERPRINTS || '')
-  .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  .split(',')
+  .map(s => s.trim().toUpperCase())
+  .filter(Boolean);
 const ANDROID_FINGERPRINTS = FINGERPRINTS_CRUDOS.filter(f => FORMATO_SHA256.test(f));
 
 if (FINGERPRINTS_CRUDOS.length && ANDROID_FINGERPRINTS.length !== FINGERPRINTS_CRUDOS.length) {
@@ -138,7 +144,8 @@ if (FINGERPRINTS_CRUDOS.length && ANDROID_FINGERPRINTS.length !== FINGERPRINTS_C
   // falla y la app se abre con barra de navegador. Mejor avisar fuerte aquí.
   console.warn('[android] Hay huellas SHA-256 con formato inválido y se van a ignorar:');
   for (const f of FINGERPRINTS_CRUDOS) {
-    if (!FORMATO_SHA256.test(f)) console.warn(`      "${f}" (se esperan 32 pares AA:BB:... separados por dos puntos)`);
+    if (!FORMATO_SHA256.test(f))
+      console.warn(`      "${f}" (se esperan 32 pares AA:BB:... separados por dos puntos)`);
   }
 }
 
@@ -150,14 +157,16 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
       error: 'Falta configurar ANDROID_PACKAGE_NAME y ANDROID_SHA256_CERT_FINGERPRINTS en el entorno.'
     });
   }
-  res.type('application/json').json([{
-    relation: ['delegate_permission/common.handle_all_urls'],
-    target: {
-      namespace: 'android_app',
-      package_name: ANDROID_PACKAGE_NAME,
-      sha256_cert_fingerprints: ANDROID_FINGERPRINTS
+  res.type('application/json').json([
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: ANDROID_PACKAGE_NAME,
+        sha256_cert_fingerprints: ANDROID_FINGERPRINTS
+      }
     }
-  }]);
+  ]);
 });
 
 // Cualquier otro /.well-known/* (por ejemplo apple-app-site-association para
@@ -190,4 +199,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 db.init()
   .then(() => app.listen(PORT, () => console.log(`Rastro API escuchando en puerto ${PORT}`)))
-  .catch(err => { console.error('No se pudo inicializar la base de datos:', err.message); process.exit(1); });
+  .catch(err => {
+    console.error('No se pudo inicializar la base de datos:', err.message);
+    process.exit(1);
+  });

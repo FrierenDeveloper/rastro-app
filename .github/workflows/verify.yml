@@ -1,0 +1,67 @@
+name: verify
+
+# Corre el arnés en cada push y en cada pull request.
+# Los tests de mutación van en un job aparte porque tardan mucho más.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Formato + lint + tests con cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: npm ci
+
+      - name: verify (formato -> lint -> tests con cobertura)
+        working-directory: backend
+        run: npm run verify
+
+      - name: Guardar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: backend/reports/coverage
+          if-no-files-found: ignore
+
+  mutation:
+    name: Tests de mutación
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: npm ci
+
+      - name: test:mutation
+        working-directory: backend
+        run: npm run test:mutation
+
+      - name: Guardar reporte de mutación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation
+          path: backend/reports/mutation
+          if-no-files-found: ignore

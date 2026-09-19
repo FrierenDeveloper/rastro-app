@@ -54,7 +54,9 @@ async function deletePhoto(fotoUrl) {
       const p = path.join(localDir, path.basename(fotoUrl));
       if (fs.existsSync(p)) fs.unlinkSync(p);
     }
-  } catch (e) { /* no bloquear la operación principal por un error de limpieza */ }
+  } catch (e) {
+    /* no bloquear la operación principal por un error de limpieza */
+  }
 }
 
 module.exports = { savePhoto, deletePhoto, usingSupabase: useSupabase, localDir };

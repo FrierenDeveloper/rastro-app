@@ -27,7 +27,10 @@ function ipReal(req) {
     const saltos = Math.floor(hops);
     const cadena = req.headers['x-forwarded-for'];
     if (typeof cadena === 'string' && cadena.length) {
-      const partes = cadena.split(',').map(p => p.trim()).filter(Boolean);
+      const partes = cadena
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
       const ip = partes[partes.length - saltos];
       if (ip) return ip;
     }
@@ -57,7 +60,9 @@ function keyPorIp(req) {
 // misma cuenta a efectos del límite. El peor caso es que compartan el cupo de
 // intentos de login; no se mezclan datos ni contraseñas.
 function normalizarCuenta(email) {
-  const texto = String(email || '').trim().toLowerCase();
+  const texto = String(email || '')
+    .trim()
+    .toLowerCase();
   const corte = texto.lastIndexOf('@');
   if (corte <= 0) return texto;
   const local = texto.slice(0, corte);
@@ -79,9 +84,12 @@ function keyPorCuenta(req) {
   if (typeof cuerpo.email === 'string' && cuerpo.email.trim()) {
     return 'cuenta:' + normalizarCuenta(cuerpo.email).slice(0, 120);
   }
-  const valor = typeof cuerpo.token === 'string' ? cuerpo.token
-    : typeof cuerpo.credential === 'string' ? cuerpo.credential
-    : '';
+  const valor =
+    typeof cuerpo.token === 'string'
+      ? cuerpo.token
+      : typeof cuerpo.credential === 'string'
+        ? cuerpo.credential
+        : '';
   if (valor.trim()) return 'valor:' + valor.trim().slice(0, 120);
   return 'ip:' + ipReal(req);
 }

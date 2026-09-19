@@ -25,7 +25,9 @@ async function requireAuth(req, res, next) {
     }
     req.userId = payload.sub;
     next();
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
 // No bloquea la request si no hay token, pero lo decodifica si existe.
@@ -37,7 +39,9 @@ function optionalAuth(req, res, next) {
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
       req.userId = payload.sub;
-    } catch (err) { /* token inválido: seguimos como anónimo */ }
+    } catch (err) {
+      /* token inválido: seguimos como anónimo */
+    }
   }
   next();
 }
@@ -49,10 +53,14 @@ async function requireVerified(req, res, next) {
     const r = await db.query('SELECT email_verified FROM users WHERE id = $1', [req.userId]);
     if (!r.rows[0]) return res.status(401).json({ error: 'Sesión inválida o expirada.' });
     if (r.rows[0].email_verified === false) {
-      return res.status(403).json({ error: 'Confirma tu correo para poder publicar. Revisa tu bandeja de entrada.' });
+      return res
+        .status(403)
+        .json({ error: 'Confirma tu correo para poder publicar. Revisa tu bandeja de entrada.' });
     }
     next();
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
 module.exports = { requireAuth, optionalAuth, requireVerified };

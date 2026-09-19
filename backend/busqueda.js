@@ -50,17 +50,29 @@ const PERFIL = {
   // base: km que se sugieren de entrada (0 h). anclado a la mediana publicada.
   // crece: cuánto se amplía con el tiempo (modelización propia).
   // tope: máximo razonable; más allá no tiene sentido para esa especie.
-  gato:   { base: 0.05, crece: 0.25, tope: 1.5 },   // mediana publicada: 50 m
-  perro:  { base: 0.40, crece: 1.60, tope: 15.0 },  // radio típico: ~400 m
-  ave:    { base: 0.30, crece: 2.00, tope: 30.0 },  // puede volar lejos
+  gato: { base: 0.05, crece: 0.25, tope: 1.5 }, // mediana publicada: 50 m
+  perro: { base: 0.4, crece: 1.6, tope: 15.0 }, // radio típico: ~400 m
+  ave: { base: 0.3, crece: 2.0, tope: 30.0 }, // puede volar lejos
   conejo: { base: 0.15, crece: 0.35, tope: 2.0 },
-  otro:   { base: 0.30, crece: 1.00, tope: 10.0 }
+  otro: { base: 0.3, crece: 1.0, tope: 10.0 }
 };
 
 const FUENTES = [
-  { cita: 'Huang et al. 2018, Animals 8(1):5', url: 'https://www.mdpi.com/2076-2615/8/1/5', dato: 'gatos: 50% dentro de 50 m, 75% dentro de 500 m' },
-  { cita: 'Lord et al. 2007, JAVMA 230(2):211', url: 'https://pubmed.ncbi.nlm.nih.gov/17223753/', dato: 'perros: 71% recuperados; 15% por carteles en el barrio' },
-  { cita: 'Ignatius 2015 (tesis, SMUMN)', url: 'http://gis.smumn.edu/GradProjects/IgnatiusA.pdf', dato: 'perros: radio de búsqueda típico ~400 m' }
+  {
+    cita: 'Huang et al. 2018, Animals 8(1):5',
+    url: 'https://www.mdpi.com/2076-2615/8/1/5',
+    dato: 'gatos: 50% dentro de 50 m, 75% dentro de 500 m'
+  },
+  {
+    cita: 'Lord et al. 2007, JAVMA 230(2):211',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/17223753/',
+    dato: 'perros: 71% recuperados; 15% por carteles en el barrio'
+  },
+  {
+    cita: 'Ignatius 2015 (tesis, SMUMN)',
+    url: 'http://gis.smumn.edu/GradProjects/IgnatiusA.pdf',
+    dato: 'perros: radio de búsqueda típico ~400 m'
+  }
 ];
 
 /**
@@ -103,13 +115,15 @@ function sugerenciaBusqueda(tipo, horas) {
   let consejo;
   if (tipo === 'gato') {
     // Los datos son tajantes: el 75% aparece dentro de 500 m.
-    consejo = km <= 0.5
-      ? `Los gatos casi siempre se esconden muy cerca: revisa a fondo tu casa, patios vecinos, debajo de terrazas y autos. No hace falta irte lejos.`
-      : `Aunque el 75% de los gatos aparece dentro de 500 m, a estas alturas conviene ampliar un poco: pide a los vecinos que miren sus patios y bodegas.`;
+    consejo =
+      km <= 0.5
+        ? `Los gatos casi siempre se esconden muy cerca: revisa a fondo tu casa, patios vecinos, debajo de terrazas y autos. No hace falta irte lejos.`
+        : `Aunque el 75% de los gatos aparece dentro de 500 m, a estas alturas conviene ampliar un poco: pide a los vecinos que miren sus patios y bodegas.`;
   } else if (tipo === 'perro') {
-    consejo = h <= 12
-      ? `Un perro suele alejarse poco al principio. Pregunta en la calle, revisa refugios y veterinarias cercanas, y reparte carteles: es lo que más rinde.`
-      : `A estas alturas lo más efectivo es la difusión: refugios, veterinarias, redes del barrio y carteles. Los perros se recuperan sobre todo porque alguien los encuentra y los reporta.`;
+    consejo =
+      h <= 12
+        ? `Un perro suele alejarse poco al principio. Pregunta en la calle, revisa refugios y veterinarias cercanas, y reparte carteles: es lo que más rinde.`
+        : `A estas alturas lo más efectivo es la difusión: refugios, veterinarias, redes del barrio y carteles. Los perros se recuperan sobre todo porque alguien los encuentra y los reporta.`;
   } else {
     consejo = `Revisa primero la zona cercana y avisa a los vecinos; después amplía hacia donde haya más gente.`;
   }

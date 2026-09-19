@@ -21,20 +21,30 @@ async function sendToUser(userId, payload) {
   if (!enabled) return;
   let subs;
   try {
-    subs = await db.query('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1', [userId]);
-  } catch (e) { return; }
+    subs = await db.query('SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1', [
+      userId
+    ]);
+  } catch (e) {
+    return;
+  }
 
-  await Promise.all(subs.rows.map(async s => {
-    const subscription = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
-    try {
-      await webpush.sendNotification(subscription, JSON.stringify(payload));
-    } catch (err) {
-      // 404/410 = la suscripción ya no existe (app desinstalada, etc.).
-      if (err && (err.statusCode === 404 || err.statusCode === 410)) {
-        try { await db.query('DELETE FROM push_subscriptions WHERE id = $1', [s.id]); } catch (e) { /* ignore */ }
+  await Promise.all(
+    subs.rows.map(async s => {
+      const subscription = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
+      try {
+        await webpush.sendNotification(subscription, JSON.stringify(payload));
+      } catch (err) {
+        // 404/410 = la suscripción ya no existe (app desinstalada, etc.).
+        if (err && (err.statusCode === 404 || err.statusCode === 410)) {
+          try {
+            await db.query('DELETE FROM push_subscriptions WHERE id = $1', [s.id]);
+          } catch (e) {
+            /* ignore */
+          }
+        }
       }
-    }
-  }));
+    })
+  );
 }
 
 module.exports = { sendToUser, enabled, publicKey: PUBLIC_KEY };

@@ -177,10 +177,14 @@ async function init() {
   // el índice fallaría al crearse y el servidor no arrancaría; en ese caso se
   // avisa y se sigue (el registro igual comprueba duplicados antes de insertar).
   try {
-    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_correo_normalizado ON users(normalizar_correo(email))');
+    await pool.query(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_correo_normalizado ON users(normalizar_correo(email))'
+    );
   } catch (e) {
     console.warn('[db] No se pudo crear el índice único de correo normalizado:', e.message);
-    console.warn('[db] Suele significar que hay cuentas duplicadas del mismo buzón. Revísalas y vuelve a arrancar.');
+    console.warn(
+      '[db] Suele significar que hay cuentas duplicadas del mismo buzón. Revísalas y vuelve a arrancar.'
+    );
   }
 
   // Rellena el destinatario de los mensajes antiguos (eran siempre al dueño del aviso).

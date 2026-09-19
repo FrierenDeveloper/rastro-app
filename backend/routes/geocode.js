@@ -25,7 +25,10 @@ const cache = new Map();
 function cacheGet(key) {
   const hit = cache.get(key);
   if (!hit) return null;
-  if (hit.expires < Date.now()) { cache.delete(key); return null; }
+  if (hit.expires < Date.now()) {
+    cache.delete(key);
+    return null;
+  }
   return hit.results;
 }
 function cacheSet(key, results) {
@@ -39,7 +42,9 @@ function cacheSet(key, results) {
 // Arma una etiqueta legible a partir de las propiedades de Photon.
 function labelDe(p) {
   const partes = [];
-  const push = v => { if (v && !partes.includes(v)) partes.push(v); };
+  const push = v => {
+    if (v && !partes.includes(v)) partes.push(v);
+  };
   push(p.name);
   push([p.street, p.housenumber].filter(Boolean).join(' '));
   push(p.district || p.suburb || p.locality);
@@ -50,7 +55,8 @@ function labelDe(p) {
 // GET /api/geocode?q=texto  (requiere sesión)
 // Usa Photon (basado en OpenStreetMap, sin clave) pero SOLO devuelve resultados
 // de Chile, y el navegador nunca habla con el servicio externo directamente.
-router.get('/',
+router.get(
+  '/',
   requireAuth,
   geoLimiter,
   query('q').isString().trim().isLength({ min: 3, max: 120 }).withMessage('Escribe al menos 3 caracteres.'),
@@ -64,7 +70,9 @@ router.get('/',
       if (cached) return res.json({ results: cached });
 
       // Sesgo hacia Santiago para que los resultados cercanos salgan primero.
-      const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(req.query.q) +
+      const url =
+        'https://photon.komoot.io/api/?q=' +
+        encodeURIComponent(req.query.q) +
         '&lat=-33.4489&lon=-70.6693&limit=8';
 
       let data;
@@ -93,7 +101,9 @@ router.get('/',
 
       cacheSet(key, results);
       res.json({ results });
-    } catch (err) { next(err); }
+    } catch (err) {
+      next(err);
+    }
   }
 );
 
