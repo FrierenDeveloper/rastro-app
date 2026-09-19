@@ -240,6 +240,13 @@ router.post(
       if (!user || !(await bcrypt.compare(password, user.password_hash))) {
         return res.status(401).json({ error: 'Correo o contraseña incorrectos.' });
       }
+      // El correo sin confirmar NO entra (antes sí, y el muro aparecía al
+      // publicar con requireVerified). La comprobación va DESPUÉS de validar la
+      // contraseña a propósito: así un desconocido no puede usar el 403 para
+      // averiguar qué correos están registrados sin confirmar.
+      if (!user.email_verified) {
+        return res.status(403).json({ error: 'Confirma tu correo para iniciar sesión.' });
+      }
       res.json({
         token: signToken(user.id, user.token_version),
         user: { id: user.id, email: user.email, phone: user.phone }
@@ -263,6 +270,16 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: 'Correo inválido.' });
+
+      // Sin proveedor de correo el enlace no se puede entregar: antes se creaba
+      // igual el token de reseteo y se respondía 200, dejando un token vivo que
+      // nadie podía recibir (y la app decía "te enviamos un enlace"). Se corta
+      // ANTES de consultar la cuenta, así el 503 no depende de si existe.
+      if (!mailer.usingEmail) {
+        return res
+          .status(503)
+          .json({ error: 'La recuperación por correo no está configurada en este servidor.' });
+      }
 
       const result = await db.query(
         `SELECT id, email FROM users

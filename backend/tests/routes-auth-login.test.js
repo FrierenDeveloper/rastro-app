@@ -96,6 +96,7 @@ function usuarioDeLogin(extra = {}) {
     phone: '+56 9 1111 2222',
     password_hash: HASH,
     token_version: 0,
+    email_verified: true,
     ...extra
   };
 }
@@ -245,21 +246,46 @@ describe('POST /login · credenciales', () => {
     expect(db.query).toHaveBeenCalledWith(SQL_LOGIN, ['ana+perro@example.com', 'ana@example.com']);
   });
 
-  it('una cuenta sin el correo confirmado también puede iniciar sesión', async () => {
-    // Comportamiento actual: /login NO exige email_verified. El bloqueo vive en
-    // requireVerified (publicar, reportar...). Se documenta aquí para que, si
-    // algún día el login lo exige, esta prueba salte y haya que actualizarla.
+  it('una cuenta sin el correo confirmado no puede iniciar sesión (403)', async () => {
+    // Antes entraba: /login no miraba email_verified y el muro aparecía al
+    // publicar (requireVerified). Ahora el 403 llega DESPUÉS de comprobar la
+    // contraseña, para no revelar a un desconocido qué correos sin confirmar
+    // existen (ver la prueba siguiente con contraseña incorrecta).
     db.query.mockResolvedValue({ rows: [usuarioDeLogin({ email_verified: false })] });
     const res = await conIp(pedir(app).post('/api/auth/login')).send({
       email: 'ana@test.local',
       password: PASSWORD
     });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({
-      token: expect.any(String),
-      user: { id: 'u-1', email: 'ana@test.local', phone: '+56 9 1111 2222' }
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual({ error: 'Confirma tu correo para iniciar sesión.' });
+    expect(res.body.token).toBeUndefined();
+    expect(res.body.user).toBeUndefined();
+  });
+
+  it('si la fila no trae email_verified tampoco entra', async () => {
+    const sinBandera = usuarioDeLogin();
+    delete sinBandera.email_verified;
+    db.query.mockResolvedValue({ rows: [sinBandera] });
+
+    const res = await conIp(pedir(app).post('/api/auth/login')).send({
+      email: 'ana@test.local',
+      password: PASSWORD
     });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual({ error: 'Confirma tu correo para iniciar sesión.' });
+  });
+
+  it('con la contraseña incorrecta manda el 401, no el 403 de sin confirmar', async () => {
+    db.query.mockResolvedValue({ rows: [usuarioDeLogin({ email_verified: false })] });
+    const res = await conIp(pedir(app).post('/api/auth/login')).send({
+      email: 'ana@test.local',
+      password: 'otra-contraseña-larga'
+    });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toStrictEqual(MENSAJE_CREDENCIALES);
   });
 
   it('un fallo de la base responde 500', async () => {
@@ -344,6 +370,48 @@ describe('POST /forgot · validaciones', () => {
       expect(res.body).toStrictEqual(MENSAJE_CORREO);
     }
     expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('sin proveedor de correo un correo inválido sigue siendo 400: la validación va primero', async () => {
+    mailer.usingEmail = false;
+    const res = await conIp(pedir(app).post('/api/auth/forgot')).send({ email: 'no-es-correo' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(MENSAJE_CORREO);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /forgot · sin proveedor de correo', () => {
+  it('responde 503 y no crea ni un token de reseteo', async () => {
+    // Antes se respondía 200 y se guardaba el token igual: quedaba un token
+    // vivo que nadie iba a recibir (ni usar), y la app decía "enviado".
+    mailer.usingEmail = false;
+    const res = await conIp(pedir(app).post('/api/auth/forgot')).send({ email: buzon() });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toStrictEqual(MENSAJE_SIN_CONFIGURAR);
+    expect(db.query).not.toHaveBeenCalled();
+    expect(mailer.sendMail).not.toHaveBeenCalled();
+  });
+
+  it('el 503 es el mismo exista o no la cuenta (no se consulta la base)', async () => {
+    mailer.usingEmail = false;
+    db.query.mockResolvedValue({ rows: [{ id: 'u-9', email: 'ana@test.local' }] });
+
+    const res = await conIp(pedir(app).post('/api/auth/forgot')).send({ email: buzon() });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toStrictEqual(MENSAJE_SIN_CONFIGURAR);
+    expect(db.query).not.toHaveBeenCalled();
+    expect(mailer.sendMail).not.toHaveBeenCalled();
+  });
+
+  it('con proveedor configurado vuelve a responder 200', async () => {
+    const res = await conIp(pedir(app).post('/api/auth/forgot')).send({ email: buzon() });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ ok: true, message: MENSAJE_SIN_CUENTA });
   });
 });
 
