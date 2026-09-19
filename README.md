@@ -79,9 +79,20 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
 - **Alertas por zona**: guardas tu barrio y te llega un push cuando alguien
   publica una mascota perdida cerca.
 - **Cartel imprimible con QR**: desde "Mis avisos" generas un cartel con la foto,
-  los datos y un código QR que lleva al aviso, para pegar en la calle.
-- **Radio de búsqueda según el tiempo perdido**: la app sugiere hasta dónde
-  buscar según cuánto lleva perdida la mascota.
+  los datos, un código QR y la dirección escrita (por si el QR sale borroso o
+  quien lo lee no tiene cámara), para pegar en la calle.
+- **Radio de búsqueda según el tiempo perdido**, con los valores base anclados a
+  estudios publicados (ver `docs/RADIO_DE_BUSQUEDA.md`): el formulario de "Perdí"
+  muestra un **gráfico de horas** con la zona sugerida y un consejo según la
+  especie, y las **alertas por zona** usan ese mismo radio para decidir a quién
+  avisar.
+- **Ubicación poco invasiva**: la app pide tu posición **una sola vez** al
+  abrirla (con precisión de red, no GPS), la recuerda para no volver a pedirla y
+  solo la refresca si tiene más de 5 minutos. El **seguimiento continuo es
+  opcional** (botón "Seguir"): se enciende a propósito, se apaga solo a los
+  10 minutos y al salir de la app. Tu ubicación nunca se envía al servidor por
+  abrir la app: solo si publicas un aviso, guardas tu zona o adjuntas
+  "lo vi aquí" a un mensaje.
 - **Verificación de correo** y **captcha liviano sin servicios externos**
   (reto firmado + honeypot) para frenar cuentas y avisos automatizados.
 - **Panel de administración** (se activa con `ADMIN_EMAILS`): avisos reportados,
