@@ -3,6 +3,15 @@
   --line:#D9D0B8; --green:#3F8361; --green-soft:#DCEAE1;
   --amber:#D98A2B; --amber-soft:#F5E4C6; --rust:#B94B2C; --rust-soft:#F3DFD4;
   --shadow: 0 2px 10px rgba(27,42,47,0.10);
+
+  /* Escala de capas. IMPORTANTE: Leaflet pinta sus paneles del mapa hasta con
+     z-index 1000 (los controles de zoom son .leaflet-top/.leaflet-bottom).
+     Si una ventana de la app tiene MENOS de 1000, el mapa se dibuja encima de
+     ella y el usuario no puede leer su contenido ni pulsar sus botones.
+     Por eso todo lo que deba ir sobre el mapa supera ese 1000. */
+  --z-sobre-mapa: 1100;   /* desplegables que salen encima del mapa (direcciones) */
+  --z-ventana: 1200;      /* ventanas: editar, reencuentro, consejos, onboarding */
+  --z-aviso: 1300;        /* el aviso flotante va siempre por encima de todo */
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -124,7 +133,7 @@ input[type=file]{display:none;}
 .danger-zone button{background:none;border:1px solid var(--rust);color:var(--rust);border-radius:9px;padding:8px 14px;font-size:12.5px;cursor:pointer;}
 
 footer.note{font-size:11.5px;color:var(--ink-soft);text-align:center;padding:6px 24px 22px;}
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:50;}
+.toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:var(--z-aviso);}
 .toast.show{opacity:1;}
 .leaflet-popup-content{font-family:'Inter',sans-serif;font-size:12.5px;}
 .hidden{display:none !important;}
@@ -175,7 +184,7 @@ nav.tabs button{position:relative;}
 .inbox-item .report-actions{margin-top:8px;}
 
 /* ---------- Modal editar ---------- */
-.modal{position:fixed;inset:0;background:rgba(27,42,47,0.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:60;}
+.modal{position:fixed;inset:0;background:rgba(27,42,47,0.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:var(--z-ventana);}
 .modal-box{background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
 .modal-box h3{margin:0 0 6px;font-size:19px;}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;}
@@ -184,7 +193,7 @@ nav.tabs button{position:relative;}
 /* ---------- Buscador de direcciones ---------- */
 .addr-search{position:relative;}
 .addr-search input{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#fff;font-family:inherit;font-size:14px;color:var(--ink);}
-.addr-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);z-index:40;max-height:260px;overflow-y:auto;}
+.addr-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);z-index:var(--z-sobre-mapa);max-height:260px;overflow-y:auto;}
 .addr-item{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #EEE8DA;}
 .addr-item:last-child{border-bottom:none;}
 .addr-item:hover{background:var(--green-soft);}
