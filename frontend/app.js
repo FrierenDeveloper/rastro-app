@@ -27,6 +27,11 @@ let editingId = null;
 
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
 
+// Iconos de línea del sprite de index.html. Solo para textos que arma el JS:
+// el resto de la interfaz los lleva ya en el HTML. Son cadenas propias, sin
+// datos del usuario, por eso se pueden inyectar con innerHTML.
+const ico = nombre => `<svg class="ic" aria-hidden="true"><use href="#i-${nombre}" /></svg>`;
+
 // Misma estimación que backend/busqueda.js: cuánto se aleja una mascota según
 // el tiempo. ESTA FÓRMULA ESTÁ DUPLICADA A PROPÓSITO (aquí y en el backend)
 // para poder mostrar la sugerencia al instante, sin ir al servidor. Si cambias
@@ -640,7 +645,7 @@ function aplicarUbicacion(lat, lng, accuracy, { deCache = false } = {}) {
   ubicacion.ultima = { lat, lng, accuracy: accuracy || 0, ts: Date.now() };
   if (!deCache) guardarUbicacion();
   const chip = document.getElementById('loc-chip');
-  if (chip) chip.textContent = '📍 Ubicación detectada';
+  if (chip) chip.textContent = 'Ubicación detectada';
   pintarMarcadorUsuario();
   // Solo movemos los mapas de "Encontré/Perdí" en la primera lectura y si el
   // usuario no eligió una ubicación a mano.
@@ -663,7 +668,7 @@ function aplicarUbicacion(lat, lng, accuracy, { deCache = false } = {}) {
 function pedirUbicacion({ altaPrecision = false } = {}) {
   const chip = document.getElementById('loc-chip');
   if (!navigator.geolocation) {
-    if (chip) chip.textContent = '📍 Santiago (ubicación manual)';
+    if (chip) chip.textContent = 'Santiago (ubicación manual)';
     return Promise.resolve(null);
   }
   if (ubicacion.pidiendo) return Promise.resolve(null);
@@ -677,7 +682,7 @@ function pedirUbicacion({ altaPrecision = false } = {}) {
       },
       () => {
         ubicacion.pidiendo = false;
-        if (chip && !ubicacion.ultima) chip.textContent = '📍 Santiago (toca el mapa para ajustar)';
+        if (chip && !ubicacion.ultima) chip.textContent = 'Santiago (toca el mapa para ajustar)';
         resolve(null);
       },
       altaPrecision
@@ -748,7 +753,7 @@ function actualizarBotonSeguir() {
   if (!btn) return;
   const activo = estaSiguiendo();
   btn.classList.toggle('active', activo);
-  btn.textContent = activo ? '📡 Siguiendo' : '📡 Seguir';
+  btn.innerHTML = ico('radar') + (activo ? 'Siguiendo' : 'Seguir');
   btn.title = activo
     ? 'Dejar de seguir tu ubicación'
     : 'Mantener tu punto actualizado mientras te mueves (gasta más batería)';
@@ -864,7 +869,7 @@ function limpiarZonaFoto(zone, input) {
   });
   const hint = document.createElement('div');
   hint.className = 'hint';
-  hint.innerHTML = '<b>📷</b>Toca para tomar o subir una foto';
+  hint.innerHTML = ico('camera') + 'Toca para tomar o subir una foto';
   zone.appendChild(hint);
 }
 
@@ -884,7 +889,7 @@ function renderMatchBanner(containerId, matches) {
     return;
   }
   el.innerHTML = `<div class="match-banner">
-    <h3>🐾 ${matches.length} posible${matches.length > 1 ? 's' : ''} coincidencia${matches.length > 1 ? 's' : ''} cerca</h3>
+    <h3>${ico('paw')} ${matches.length} posible${matches.length > 1 ? 's' : ''} coincidencia${matches.length > 1 ? 's' : ''} cerca</h3>
     <p>Mismo tipo de animal, color parecido y a menos de 5 km. Ábrelo desde "Mapa" para contactar dentro de la app.</p>
     ${matches.map(m => `<div class="match-item">${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`).join('')}
   </div>`;
@@ -1261,7 +1266,7 @@ async function loadConversation() {
             m => `
         <div class="msg ${m.mio ? 'mine' : 'theirs'}">
           <div class="msg-text">${esc(m.mensaje)}</div>
-          ${m.lat !== null ? `<a class="msg-loc" href="https://www.openstreetmap.org/?mlat=${m.lat}&mlon=${m.lng}#map=16/${m.lat}/${m.lng}" target="_blank" rel="noopener">📍 ubicación compartida</a>` : ''}
+          ${m.lat !== null ? `<a class="msg-loc" href="https://www.openstreetmap.org/?mlat=${m.lat}&mlon=${m.lng}#map=16/${m.lat}/${m.lng}" target="_blank" rel="noopener">${ico('pin')} ubicación compartida</a>` : ''}
           <div class="when">${timeAgo(m.created_at)}</div>
         </div>`
           )
@@ -1448,9 +1453,16 @@ document.getElementById('btn-push').addEventListener('click', async () => {
 
 /* ============ Tema claro / oscuro ============ */
 function aplicarTema(tema) {
-  document.body.classList.toggle('theme-dark', tema === 'dark');
+  const oscuro = tema === 'dark';
+  document.body.classList.toggle('theme-dark', oscuro);
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = tema === 'dark' ? '☀️' : '🌙';
+  if (btn) {
+    btn.innerHTML = ico(oscuro ? 'sun' : 'moon');
+    btn.title = oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+  }
+  // La barra del sistema (Android) sigue al tema elegido.
+  const meta = document.getElementById('meta-theme');
+  if (meta) meta.content = oscuro ? '#14181a' : '#f5f2eb';
 }
 function initTema() {
   const guardado = localStorage.getItem('rastro_tema');
@@ -1611,9 +1623,9 @@ async function actualizarBotonZona() {
   try {
     const { zone } = await api('/api/push/zone');
     const b = document.getElementById('btn-zone');
-    b.textContent = zone
-      ? '🔔 Alertas de zona activadas (toca para desactivar)'
-      : '🔔 Activar alertas de mi zona';
+    b.innerHTML = zone
+      ? ico('bell') + 'Alertas de zona activadas (toca para desactivar)'
+      : ico('bell') + 'Activar alertas de mi zona';
   } catch (e) {
     /* ignore */
   }
@@ -1635,7 +1647,7 @@ document.getElementById('btn-zone').addEventListener('click', async () => {
     if (config.pushEnabled && 'serviceWorker' in navigator && 'PushManager' in window) {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (!sub) toast('Tip: activa también las notificaciones (🔔 arriba).');
+      if (!sub) toast('Tip: activa también las notificaciones con la campana de arriba.');
     }
     actualizarBotonZona();
   } catch (ex) {

@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Rastro — Mascotas perdidas y encontradas</title>
     <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#1B2A2F" />
+    <meta name="theme-color" id="meta-theme" content="#f5f2eb" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
@@ -22,13 +23,147 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="stylesheet" href="styles.css" />
-    <link rel="icon" href="icons/icon-192.png" />
   </head>
   <body>
+    <!-- ===================== ICONOS (sprite de línea) =====================
+         Trazos de 1.7 px con extremos redondeados. Heredan color y grosor de
+         la clase .ic, así que se adaptan al tema claro/oscuro sin duplicar. -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <!-- La marca es un CAMINO: tres pisadas que se alejan hacia arriba a la
+           izquierda, cada vez más pequeñas y tenues, y alternando el pie (la
+           del medio va espejada y girada al otro lado), como un caminar real.
+           Va RELLENA (silueta), no a trazo: a 32 px el trazo fino pegaría los
+           dedos entre sí y la huella dejaría de leerse. -->
+      <symbol id="i-huella" viewBox="0 0 12 12">
+        <ellipse cx="4.1" cy="4.8" rx="1.1" ry="1.4" fill="currentColor" stroke="none" />
+        <ellipse cx="6.3" cy="3.4" rx="1.15" ry="1.55" fill="currentColor" stroke="none" />
+        <ellipse cx="8.6" cy="4.6" rx="1.05" ry="1.35" fill="currentColor" stroke="none" />
+        <ellipse cx="6.5" cy="8.1" rx="2.6" ry="2.2" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="i-logo" viewBox="0 0 24 24">
+        <use href="#i-huella" transform="translate(17.4 17) rotate(-8) scale(1.1) translate(-6.3 -6.1)" />
+        <use
+          href="#i-huella"
+          opacity="0.55"
+          transform="translate(11.4 10.6) rotate(16) scale(-0.68 0.68) translate(-6.3 -6.1)"
+        />
+        <use
+          href="#i-huella"
+          opacity="0.3"
+          transform="translate(5.6 4.6) rotate(-26) scale(0.44) translate(-6.3 -6.1)"
+        />
+      </symbol>
+      <!-- Versión reducida para la cabecera (32 px): con tres pisadas los dedos
+           no llegan a leerse, así que allí van solo las dos primeras. -->
+      <symbol id="i-logo-min" viewBox="0 0 24 24">
+        <use href="#i-huella" transform="translate(15.6 15.6) rotate(-8) scale(1.12) translate(-6.3 -6.1)" />
+        <use
+          href="#i-huella"
+          opacity="0.5"
+          transform="translate(7.4 7) rotate(14) scale(-0.68 0.68) translate(-6.3 -6.1)"
+        />
+      </symbol>
+      <symbol id="i-paw" viewBox="0 0 24 24">
+        <ellipse cx="7.6" cy="10" rx="2.3" ry="2.9" />
+        <ellipse cx="12.2" cy="7.9" rx="2.4" ry="3.2" />
+        <ellipse cx="17" cy="9.9" rx="2.2" ry="2.8" />
+        <ellipse cx="12.4" cy="17" rx="5.4" ry="4.5" />
+      </symbol>
+      <symbol id="i-map" viewBox="0 0 24 24">
+        <path d="M9 4.6 3.6 6.9v12.5L9 17.1l6 2.3 5.4-2.3V4.6L15 6.9 9 4.6Z" />
+        <path d="M9 4.6v12.5M15 6.9v12.5" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4.2 4.2" />
+      </symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path
+          d="M20 12.4c0 3.9-3.6 7-8 7-1 0-1.9-.2-2.8-.4l-4.7 1.6 1.3-3.5C4.7 15.7 4 14.1 4 12.4c0-3.9 3.6-7 8-7s8 3.1 8 7Z"
+        />
+      </symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24">
+        <path
+          d="M12 20.2S4.6 15.6 4.6 10.7A4.1 4.1 0 0 1 12 8.3a4.1 4.1 0 0 1 7.4 2.4c0 4.9-7.4 9.5-7.4 9.5Z"
+        />
+      </symbol>
+      <symbol id="i-list" viewBox="0 0 24 24">
+        <path d="M8.5 6.5h11M8.5 12h11M8.5 17.5h11" />
+        <path d="M4.6 6.5h.01M4.6 12h.01M4.6 17.5h.01" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="M12 3.6 19 6v5.9c0 4-3 7.3-7 8.5-4-1.2-7-4.5-7-8.5V6l7-2.4Z" />
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="8.6" r="3.4" />
+        <path d="M5.4 20c0-3.2 2.9-5.6 6.6-5.6s6.6 2.4 6.6 5.6" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path
+          d="M12 2.6v2.2M12 19.2v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.4 19.6 6 18M18 6l1.6-1.6"
+        />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M20.2 14.6A8.6 8.6 0 0 1 9.4 3.8a8.6 8.6 0 1 0 10.8 10.8Z" />
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24">
+        <path d="M18.2 15.6V11a6.2 6.2 0 1 0-12.4 0v4.6L4.2 18.2h15.6l-1.6-2.6Z" />
+        <path d="M10 20.6h4" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path d="M12 4.2v9.9m0 0 3.6-3.6M12 14.1l-3.6-3.6M5.2 18.8h13.6" />
+      </symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24">
+        <path d="M12 21s6-5.4 6-10.1a6 6 0 1 0-12 0C6 15.6 12 21 12 21Z" />
+        <circle cx="12" cy="10.9" r="2.3" />
+      </symbol>
+      <symbol id="i-crosshair" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="7" />
+        <path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3" />
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="i-radar" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M19.6 12a7.6 7.6 0 1 1-2.3-5.4" />
+        <path d="M19.6 4.6v4.6h-4.6" />
+      </symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24">
+        <path d="M4 8.6h3.1L8.6 6.4h6.8l1.5 2.2H20v9.6H4V8.6Z" />
+        <circle cx="12" cy="13.2" r="3.2" />
+      </symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24">
+        <path d="M3.6 6.4h16.8v11.2H3.6V6.4Z" />
+        <path d="m3.6 7.4 8.4 6 8.4-6" />
+      </symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24">
+        <path d="M9.6 17.6h4.8M10.2 20.4h3.6" />
+        <path
+          d="M12 3.6a5.6 5.6 0 0 1 3.3 10.1c-.5.4-.8.9-.8 1.5h-5c0-.6-.3-1.1-.8-1.5A5.6 5.6 0 0 1 12 3.6Z"
+        />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="4.6" y="10.6" width="14.8" height="9.4" rx="2.6" />
+        <path d="M8.2 10.6V8.2a3.8 3.8 0 0 1 7.6 0v2.4" />
+      </symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24">
+        <path d="M12 3.6l1.8 4.6 4.6 1.8-4.6 1.8L12 16.4l-1.8-4.6L5.6 10l4.6-1.8L12 3.6Z" />
+        <path d="M18.4 16.2l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z" />
+      </symbol>
+      <symbol id="i-leaf" viewBox="0 0 24 24">
+        <path d="M5 19c0-8 5-13 14-13 0 9-5 13-12 13H5Z" />
+        <path d="M8 16c1.6-3.2 4-5.6 7.4-7.2" />
+      </symbol>
+    </svg>
+
     <!-- ===================== RESET SCREEN ===================== -->
     <div id="reset-screen" class="hidden">
       <div class="brand">
-        <div class="paw">🐾</div>
+        <svg class="brand-logo lg" aria-hidden="true"><use href="#i-logo" /></svg>
         <h1 class="serif">Rastro</h1>
         <p class="tag">Elige una contraseña nueva</p>
       </div>
@@ -49,7 +184,7 @@
     <!-- ===================== AUTH SCREEN ===================== -->
     <div id="auth-screen">
       <div class="brand">
-        <div class="paw">🐾</div>
+        <svg class="brand-logo lg" aria-hidden="true"><use href="#i-logo" /></svg>
         <h1 class="serif">Rastro</h1>
         <p class="tag">Ayuda a los animales de tu barrio a volver a casa</p>
       </div>
@@ -128,54 +263,97 @@
     <div id="app" class="hidden">
       <header>
         <div class="brand">
-          <span class="paw">🐾</span>
+          <svg class="brand-logo sm" aria-hidden="true"><use href="#i-logo-min" /></svg>
           <h1>Rastro</h1>
         </div>
         <p>Ayuda a los animales de tu barrio a volver a casa</p>
         <div class="header-row">
-          <span class="loc-chip" id="loc-chip">📍 Ubicándote…</span>
+          <span class="loc-chip">
+            <svg class="ic" aria-hidden="true"><use href="#i-pin" /></svg>
+            <span id="loc-chip">Ubicándote…</span>
+          </span>
           <span class="header-actions">
-            <button class="icon-btn dark hidden" id="btn-install" title="Instalar la app">⬇️</button>
-            <button class="icon-btn dark" id="btn-theme" title="Modo claro / oscuro">🌙</button>
-            <button class="icon-btn dark hidden" id="btn-push" title="Activar notificaciones">🔔</button>
+            <button class="icon-btn dark hidden" id="btn-install" title="Instalar la app">
+              <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
+            </button>
+            <button class="icon-btn dark" id="btn-theme" title="Modo claro / oscuro">
+              <svg class="ic" aria-hidden="true"><use href="#i-moon" /></svg>
+            </button>
+            <button class="icon-btn dark hidden" id="btn-push" title="Activar notificaciones">
+              <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>
+            </button>
             <button class="logout-btn" id="btn-logout">Cerrar sesión</button>
           </span>
         </div>
       </header>
 
       <nav class="tabs">
-        <button data-tab="home" class="active">Mapa</button>
-        <button data-tab="found">Encontré</button>
-        <button data-tab="lost">Perdí</button>
-        <button data-tab="chats">Chats <span class="badge hidden" id="badge-chats">0</span></button>
-        <button data-tab="exitos">Éxitos</button>
-        <button data-tab="inbox">Avisos</button>
-        <button data-tab="admin" class="hidden" id="tab-admin">Admin</button>
+        <button data-tab="home" class="active">
+          <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg>Mapa
+        </button>
+        <button data-tab="found">
+          <svg class="ic" aria-hidden="true"><use href="#i-paw" /></svg>Encontré
+        </button>
+        <button data-tab="lost">
+          <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>Perdí
+        </button>
+        <button data-tab="chats">
+          <svg class="ic" aria-hidden="true"><use href="#i-chat" /></svg>Chats
+          <span class="badge hidden" id="badge-chats">0</span>
+        </button>
+        <button data-tab="exitos">
+          <svg class="ic" aria-hidden="true"><use href="#i-heart" /></svg>Éxitos
+        </button>
+        <button data-tab="inbox">
+          <svg class="ic" aria-hidden="true"><use href="#i-list" /></svg>Avisos
+        </button>
+        <button data-tab="admin" class="hidden" id="tab-admin">
+          <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>Admin
+        </button>
       </nav>
 
       <main>
         <div id="verify-banner" class="verify-banner hidden">
-          <span>✉️ Confirma tu correo para poder publicar avisos.</span>
+          <span>
+            <svg class="ic" aria-hidden="true"><use href="#i-mail" /></svg>
+            Confirma tu correo para poder publicar avisos.
+          </span>
           <button id="btn-resend-verify">Reenviar</button>
         </div>
         <!-- HOME -->
         <section class="view active" id="view-home">
           <div class="toolbar">
             <div class="addr-search" style="flex: 1">
-              <input type="text" id="addr-home" placeholder="Buscar dirección en Chile…" autocomplete="off" />
+              <div class="search-field">
+                <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
+                <input
+                  type="text"
+                  id="addr-home"
+                  placeholder="Buscar dirección en Chile…"
+                  autocomplete="off"
+                />
+              </div>
               <div class="addr-results hidden" id="addr-results-home"></div>
             </div>
           </div>
           <div class="toolbar">
-            <input
-              type="text"
-              id="search-text"
-              placeholder="🔎 Buscar por raza, color o descripción…"
-              autocomplete="off"
-            />
+            <div class="search-field">
+              <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
+              <input
+                type="text"
+                id="search-text"
+                placeholder="Buscar por raza, color o descripción…"
+                autocomplete="off"
+              />
+            </div>
           </div>
-          <button class="tip-link" id="btn-zone">🔔 Activar alertas de mi zona</button>
-          <button class="tip-link" id="btn-tips">💡 Consejos para encontrar a tu mascota</button>
+          <button class="tip-link" id="btn-zone">
+            <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>Activar alertas de mi zona
+          </button>
+          <button class="tip-link" id="btn-tips">
+            <svg class="ic" aria-hidden="true"><use href="#i-bulb" /></svg>Consejos para encontrar a tu
+            mascota
+          </button>
           <div class="toolbar">
             <select id="filter-tipo">
               <option value="">Todos los tipos</option>
@@ -192,17 +370,25 @@
             </select>
           </div>
           <div class="toolbar">
-            <button class="icon-btn active" id="btn-view-map">Mapa</button>
-            <button class="icon-btn" id="btn-view-list">Lista</button>
-            <button class="icon-btn" id="btn-my-loc">📍 Ir a mí</button>
+            <button class="icon-btn active" id="btn-view-map">
+              <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg>Mapa
+            </button>
+            <button class="icon-btn" id="btn-view-list">
+              <svg class="ic" aria-hidden="true"><use href="#i-list" /></svg>Lista
+            </button>
+            <button class="icon-btn" id="btn-my-loc">
+              <svg class="ic" aria-hidden="true"><use href="#i-crosshair" /></svg>Ir a mí
+            </button>
             <button
               class="icon-btn hidden"
               id="btn-seguir"
               title="Mantener tu punto actualizado mientras te mueves (gasta más batería)"
             >
-              📡 Seguir
+              <svg class="ic" aria-hidden="true"><use href="#i-radar" /></svg>Seguir
             </button>
-            <button class="icon-btn" id="btn-refresh">↻ Actualizar</button>
+            <button class="icon-btn" id="btn-refresh">
+              <svg class="ic" aria-hidden="true"><use href="#i-refresh" /></svg>Actualizar
+            </button>
           </div>
           <div id="list-map"></div>
           <div id="reports-list"></div>
@@ -211,12 +397,15 @@
         <!-- FOUND -->
         <section class="view" id="view-found">
           <div class="card">
-            <h2>Encontré un animal 🐾</h2>
+            <h2>Encontré un animal</h2>
             <p class="sub">Sube una foto y sus características para avisar a quien lo esté buscando.</p>
             <form id="form-found">
               <label>Foto del animal</label>
               <div class="photo-zone" id="photo-zone-found">
-                <div class="hint"><b>📷</b>Toca para tomar o subir una foto</div>
+                <div class="hint">
+                  <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para tomar o subir una
+                  foto
+                </div>
                 <input type="file" accept="image/*" capture="environment" id="photo-input-found" />
               </div>
 
@@ -271,12 +460,15 @@
 
               <label>Buscar dirección</label>
               <div class="addr-search">
-                <input
-                  type="text"
-                  id="addr-found"
-                  placeholder="Ej: Av. Providencia 1234, Santiago"
-                  autocomplete="off"
-                />
+                <div class="search-field">
+                  <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
+                  <input
+                    type="text"
+                    id="addr-found"
+                    placeholder="Ej: Av. Providencia 1234, Santiago"
+                    autocomplete="off"
+                  />
+                </div>
                 <div class="addr-results hidden" id="addr-results-found"></div>
               </div>
 
@@ -296,7 +488,7 @@
         <!-- LOST -->
         <section class="view" id="view-lost">
           <div class="card">
-            <h2>Perdí a mi mascota 💔</h2>
+            <h2>Perdí a mi mascota</h2>
             <p class="sub">Cuéntanos cómo es para avisarte si alguien la encuentra cerca.</p>
             <form id="form-lost">
               <label>Nombre de tu mascota</label>
@@ -304,7 +496,10 @@
 
               <label>Foto de tu mascota</label>
               <div class="photo-zone" id="photo-zone-lost">
-                <div class="hint"><b>📷</b>Toca para tomar o subir una foto</div>
+                <div class="hint">
+                  <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para tomar o subir una
+                  foto
+                </div>
                 <input type="file" accept="image/*" capture="environment" id="photo-input-lost" />
               </div>
 
@@ -356,12 +551,15 @@
 
               <label>Buscar dirección</label>
               <div class="addr-search">
-                <input
-                  type="text"
-                  id="addr-lost"
-                  placeholder="Ej: Plaza Ñuñoa, Santiago"
-                  autocomplete="off"
-                />
+                <div class="search-field">
+                  <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
+                  <input
+                    type="text"
+                    id="addr-lost"
+                    placeholder="Ej: Plaza Ñuñoa, Santiago"
+                    autocomplete="off"
+                  />
+                </div>
                 <div class="addr-results hidden" id="addr-results-lost"></div>
               </div>
 
@@ -417,9 +615,13 @@
 
         <!-- ADMIN -->
         <section class="view" id="view-admin">
-          <h2 class="admin-title">🛡️ Avisos reportados</h2>
+          <h2 class="admin-title">
+            <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>Avisos reportados
+          </h2>
           <div id="admin-flagged"></div>
-          <h2 class="admin-title">👥 Usuarios recientes</h2>
+          <h2 class="admin-title">
+            <svg class="ic" aria-hidden="true"><use href="#i-user" /></svg>Usuarios recientes
+          </h2>
           <div id="admin-users"></div>
         </section>
 
@@ -482,13 +684,17 @@
     <!-- ===================== MODAL REENCUENTRO ===================== -->
     <div id="reunion-modal" class="modal hidden">
       <div class="modal-box">
-        <h3>🎉 ¿Volvió a casa?</h3>
+        <h3>
+          <svg class="ic" aria-hidden="true"><use href="#i-sparkle" /></svg>¿Volvió a casa?
+        </h3>
         <p class="sub">
           Cuéntaselo a la comunidad: tu historia motiva a otros y deja el aviso como resuelto.
         </p>
         <label>Foto del reencuentro (opcional)</label>
         <div class="photo-zone" id="photo-zone-reunion">
-          <div class="hint"><b>📷</b>Toca para subir una foto</div>
+          <div class="hint">
+            <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para subir una foto
+          </div>
           <input type="file" accept="image/*" id="photo-input-reunion" />
         </div>
         <label>Nota (opcional)</label>
@@ -509,7 +715,9 @@
     <!-- ===================== CONSEJOS ===================== -->
     <div id="tips-modal" class="modal hidden">
       <div class="modal-box">
-        <h3>💡 Consejos para encontrar a tu mascota</h3>
+        <h3>
+          <svg class="ic" aria-hidden="true"><use href="#i-bulb" /></svg>Consejos para encontrar a tu mascota
+        </h3>
         <p class="sub">Lo que mejor funciona, según quien ya lo vivió:</p>
         <ul class="tips-list">
           <li><b>Publica rápido.</b> Las primeras 24 horas son las más importantes.</li>
@@ -535,7 +743,9 @@
     <div id="onboarding" class="modal hidden">
       <div class="modal-box onboard">
         <div class="onboard-step" data-step="0">
-          <div class="onboard-emoji">🐾</div>
+          <div class="onboard-emoji">
+            <svg class="ic" aria-hidden="true"><use href="#i-logo-min" /></svg>
+          </div>
           <h3>Bienvenido a Rastro</h3>
           <p class="sub">
             El mapa de mascotas perdidas y encontradas de tu barrio. Publica un aviso o ayuda a alguien a
@@ -543,14 +753,18 @@
           </p>
         </div>
         <div class="onboard-step hidden" data-step="1">
-          <div class="onboard-emoji">📸</div>
+          <div class="onboard-emoji">
+            <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>
+          </div>
           <h3>Publica en 30 segundos</h3>
           <p class="sub">
             Saca una foto, marca el punto en el mapa y listo. Mientras más datos, más fácil es reconocerla.
           </p>
         </div>
         <div class="onboard-step hidden" data-step="2">
-          <div class="onboard-emoji">🔒</div>
+          <div class="onboard-emoji">
+            <svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>
+          </div>
           <h3>Tu privacidad, protegida</h3>
           <p class="sub">
             Tu teléfono y correo nunca se muestran: todo pasa por el chat de la app. Y la ubicación exacta
