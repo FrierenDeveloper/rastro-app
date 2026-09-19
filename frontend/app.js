@@ -1,7 +1,13 @@
 // Registrar el service worker ANTES que cualquier otro código: si algo más
 // abajo en este archivo llegara a fallar, el registro no debe verse afectado.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // Ruta absoluta y scope raíz a propósito: con 'sw.js' a secas, abrir la app en
+  // una ruta como /cualquier-cosa (el servidor devuelve el index por el fallback)
+  // buscaba /cualquier-cosa/sw.js y el service worker no llegaba a registrarse,
+  // así que se perdían el modo sin conexión y las notificaciones push.
+  window.addEventListener('load', () =>
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+  );
 }
 
 // ============ Configuración ============
@@ -1961,6 +1967,17 @@ async function abrirDeepLink() {
 }
 
 /* ============ Bootstrap ============ */
+// Abre la pestaña que pida la URL (?tab=found, ?tab=lost, ?tab=chats, ?tab=inbox).
+// La usan los atajos del icono de la app (manifest.json → shortcuts) y las
+// notificaciones push. Se ignoran las pestañas ocultas, así que ?tab=admin no
+// abre el panel a quien no es administrador.
+function abrirTabDeLaUrl(params) {
+  const tab = params.get('tab');
+  if (!tab) return;
+  const boton = document.querySelector(`nav.tabs button[data-tab="${tab}"]:not(.hidden)`);
+  if (boton) boton.click();
+}
+
 (async function bootstrap() {
   initTema();
   await loadConfig();
@@ -1981,7 +1998,7 @@ async function abrirDeepLink() {
       me = data.user;
       showApp();
       startApp();
-      if (params.get('tab') === 'chats') document.querySelector('nav.tabs button[data-tab="chats"]').click();
+      abrirTabDeLaUrl(params);
       return;
     } catch (e) {
       /* token inválido: volvemos al login */ token = null;
