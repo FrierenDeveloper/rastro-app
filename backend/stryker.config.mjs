@@ -53,7 +53,22 @@ export default {
     break: 80
   },
   timeoutMS: 20000,
-  concurrency: 2,
+  // Hilos en paralelo. La máquina de desarrollo (Ryzen 5 5600X) tiene 6 núcleos
+  // y 12 hilos, así que en local se usan 12; el runner de GitHub Actions solo
+  // tiene 2-4 vCPU, y allí 12 procesos no aceleran nada: agotan la memoria y
+  // provocan timeouts (mutantes que "sobreviven" por lentitud, no por falta de
+  // pruebas). Se puede forzar sin tocar este archivo:
+  //   STRIKER_CONCURRENCY=4 npm run test:mutation
+  concurrency: Number(process.env.STRIKER_CONCURRENCY) || (process.env.CI ? 2 : 12),
+  // Caché incremental (reports/stryker-incremental.json, dentro de
+  // backend/reports/, que git ignora): reutiliza el resultado de los mutantes
+  // cuyo código y pruebas no cambiaron. La primera pasada cuesta lo mismo y las
+  // siguientes tardan segundos. En CI no aporta (no hay caché entre jobs).
+  incremental: true,
+  // Explícito aunque sea el valor por defecto del runner de Vitest: cada mutante
+  // ejecuta únicamente las pruebas que lo cubren, que es lo que hace viable esta
+  // suite (con "all" cada mutante correría las 763 pruebas).
+  coverageAnalysis: 'perTest',
   tempDirName: '.stryker-tmp',
   cleanTempDir: true,
   ignoreStatic: true
