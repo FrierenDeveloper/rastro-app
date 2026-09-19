@@ -116,6 +116,54 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+/* ---------- Verificación de dominio para el APK de Android (TWA) ---------- */
+// Un APK tipo TWA (Bubblewrap / PWABuilder) comprueba que la app y esta web son
+// del mismo dueño leyendo /.well-known/assetlinks.json. Si el archivo falta, o
+// si la firma no coincide, Android abre la app CON la barra del navegador a la
+// vista (deja de parecer una app).
+//
+// Se configura por variables de entorno, así no hay que tocar código:
+//   ANDROID_PACKAGE_NAME              ej: com.rastro.app
+//   ANDROID_SHA256_CERT_FINGERPRINTS  uno o varios SHA-256 separados por coma
+// Los dos datos los entrega PWABuilder, o se sacan con:
+//   keytool -list -v -keystore mi.keystore
+const ANDROID_PACKAGE_NAME = (process.env.ANDROID_PACKAGE_NAME || '').trim();
+const FORMATO_SHA256 = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
+const FINGERPRINTS_CRUDOS = (process.env.ANDROID_SHA256_CERT_FINGERPRINTS || '')
+  .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+const ANDROID_FINGERPRINTS = FINGERPRINTS_CRUDOS.filter(f => FORMATO_SHA256.test(f));
+
+if (FINGERPRINTS_CRUDOS.length && ANDROID_FINGERPRINTS.length !== FINGERPRINTS_CRUDOS.length) {
+  // Un SHA mal copiado no da error en Android: simplemente la verificación
+  // falla y la app se abre con barra de navegador. Mejor avisar fuerte aquí.
+  console.warn('[android] Hay huellas SHA-256 con formato inválido y se van a ignorar:');
+  for (const f of FINGERPRINTS_CRUDOS) {
+    if (!FORMATO_SHA256.test(f)) console.warn(`      "${f}" (se esperan 32 pares AA:BB:... separados por dos puntos)`);
+  }
+}
+
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  if (!ANDROID_PACKAGE_NAME || !ANDROID_FINGERPRINTS.length) {
+    // Sin configurar responde 404 JSON. NO devolvemos la app: un verificador que
+    // recibe HTML en vez de JSON falla de una forma muy difícil de diagnosticar.
+    return res.status(404).json({
+      error: 'Falta configurar ANDROID_PACKAGE_NAME y ANDROID_SHA256_CERT_FINGERPRINTS en el entorno.'
+    });
+  }
+  res.type('application/json').json([{
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: {
+      namespace: 'android_app',
+      package_name: ANDROID_PACKAGE_NAME,
+      sha256_cert_fingerprints: ANDROID_FINGERPRINTS
+    }
+  }]);
+});
+
+// Cualquier otro /.well-known/* (por ejemplo apple-app-site-association para
+// iOS) responde 404 JSON y nunca el index.html de la app.
+app.use('/.well-known', (req, res) => res.status(404).json({ error: 'No encontrado.' }));
+
 // Sirve el frontend (PWA) desde el mismo servidor. Para producción a mayor escala,
 // puedes separarlos y desplegar el frontend en un CDN/hosting estático aparte.
 const frontendDir = path.join(__dirname, '..', 'frontend');

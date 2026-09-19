@@ -43,3 +43,10 @@ services:
       # Correos con permiso para el panel de administración, separados por coma.
       - key: ADMIN_EMAILS
         sync: false
+      # Solo si publicaste la PWA como APK de Android (PWABuilder/Bubblewrap).
+      # Los entrega PWABuilder al generar el paquete. Sin esto, el APK abre con
+      # la barra del navegador a la vista (deja de parecer una app).
+      - key: ANDROID_PACKAGE_NAME
+        sync: false
+      - key: ANDROID_SHA256_CERT_FINGERPRINTS
+        sync: false
