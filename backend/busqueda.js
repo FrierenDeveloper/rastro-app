@@ -110,7 +110,6 @@ function sugerenciaBusqueda(tipo, horas) {
   const km = radioBusquedaKm(tipo, horas);
   const metros = km < 1 ? Math.round(km * 1000) : null;
   const h = Math.max(0, Number(horas) || 0);
-  const nombre = tipo === 'gato' ? 'tu gato' : tipo === 'perro' ? 'tu perro' : 'tu mascota';
 
   let consejo;
   if (tipo === 'gato') {

@@ -79,5 +79,17 @@ export default {
   // borrando al terminar (cleanTempDir).
   tempDirName: path.join(os.tmpdir(), 'stryker-rastro'),
   cleanTempDir: true,
-  ignoreStatic: true
+  // Mutantes "estáticos": código que se ejecuta UNA sola vez al cargar el módulo
+  // (tablas y constantes, configuración leída del entorno, funciones de
+  // normalización de nivel de módulo...). Se ignoran por defecto porque un test
+  // que importa el módulo una vez no puede observarlos: solo engordarían el
+  // denominador sin que nadie los mire. Están fichados: 178 entre busqueda.js
+  // (20), routes/push.js (20), routes/reports.js (135) y 3 sueltos.
+  //
+  // Para ver la foto REAL (y poder trabajarlos recargando el módulo dentro del
+  // test con el patrón cargar(): new Module + _compile):
+  //   STRYKER_ESTATICOS=1 npm run test:mutation
+  // OJO: al incluirlos el score oficial BAJA, porque los que sobreviven entran
+  // en el denominador. La métrica honesta mientras tanto es muertos/generados.
+  ignoreStatic: process.env.STRYKER_ESTATICOS !== '1'
 };

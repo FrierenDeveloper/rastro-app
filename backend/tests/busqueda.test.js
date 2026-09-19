@@ -110,7 +110,7 @@ describe('sugerenciaBusqueda', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Bordes EXACTOS de los umbrales de sugerenciaBusqueda (líneas 111-136).
+// Bordes EXACTOS de los umbrales de sugerenciaBusqueda (líneas 110-135).
 //
 // Estos casos existen para matar los mutantes de comparación: un mutante
 // `<=` -> `<` (o `>`), o un `km < 1` -> `km <= 1`, solo se nota cuando el valor
@@ -118,14 +118,12 @@ describe('sugerenciaBusqueda', () => {
 // texto COMPLETO del consejo y de la sugerencia: así también caen los mutantes
 // que vacían una plantilla de texto (que un `length > 10` no distingue).
 //
-// MUTANTES EQUIVALENTES (no se fuerzan, no hay test que los mate sin tocar
-// producción): el ternario `nombre` de la línea 113 es CÓDIGO MUERTO — se
-// calcula y no se lee en ninguna parte de la función ni se devuelve. Comprobado
-// comparando el objeto devuelto completo entre el original y 12 versiones
-// mutadas de esa línea (condiciones a true/false, `===` -> `!==`, claves y
-// literales a '') sobre 11 tipos x 21 valores de horas = 231 casos: las 12 dan
-// 0 diferencias. En cambio los 6 mutantes de los umbrales (líneas 111, 119,
-// 122, 124 x2 y 125) sí se distinguen con los casos de abajo.
+// AQUÍ VIVÍAN LOS "MUTANTES EQUIVALENTES": el ternario `nombre` se calculaba y
+// no se leía en ninguna parte ni se devolvía. Se comprobó comparando el objeto
+// devuelto completo entre el original y 12 versiones mutadas de esa línea sobre
+// 11 tipos x 21 valores de horas (231 casos): las 12 daban 0 diferencias, así
+// que ningún test podía matarlas. En vez de forzar una prueba se eliminó el
+// código muerto, y con él sus 11 mutantes (que ya no se generan).
 // ---------------------------------------------------------------------------
 describe('sugerenciaBusqueda: bordes exactos de los umbrales', () => {
   it('con km exactamente 1 la sugerencia ya va en km, no en metros', () => {
