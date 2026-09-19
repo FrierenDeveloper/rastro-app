@@ -210,27 +210,43 @@ button:disabled {
 }
 
 /* ---------- Auth screen ---------- */
-#auth-screen {
+/* #reset-screen va en las mismas reglas: no tenía estilos propios y la pantalla
+   de "elige una contraseña nueva" salía sin centrar y con la tarjeta de borde a
+   borde. */
+#auth-screen,
+#reset-screen {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-height: 100vh;
   padding: 28px 22px 34px;
 }
-#auth-screen .brand {
+#auth-screen .brand,
+#reset-screen .brand {
   text-align: center;
   margin-bottom: 24px;
 }
-#auth-screen h1 {
+#auth-screen h1,
+#reset-screen h1 {
   font-size: 32px;
   margin: 10px 0 6px;
 }
-#auth-screen p.tag {
+#auth-screen p.tag,
+#reset-screen p.tag {
   color: var(--ink-soft);
   font-size: 14px;
   margin: 0 auto;
   max-width: 30ch;
   line-height: 1.5;
+  /* OJO: .tag es la etiqueta de estado de los avisos (10,5 px, negrita y
+     nowrap). Sin deshacerlo aquí, el subtítulo se dibujaba en una sola línea de
+     ~391 px y empujaba la página 31 px a lo ancho en cualquier móvil de 360 px,
+     además de salir en negrita y con relleno de píldora. */
+  white-space: normal;
+  font-weight: 400;
+  letter-spacing: normal;
+  padding: 0;
+  border-radius: 0;
 }
 .auth-card {
   background: var(--card);

@@ -30,6 +30,29 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "screenshots/acceso.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Entra o crea tu cuenta en Rastro"
+    },
+    {
+      "src": "screenshots/privacidad.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Qué se ve y qué no de tus datos"
+    },
+    {
+      "src": "screenshots/politica.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Política de privacidad completa"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Encontré un animal",
