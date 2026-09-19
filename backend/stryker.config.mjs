@@ -32,6 +32,9 @@
 // ============================================================================
 //
 // Stryker 10 no exporta un helper defineConfig: se exporta el objeto directo.
+import os from 'node:os';
+import path from 'node:path';
+
 export default {
   testRunner: 'vitest',
   // Solo se mutan los archivos que la ley considera lógica/servicios/endpoints.
@@ -69,7 +72,12 @@ export default {
   // ejecuta únicamente las pruebas que lo cubren, que es lo que hace viable esta
   // suite (con "all" cada mutante correría las 763 pruebas).
   coverageAnalysis: 'perTest',
-  tempDirName: '.stryker-tmp',
+  // El sandbox (la copia de trabajo que Stryker crea en cada corrida) se deja
+  // FUERA del repo a propósito: el proyecto vive dentro de OneDrive y, dentro de
+  // una carpeta sincronizada, OneDrive intentaría subir los archivos temporales
+  // mientras se ejecutan las pruebas. En %TEMP% no molesta a nadie. Se sigue
+  // borrando al terminar (cleanTempDir).
+  tempDirName: path.join(os.tmpdir(), 'stryker-rastro'),
   cleanTempDir: true,
   ignoreStatic: true
 };
