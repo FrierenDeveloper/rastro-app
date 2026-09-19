@@ -57,6 +57,7 @@ afterEach(() => {
   delete process.env.VAPID_PUBLIC_KEY;
   delete process.env.VAPID_PRIVATE_KEY;
   delete process.env.VAPID_SUBJECT;
+  vi.restoreAllMocks();
 });
 
 describe('configuración VAPID al cargarse', () => {
@@ -208,6 +209,30 @@ describe('sendToUser habilitado', () => {
     await activo.sendToUser('u-9', {});
 
     expect(poolFalso.query).toHaveBeenCalledTimes(1);
+  });
+
+  // Sin este registro, un envío que falla (claves VAPID que no cuadran, 403 del
+  // servicio push...) desaparece sin dejar rastro y es imposible saber por qué
+  // no llegó la notificación.
+  it('deja registro del fallo que no es 404/410, con el código y el detalle', async () => {
+    const activo = pushActivo();
+    poolFalso.query.mockResolvedValue({ rows: [SUSCRIPCION_1] });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    webpushFalso.sendNotification.mockRejectedValueOnce(
+      Object.assign(new Error('las claves VAPID no coinciden'), { statusCode: 403 })
+    );
+    await activo.sendToUser('u-9', {});
+    expect(error).toHaveBeenLastCalledWith(
+      '[push] no se pudo enviar a u-9 (403): las claves VAPID no coinciden'
+    );
+
+    webpushFalso.sendNotification.mockRejectedValueOnce(null);
+    await activo.sendToUser('u-9', {});
+    expect(error).toHaveBeenLastCalledWith('[push] no se pudo enviar a u-9 (sin código): null');
+
+    expect(error).toHaveBeenCalledTimes(2);
+    expect(poolFalso.query).not.toHaveBeenCalledWith(BORRADO, expect.anything());
   });
 
   it('un rechazo sin error (null) no rompe ni borra', async () => {

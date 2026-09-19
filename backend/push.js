@@ -41,6 +41,13 @@ async function sendToUser(userId, payload) {
           } catch (e) {
             /* ignore */
           }
+        } else {
+          // Cualquier otro fallo (claves VAPID que no cuadran, 403/500 del
+          // servicio push, timeout...) se quedaba en silencio: sin este registro
+          // no hay manera de saber por qué no llegó una notificación.
+          const codigo = err && err.statusCode ? err.statusCode : 'sin código';
+          const detalle = err && err.message ? err.message : String(err);
+          console.error(`[push] no se pudo enviar a ${userId} (${codigo}): ${detalle}`);
         }
       }
     })
