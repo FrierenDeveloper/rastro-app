@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
-const { radioBusquedaKm } = require('../busqueda');
+const { radioBusquedaKm, curvaRadio, sugerenciaBusqueda } = require('../busqueda');
 const { requireAuth, optionalAuth, requireVerified } = require('../middleware/auth');
 const { keyPorIp } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
@@ -153,7 +153,6 @@ router.post('/', requireAuth, requireVerified, createLimiter, upload.single('fot
       const horasPerdido = estado === 'perdido' && req.body.perdido_hace_horas !== undefined
         ? parseInt(req.body.perdido_hace_horas, 10) : null;
       const radioKm = horasPerdido === null ? null : radioBusquedaKm(tipo, horasPerdido);
-
       let fotoUrl = null;
       if (req.file) {
         const tipoReal = tipoImagenReal(req.file.buffer);
@@ -171,8 +170,13 @@ router.post('/', requireAuth, requireVerified, createLimiter, upload.single('fot
       );
 
       // Avisar a las zonas suscritas (no bloquea la respuesta si falla).
-      if (estado === 'perdido' && radioKm) {
-        notificarZona(id, tipo, color, lat, lng, radioKm, req.userId).catch(() => {});
+      // Para el aviso usamos un mínimo de 500 m: el radio de BÚSQUEDA de un gato
+      // es de decenas de metros (mediana 50 m), pero la alerta de zona llega a
+      // personas, y el estudio muestra que el 75% de los gatos aparece dentro de
+      // 500 m. Avisar solo a la casa de al lado desperdiciaría la alerta.
+      if (estado === 'perdido') {
+        const radioAviso = Math.max(radioKm || 0, 0.5);
+        notificarZona(id, tipo, color, lat, lng, radioAviso, req.userId).catch(() => {});
       }
 
       const result = await db.query('SELECT * FROM reports WHERE id = $1', [id]);
@@ -280,6 +284,25 @@ router.get('/mine/all', requireAuth, async (req, res, next) => {
 /* ---------- Muro de reencuentros (público) ---------- */
 // Avisos resueltos con su foto/nota del reencuentro. Da prueba social y
 // motivación para seguir publicando.
+/* ---------- Radio de búsqueda sugerido (público) ---------- */
+// Devuelve la curva de radio por horas para dibujarla en el formulario de
+// "Perdí", más el texto de sugerencia. Público: es información de ayuda, no
+// hay nada privado aquí y así funciona incluso antes de iniciar sesión.
+router.get('/busqueda', optionalAuth, infoLimiter, (req, res) => {
+  const tipo = TIPOS_VALIDOS.includes(req.query.tipo) ? req.query.tipo : 'perro';
+  const horas = Math.min(24 * 365, Math.max(0, parseInt(req.query.horas, 10) || 0));
+  res.json({
+    tipo,
+    horas,
+    sugerencia: sugerenciaBusqueda(tipo, horas),
+    curva: curvaRadio(tipo, 72, 24),
+    curvas: TIPOS_VALIDOS.reduce((acc, t) => {
+      acc[t] = curvaRadio(t, 72, 24);
+      return acc;
+    }, {})
+  });
+});
+
 router.get('/reunions', optionalAuth, infoLimiter, async (req, res, next) => {
   try {
     const result = await db.query(
@@ -353,8 +376,12 @@ router.get('/:id/poster', optionalAuth, param('id').isUUID(), async (req, res, n
   .dato{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #eee;font-size:16px;}
   .dato b{color:#41565B;font-weight:600;}
   .qr{display:flex;align-items:center;gap:16px;margin-top:18px;padding-top:16px;border-top:2px dashed #ddd;}
-  .qr img{width:130px;height:130px;}
+  .qr img{width:130px;height:130px;flex-shrink:0;}
   .qr div{font-size:14px;color:#41565B;line-height:1.5;}
+  /* El enlace también en texto: si el QR sale borroso al imprimir, o quien lo
+     lee no tiene cámara, tiene que poder escribir la dirección a mano. */
+  .qr .enlace{margin-top:8px;font-size:12.5px;color:#6b7a7d;}
+  .qr .enlace span{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#1B2A2F;word-break:break-all;}
   .pie{margin-top:16px;font-size:13px;color:#6b7a7d;text-align:center;}
   .nota{max-width:640px;margin:12px auto 0;font-size:12.5px;color:#6b7a7d;text-align:center;}
   @media print{ body{background:#fff;padding:0;} .hoja{box-shadow:none;border-radius:0;max-width:100%;} .nota{display:none;} }
@@ -374,7 +401,11 @@ router.get('/:id/poster', optionalAuth, param('id').isUUID(), async (req, res, n
     </div>
     <div class="qr">
       <img src="${qr}" alt="Código QR">
-      <div><b>Escanea el código con la cámara del celular</b><br>Ahí puedes ver el aviso completo y escribirme dentro de la app, sin compartir mi teléfono ni mi correo.</div>
+      <div>
+        <b>Escanea el código con la cámara del celular</b><br>
+        Ahí puedes ver el aviso completo y escribirme dentro de la app, sin compartir mi teléfono ni mi correo.
+        <div class="enlace">O escríbelo a mano:<br><span>${escHtml(enlace)}</span></div>
+      </div>
     </div>
     <div class="pie">Publicado en Rastro · el contacto se hace dentro de la app</div>
   </div>

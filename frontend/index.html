@@ -156,7 +156,8 @@
       <div class="toolbar">
         <button class="icon-btn active" id="btn-view-map">Mapa</button>
         <button class="icon-btn" id="btn-view-list">Lista</button>
-        <button class="icon-btn" id="btn-my-loc" style="margin-left:auto;">📍 Ir a mí</button>
+        <button class="icon-btn" id="btn-my-loc">📍 Ir a mí</button>
+        <button class="icon-btn hidden" id="btn-seguir" title="Mantener tu punto actualizado mientras te mueves (gasta más batería)">📡 Seguir</button>
         <button class="icon-btn" id="btn-refresh">↻ Actualizar</button>
       </div>
       <div id="list-map"></div>
@@ -284,6 +285,7 @@
             <option value="336">Más de una semana</option>
           </select>
           <p class="loc-note" id="radio-hint-lost"></p>
+          <div id="radio-chart-lost"></div>
 
           <button type="submit" class="submit-btn lost">Publicar aviso de mascota perdida</button>
           <div id="match-area-lost"></div>

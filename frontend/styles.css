@@ -199,6 +199,12 @@ nav.tabs button{position:relative;}
 .tips-list li{margin-bottom:9px;}
 .tips-list b{color:var(--ink);}
 
+/* ---------- Gráfico del radio de búsqueda (formulario "Perdí") ---------- */
+.chart-card{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 10px 8px;}
+.chart-titulo{font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:0 0 6px 4px;}
+.chart-pie{font-size:11px;color:var(--ink-soft);line-height:1.45;margin:6px 4px 2px;}
+.hint-suave{color:var(--ink-soft);font-size:12px;}
+
 /* ---------- Onboarding ---------- */
 .onboard{text-align:center;max-width:400px;}
 .onboard-emoji{font-size:46px;margin-bottom:6px;}

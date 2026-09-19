@@ -14,7 +14,7 @@ let userLoc = { lat: -33.4489, lng: -70.6693 }; // Santiago, Chile (fallback)
 let photoFile = { found: null, lost: null, reunion: null };
 let pickedLoc = { found: null, lost: null };
 let listMap, clusterGroup, mapFound, mapLost, markerFound, markerLost;
-let userMarker = null, userAccuracy = null, destinoMarker = null, userWatchId = null;
+let userMarker = null, userAccuracy = null, destinoMarker = null;
 let ultimaUbicacion = null, primeraUbicacion = true;
 let pickedManual = { found: false, lost: false };
 let allReports = [];
@@ -25,26 +25,113 @@ let editingId = null;
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
 
 // Misma estimación que backend/busqueda.js: cuánto se aleja una mascota según
-// el tiempo. Se usa solo para mostrar la sugerencia antes de publicar.
+// el tiempo. ESTA FÓRMULA ESTÁ DUPLICADA A PROPÓSITO (aquí y en el backend)
+// para poder mostrar la sugerencia al instante, sin ir al servidor. Si cambias
+// una, cambia la otra: hay una prueba (.audit/features.mjs) que compara ambas.
+//
+// El "base" de cada tipo está anclado a estudios publicados:
+//   - gato: mediana de 50 m (Huang et al. 2018, Animals 8(1):5; 75% dentro de 500 m)
+//   - perro: radio típico ~400 m (Ignatius 2015, citando a Lord et al. 2007)
+// Lo que crece con el tiempo es una modelización nuestra (raíz del tiempo).
 const RADIO_PERFIL = {
-  perro:  { base: 0.5, crece: 1.20, tope: 10.0 },
-  gato:   { base: 0.2, crece: 0.15, tope: 1.5 },
-  ave:    { base: 0.3, crece: 0.20, tope: 2.0 },
-  conejo: { base: 0.3, crece: 0.20, tope: 1.5 },
-  otro:   { base: 0.5, crece: 0.80, tope: 8.0 }
+  gato:   { base: 0.05, crece: 0.25, tope: 1.5 },
+  perro:  { base: 0.40, crece: 1.60, tope: 15.0 },
+  ave:    { base: 0.30, crece: 2.00, tope: 30.0 },
+  conejo: { base: 0.15, crece: 0.35, tope: 2.0 },
+  otro:   { base: 0.30, crece: 1.00, tope: 10.0 }
 };
 function radioBusquedaKm(tipo, horas) {
   const p = RADIO_PERFIL[tipo] || RADIO_PERFIL.otro;
-  const dias = Math.max(0, Number(horas) || 0) / 24;
-  return Math.round(Math.min(p.tope, p.base + p.crece * Math.sqrt(dias)) * 10) / 10;
+  const h = Math.max(0, Number(horas) || 0);
+  const km = p.base + p.crece * Math.sqrt(h / 24);
+  return Math.round(Math.min(p.tope, km) * 100) / 100;
 }
+// Etiqueta corta y legible: metros si es menos de 1 km.
+function fmtRadio(km) {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+
+// Texto de ayuda según el estudio y el tipo de animal.
+function consejoBusqueda(tipo, horas) {
+  if (tipo === 'gato') {
+    return 'El 75% de los gatos perdidos aparece dentro de 500 m de donde se escapó: revisa a fondo tu casa, patios vecinos, bajo terrazas y autos antes de irte lejos.';
+  }
+  if (tipo === 'perro') {
+    return horas <= 24
+      ? 'Los perros se recuperan sobre todo porque alguien los encuentra: refugios, veterinarias y carteles en el barrio rinden más que caminar kilómetros.'
+      : 'A estas alturas lo que más rinde es la difusión (refugios, veterinarias, carteles y redes del barrio): más de un tercio de los perros recuperados apareció en un refugio.';
+  }
+  return 'Empieza por la zona cercana y avisa a los vecinos; después amplía hacia donde haya más gente.';
+}
+
+/* ---------- Gráfico: cómo crece el radio con las horas ---------- */
+// Se dibuja a mano en SVG (sin librerías: la app no tiene build step).
+// Los colores usan las variables CSS del tema, así funciona igual en claro y
+// en oscuro sin duplicar el gráfico.
+// Eje X = horas (0 a 72), eje Y = radio sugerido. Marca el punto del usuario.
+function graficoRadioSVG(tipo, horasUsuario) {
+  const W = 320, H = 150, ML = 46, MR = 10, MT = 16, MB = 24;
+  const ancho = W - ML - MR, alto = H - MT - MB;
+  const horasMax = 72;
+  const puntos = [];
+  for (let i = 0; i <= 36; i++) {
+    const h = (horasMax * i) / 36;
+    puntos.push({ h, km: radioBusquedaKm(tipo, h) });
+  }
+  const kmMax = Math.max(...puntos.map(p => p.km), 0.1) * 1.15;
+  const x = h => ML + (h / horasMax) * ancho;
+  const y = km => MT + alto - (km / kmMax) * alto;
+
+  const linea = puntos.map((p, i) => `${i ? 'L' : 'M'}${x(p.h).toFixed(1)},${y(p.km).toFixed(1)}`).join(' ');
+  const area = `M${x(0)},${y(0)} ` + puntos.map(p => `L${x(p.h).toFixed(1)},${y(p.km).toFixed(1)}`).join(' ') + ` L${x(horasMax)},${y(0)} Z`;
+
+  const marcasX = [0, 24, 48, 72].map(h =>
+    `<line x1="${x(h).toFixed(1)}" y1="${MT + alto}" x2="${x(h).toFixed(1)}" y2="${MT + alto + 4}" stroke="var(--line)"/>
+     <text x="${x(h).toFixed(1)}" y="${H - 6}" font-size="9" text-anchor="middle" fill="var(--ink-soft)">${h === 0 ? 'ahora' : h + ' h'}</text>`
+  ).join('');
+  const marcasY = [0, kmMax / 2, kmMax].map(km =>
+    `<line x1="${ML - 4}" y1="${y(km).toFixed(1)}" x2="${ML}" y2="${y(km).toFixed(1)}" stroke="var(--line)"/>
+     <text x="${ML - 6}" y="${(y(km) + 3).toFixed(1)}" font-size="9" text-anchor="end" fill="var(--ink-soft)">${fmtRadio(km)}</text>`
+  ).join('');
+
+  const hUser = Math.min(horasMax, Math.max(0, Number(horasUsuario) || 0));
+  const kmUser = radioBusquedaKm(tipo, hUser);
+  const yEtiqueta = Math.max(MT + 8, y(kmUser) - 8);
+  const punto = `<circle cx="${x(hUser).toFixed(1)}" cy="${y(kmUser).toFixed(1)}" r="4.5" fill="var(--rust)" stroke="var(--card)" stroke-width="1.5"/>
+    <text x="${x(hUser).toFixed(1)}" y="${yEtiqueta.toFixed(1)}" font-size="10" font-weight="700" text-anchor="middle" fill="var(--rust)">${fmtRadio(kmUser)}</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Radio de búsqueda sugerido según las horas transcurridas" style="width:100%;height:auto;display:block">
+    <path d="${area}" fill="var(--green)" opacity="0.14"/>
+    <path d="${linea}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${marcasY}${marcasX}
+    <line x1="${ML}" y1="${MT + alto}" x2="${ML + ancho}" y2="${MT + alto}" stroke="var(--line)"/>
+    ${punto}
+  </svg>`;
+}
+
+// Actualiza la sugerencia Y el gráfico del formulario de "Perdí".
 function actualizarRadioHint() {
   const el = document.getElementById('radio-hint-lost');
+  const cont = document.getElementById('radio-chart-lost');
   const tipo = document.getElementById('tipo-lost').value;
-  const horas = document.getElementById('perdido-hace-lost').value;
-  if (!tipo || !horas) { el.textContent = ''; return; }
+  const horas = Number(document.getElementById('perdido-hace-lost').value);
+  if (!tipo || !horas) {
+    if (el) el.textContent = '';
+    if (cont) cont.innerHTML = '';
+    return;
+  }
   const km = radioBusquedaKm(tipo, horas);
-  el.textContent = `🔍 Con esos datos, te sugerimos buscar (y avisaremos) en un radio de ~${km} km.`;
+  if (el) {
+    el.innerHTML = `🔍 Te sugerimos revisar <b>${fmtRadio(km)}</b> a la redonda y avisaremos a las personas con alertas de zona dentro de ese radio.`
+      + `<br><span class="hint-suave">${consejoBusqueda(tipo, horas)}</span>`;
+  }
+  if (cont) {
+    cont.innerHTML = `<div class="chart-card">
+      <div class="chart-titulo">Cómo crece la zona de búsqueda con las horas</div>
+      ${graficoRadioSVG(tipo, horas)}
+      <div class="chart-pie">Basado en estudios publicados: gatos aparecen en mediana a 50 m (75% dentro de 500 m) · perros en un radio típico de ~400 m.</div>
+    </div>`;
+  }
 }
 
 /* ============ Capa de mapa con proveedores de respaldo ============ */
@@ -177,10 +264,7 @@ function logout() {
   token = null; me = null;
   localStorage.removeItem('rastro_token');
   if (currentConv.poll) { clearInterval(currentConv.poll); currentConv.poll = null; }
-  if (userWatchId !== null && navigator.geolocation && navigator.geolocation.clearWatch) {
-    navigator.geolocation.clearWatch(userWatchId);
-    userWatchId = null;
-  }
+  ubicacion.detener();
   showAuth();
 }
 
@@ -346,6 +430,57 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 });
 
 /* ============ Geolocalización ============ */
+// Política de ubicación (a propósito, poco invasiva):
+//
+//   * NO hay seguimiento continuo. Antes se usaba watchPosition() con
+//     enableHighAccuracy, que enciende el GPS y lo deja encendido mientras la
+//     app esté abierta: eso gasta batería y obliga a Android a mostrar el
+//     indicador de ubicación todo el rato. Se quitó.
+//   * Se pide la ubicación UNA vez al abrir la app (con precisión de red, no de
+//     GPS: para pintar un punto en un mapa de la ciudad sobra y es más rápido).
+//   * Si vuelves a la app después de un rato, se refresca sola solo si el dato
+//     tiene más de UBICACION_MAX_MS. Y el botón "Ir a mí" siempre refresca.
+//   * La última ubicación se guarda en localStorage para no volver a pedirla al
+//     recargar, y se borra al cerrar sesión.
+//
+// Nada de esto se manda al servidor por el simple hecho de abrir la app: la
+// ubicación solo viaja si publicas un aviso, guardas tu zona de alertas o
+// adjuntas "lo vi aquí" a un mensaje.
+const UBICACION_CLAVE = 'rastro_ubicacion';
+const UBICACION_MAX_MS = 5 * 60 * 1000; // a partir de 5 min se considera vieja
+const ubicacion = {
+  ultima: null,      // { lat, lng, accuracy, ts }
+  watchId: null,     // solo si el usuario activa el seguimiento a propósito
+  pidiendo: false,
+  // Al cerrar sesión: se corta cualquier seguimiento y se olvida la ubicación.
+  detener() {
+    if (this.watchId !== null && navigator.geolocation && navigator.geolocation.clearWatch) {
+      navigator.geolocation.clearWatch(this.watchId);
+    }
+    this.watchId = null;
+    this.ultima = null;
+    try { localStorage.removeItem(UBICACION_CLAVE); } catch (e) { /* no crítico */ }
+  }
+};
+
+function guardarUbicacion() {
+  try {
+    if (ubicacion.ultima) localStorage.setItem(UBICACION_CLAVE, JSON.stringify(ubicacion.ultima));
+  } catch (e) { /* modo privado o sin espacio: no es crítico */ }
+}
+function leerUbicacionGuardada() {
+  try {
+    const crudo = localStorage.getItem(UBICACION_CLAVE);
+    if (!crudo) return null;
+    const u = JSON.parse(crudo);
+    if (typeof u.lat !== 'number' || typeof u.lng !== 'number') return null;
+    return u;
+  } catch (e) { return null; }
+}
+function ubicacionVieja() {
+  return !ubicacion.ultima || (Date.now() - ubicacion.ultima.ts) > UBICACION_MAX_MS;
+}
+
 // Marcador azul "estás aquí" (con el círculo de precisión) en el mapa principal.
 function pintarMarcadorUsuario() {
   if (!listMap || !ultimaUbicacion) return;
@@ -360,9 +495,11 @@ function pintarMarcadorUsuario() {
   }
 }
 
-function aplicarUbicacion(lat, lng, accuracy) {
+function aplicarUbicacion(lat, lng, accuracy, { deCache = false } = {}) {
   userLoc = { lat, lng };
   ultimaUbicacion = { lat, lng, accuracy: accuracy || 0 };
+  ubicacion.ultima = { lat, lng, accuracy: accuracy || 0, ts: Date.now() };
+  if (!deCache) guardarUbicacion();
   const chip = document.getElementById('loc-chip');
   if (chip) chip.textContent = '📍 Ubicación detectada';
   pintarMarcadorUsuario();
@@ -382,19 +519,95 @@ function aplicarUbicacion(lat, lng, accuracy) {
   }
 }
 
-function locateUser() {
+// Pide UNA posición. Por defecto con precisión de red (rápida y suficiente);
+// alta precisión solo si el usuario la pide a propósito.
+function pedirUbicacion({ altaPrecision = false } = {}) {
   const chip = document.getElementById('loc-chip');
-  if (!navigator.geolocation) { chip.textContent = '📍 Santiago (ubicación manual)'; return; }
-  const onPos = pos => aplicarUbicacion(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-  navigator.geolocation.getCurrentPosition(
-    onPos,
-    () => { chip.textContent = '📍 Santiago (toca el mapa para ajustar)'; },
-    { timeout: 8000, enableHighAccuracy: true }
-  );
-  // Seguimiento continuo: mantiene el punto azul actualizado mientras se mueve.
-  if (navigator.geolocation.watchPosition && userWatchId === null) {
-    userWatchId = navigator.geolocation.watchPosition(onPos, () => {}, { enableHighAccuracy: true, maximumAge: 10000 });
+  if (!navigator.geolocation) {
+    if (chip) chip.textContent = '📍 Santiago (ubicación manual)';
+    return Promise.resolve(null);
   }
+  if (ubicacion.pidiendo) return Promise.resolve(null);
+  ubicacion.pidiendo = true;
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        ubicacion.pidiendo = false;
+        aplicarUbicacion(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        resolve(pos);
+      },
+      () => {
+        ubicacion.pidiendo = false;
+        if (chip && !ubicacion.ultima) chip.textContent = '📍 Santiago (toca el mapa para ajustar)';
+        resolve(null);
+      },
+      altaPrecision
+        ? { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        : { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 }
+    );
+  });
+}
+
+// Al abrir la app: usa lo guardado y, si está viejo, refresca en segundo plano.
+function locateUser() {
+  const guardada = leerUbicacionGuardada();
+  if (guardada) {
+    aplicarUbicacion(guardada.lat, guardada.lng, guardada.accuracy, { deCache: true });
+  }
+  if (ubicacionVieja()) pedirUbicacion();
+}
+
+// Un solo listener de visibilidad para toda la ubicación:
+//   - al volver a la app, refresca solo si el dato guardado caducó;
+//   - al salir de la app, corta el seguimiento continuo (si estaba activo),
+//     para no dejar el GPS encendido en segundo plano.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (estaSiguiendo()) { seguirUbicacion(false); actualizarBotonSeguir(); }
+    return;
+  }
+  if (token && ubicacionVieja()) pedirUbicacion();
+});
+
+/* Seguimiento continuo: SOLO mientras el usuario lo tenga activado con el botón
+   "siguiendo" (por ejemplo, si va caminando buscando a su mascota). Se apaga
+   solo al ocultar la pestaña y como máximo dura UBICACION_SIGUIENDO_MAX_MS. */
+const UBICACION_SIGUIENDO_MAX_MS = 10 * 60 * 1000;
+let siguiendoDesde = 0;
+function seguirUbicacion(activar) {
+  if (!navigator.geolocation) return false;
+  if (activar) {
+    if (ubicacion.watchId !== null) return true;
+    siguiendoDesde = Date.now();
+    ubicacion.watchId = navigator.geolocation.watchPosition(
+      pos => {
+        aplicarUbicacion(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        // Se corta solo: no dejamos el GPS encendido indefinidamente.
+        if (Date.now() - siguiendoDesde > UBICACION_SIGUIENDO_MAX_MS) seguirUbicacion(false);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+    );
+    return true;
+  }
+  if (ubicacion.watchId !== null) {
+    navigator.geolocation.clearWatch(ubicacion.watchId);
+    ubicacion.watchId = null;
+  }
+  return false;
+}
+function estaSiguiendo() { return ubicacion.watchId !== null; }
+
+// Refleja en el botón si el seguimiento está activo.
+function actualizarBotonSeguir() {
+  const btn = document.getElementById('btn-seguir');
+  if (!btn) return;
+  const activo = estaSiguiendo();
+  btn.classList.toggle('active', activo);
+  btn.textContent = activo ? '📡 Siguiendo' : '📡 Seguir';
+  btn.title = activo
+    ? 'Dejar de seguir tu ubicación'
+    : 'Mantener tu punto actualizado mientras te mueves (gasta más batería)';
 }
 
 function initPicker(elId, key) {
@@ -1161,13 +1374,28 @@ function startApp() {
       if (destinoMarker) listMap.removeLayer(destinoMarker);
       destinoMarker = L.marker([lat, lng]).addTo(listMap).bindPopup('Dirección').openPopup();
     });
-    document.getElementById('btn-my-loc').addEventListener('click', () => {
+    document.getElementById('btn-my-loc').addEventListener('click', async () => {
+      // Este botón SÍ pide ubicación fresca (el usuario la está pidiendo a
+      // propósito): con GPS para que el punto quede fino.
+      const pos = await pedirUbicacion({ altaPrecision: true });
       if (!navigator.geolocation) { if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 15); return; }
-      navigator.geolocation.getCurrentPosition(p => {
-        aplicarUbicacion(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
-        if (listMap) listMap.setView([p.coords.latitude, p.coords.longitude], 15);
-      }, () => { if (listMap) listMap.setView([userLoc.lat, userLoc.lng], 15); }, { enableHighAccuracy: true, timeout: 6000 });
+      const centro = pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : userLoc;
+      if (listMap) listMap.setView([centro.lat, centro.lng], 15);
     });
+
+    // Seguimiento continuo: es OPCIONAL y el usuario lo enciende a propósito
+    // (por ejemplo, si va caminando buscando a su mascota). Se apaga solo al
+    // ocultar la pestaña y a los 10 minutos, para no dejar el GPS encendido.
+    const btnSeguir = document.getElementById('btn-seguir');
+    if (btnSeguir && navigator.geolocation) {
+      btnSeguir.classList.remove('hidden');
+      btnSeguir.addEventListener('click', () => {
+        const activo = seguirUbicacion(!estaSiguiendo());
+        actualizarBotonSeguir();
+        toast(activo ? 'Siguiendo tu ubicación. Se apagará solo en 10 minutos.' : 'Dejamos de seguir tu ubicación.');
+      });
+      actualizarBotonSeguir();
+    }
     appIniciada = true;
   }
   locateUser();
