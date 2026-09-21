@@ -327,31 +327,6 @@
         </div>
       </header>
 
-      <nav class="tabs">
-        <button data-tab="home" class="active">
-          <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg>Mapa
-        </button>
-        <button data-tab="found">
-          <svg class="ic" aria-hidden="true"><use href="#i-paw" /></svg>Encontré
-        </button>
-        <button data-tab="lost">
-          <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>Perdí
-        </button>
-        <button data-tab="chats">
-          <svg class="ic" aria-hidden="true"><use href="#i-chat" /></svg>Chats
-          <span class="badge hidden" id="badge-chats">0</span>
-        </button>
-        <button data-tab="exitos">
-          <svg class="ic" aria-hidden="true"><use href="#i-heart" /></svg>Éxitos
-        </button>
-        <button data-tab="inbox">
-          <svg class="ic" aria-hidden="true"><use href="#i-list" /></svg>Avisos
-        </button>
-        <button data-tab="admin" class="hidden" id="tab-admin">
-          <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>Admin
-        </button>
-      </nav>
-
       <main>
         <div id="verify-banner" class="verify-banner hidden">
           <span>
@@ -387,13 +362,6 @@
               />
             </div>
           </div>
-          <button class="tip-link" id="btn-zone">
-            <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>Activar alertas de mi zona
-          </button>
-          <button class="tip-link" id="btn-tips">
-            <svg class="ic" aria-hidden="true"><use href="#i-bulb" /></svg>Consejos para encontrar a tu
-            mascota
-          </button>
           <div class="toolbar">
             <select id="filter-tipo">
               <option value="">Todos los tipos</option>
@@ -432,6 +400,16 @@
           </div>
           <div id="list-map"></div>
           <div id="reports-list"></div>
+
+          <!-- Éxitos / reencuentros: viven al final del mapa como leyenda
+               visible para cualquiera que entre, sin una pestaña propia. -->
+          <section class="reunion-legend">
+            <h2 class="section-title">
+              <svg class="ic" aria-hidden="true"><use href="#i-heart" /></svg>Reencuentros
+            </h2>
+            <div class="reunion-total" id="reunion-total"></div>
+            <div id="reunions-grid"></div>
+          </section>
         </section>
 
         <!-- FOUND -->
@@ -522,6 +500,14 @@
               <button type="submit" class="submit-btn found">Publicar aviso de animal encontrado</button>
               <div id="match-area-found"></div>
             </form>
+          </div>
+
+          <!-- Mis avisos encontrados: antes vivían en una pestaña "Avisos";
+               ahora cada sección lleva los suyos. -->
+          <div class="card">
+            <h2>Mis avisos encontrados</h2>
+            <p class="sub">Edita, comparte o marca como resuelto los avisos de animales que encontraste.</p>
+            <div id="inbox-found"></div>
           </div>
         </section>
 
@@ -626,6 +612,12 @@
               <div id="match-area-lost"></div>
             </form>
           </div>
+
+          <div class="card">
+            <h2>Mis avisos perdidos</h2>
+            <p class="sub">Edita, comparte o marca como resuelto los avisos de tus mascotas perdidas.</p>
+            <div id="inbox-lost"></div>
+          </div>
         </section>
 
         <!-- CHATS -->
@@ -647,12 +639,6 @@
           </div>
         </section>
 
-        <!-- ÉXITOS / REENCUENTROS -->
-        <section class="view" id="view-exitos">
-          <div class="reunion-total" id="reunion-total"></div>
-          <div id="reunions-grid"></div>
-        </section>
-
         <!-- ADMIN -->
         <section class="view" id="view-admin">
           <h2 class="admin-title">
@@ -664,12 +650,23 @@
           </h2>
           <div id="admin-users"></div>
         </section>
-
-        <!-- INBOX / MIS AVISOS -->
-        <section class="view" id="view-inbox">
-          <div id="inbox-list"></div>
-        </section>
       </main>
+
+      <!-- ===================== NAVEGACIÓN INFERIOR =====================
+           Solo las tres acciones del día a día. El orden es el pedido:
+           Perdí · Mapa · Encontré, con el mapa en el centro. El chat, las
+           alertas, los consejos y el admin viven en el menú de opciones. -->
+      <nav class="bottom-nav" aria-label="Navegación principal">
+        <button data-tab="lost" data-nav="lost">
+          <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg><span>Perdí</span>
+        </button>
+        <button data-tab="home" data-nav="home" class="active">
+          <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg><span>Mapa</span>
+        </button>
+        <button data-tab="found" data-nav="found">
+          <svg class="ic" aria-hidden="true"><use href="#i-paw" /></svg><span>Encontré</span>
+        </button>
+      </nav>
     </div>
 
     <!-- ===================== OPCIONES (panel lateral) =====================
@@ -690,6 +687,24 @@
           <svg class="ic" aria-hidden="true"><use href="#i-pin" /></svg>
           <span id="opt-ubicacion-texto">Ubicándote…</span>
         </p>
+
+        <button class="drawer-item" id="menu-chats" data-vista="chats">
+          <svg class="ic" aria-hidden="true"><use href="#i-chat" /></svg>
+          <span>Chats</span>
+          <span class="nav-dot hidden" id="badge-chats">0</span>
+        </button>
+        <button class="drawer-item" id="btn-zone">
+          <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>
+          <span id="zone-label">Activar alertas de mi zona</span>
+        </button>
+        <button class="drawer-item" id="btn-tips">
+          <svg class="ic" aria-hidden="true"><use href="#i-bulb" /></svg>
+          <span>Consejos para encontrar a tu mascota</span>
+        </button>
+        <button class="drawer-item hidden" id="tab-admin" data-vista="admin">
+          <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>
+          <span>Panel de administración</span>
+        </button>
 
         <button class="drawer-item" id="btn-theme">
           <span class="drawer-ico" id="theme-ico"></span>

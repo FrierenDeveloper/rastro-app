@@ -386,56 +386,51 @@ header h1 {
   }
 }
 
-nav.tabs {
+/* ---------- Barra de navegación inferior ---------- */
+nav.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sobre-mapa);
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  padding: 14px 16px 2px;
-}
-nav.tabs button {
-  flex: 0 0 auto;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 12px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--line);
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
   background: var(--card);
-  color: var(--ink-soft);
-  font-size: 12.5px;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px -18px rgba(42, 49, 47, 0.45);
+}
+nav.bottom-nav button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink-faint);
+  font-size: 11px;
   font-weight: 600;
-  white-space: nowrap;
   cursor: pointer;
 }
-nav.tabs button:hover {
-  color: var(--ink);
-  border-color: var(--ink-faint);
+nav.bottom-nav button .ic {
+  width: 1.5em;
+  height: 1.5em;
 }
-nav.tabs button.active {
+nav.bottom-nav button:hover {
+  color: var(--ink);
+}
+nav.bottom-nav button.active {
+  color: var(--ink);
   background: var(--paper-2);
-  border-color: transparent;
-  color: var(--ink);
-  box-shadow: var(--shadow-xs);
 }
-nav.tabs button[data-tab='found'].active,
-nav.tabs button[data-tab='exitos'].active {
-  background: var(--green-soft);
-  color: var(--green-ink);
-}
-nav.tabs button[data-tab='lost'].active {
+nav.bottom-nav button[data-tab='lost'].active {
   background: var(--amber-soft);
   color: var(--amber-ink);
 }
-nav.tabs button[data-tab='chats'].active,
-nav.tabs button[data-tab='admin'].active {
-  background: var(--info-soft);
-  color: var(--ink);
-}
-nav.tabs button[data-tab='inbox'].active {
-  background: var(--rust-soft);
-  color: var(--rust-ink);
+nav.bottom-nav button[data-tab='found'].active {
+  background: var(--green-soft);
+  color: var(--green-ink);
 }
 
 main {
@@ -1074,19 +1069,21 @@ input[type='file'] {
   color: var(--on-accent);
 }
 
-/* ---------- Badge en tabs ---------- */
-.badge {
-  display: inline-block;
-  min-width: 17px;
+/* ---------- Punto verde de mensajes nuevos ---------- */
+.nav-dot {
+  min-width: 18px;
+  height: 18px;
   padding: 0 5px;
   border-radius: var(--r-pill);
-  background: var(--rust);
-  color: var(--on-accent);
-  font-size: 10px;
+  background: #3f9d69;
+  color: #fff;
+  font-size: 10.5px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
-  vertical-align: middle;
+}
+.drawer-item .nav-dot {
+  margin-left: auto;
 }
 
 /* ---------- Checkbox ---------- */
@@ -1612,6 +1609,21 @@ input[type='file'] {
 }
 
 /* ---------- Muro de reencuentros ---------- */
+.reunion-legend {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--line);
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.section-title .ic {
+  color: var(--green);
+}
 .reunion-total {
   font-size: 14px;
   font-weight: 600;

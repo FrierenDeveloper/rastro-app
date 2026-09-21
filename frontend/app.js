@@ -521,6 +521,9 @@ function abrirMenu() {
   if (btn) btn.setAttribute('aria-expanded', 'true');
   const cerrar = document.getElementById('btn-drawer-close');
   if (cerrar) cerrar.focus();
+  // El punto verde del chat se refresca al abrir el menú para que el aviso de
+  // mensajes nuevos esté al día sin esperar al ciclo de un minuto.
+  actualizarBadgeChats();
 }
 function cerrarMenu() {
   const drawer = document.getElementById('options-drawer');
@@ -563,39 +566,48 @@ document.getElementById('btn-delete-account').addEventListener('click', async ()
   }
 });
 
-/* ============ Tabs ============ */
-document.querySelectorAll('nav.tabs button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById('view-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'home') {
-      setTimeout(() => listMap && listMap.invalidateSize(), 50);
-      renderList()
-        .then(renderListMap)
-        .catch(() => {});
-    }
-    if (btn.dataset.tab === 'found') {
-      asegurarPicker('found');
-    }
-    if (btn.dataset.tab === 'lost') {
-      asegurarPicker('lost');
-    }
-    if (btn.dataset.tab === 'chats') {
-      cerrarConversacion();
-      renderThreads();
-    }
-    if (btn.dataset.tab === 'exitos') {
-      renderReunions();
-    }
-    if (btn.dataset.tab === 'admin') {
-      renderAdmin();
-    }
-    if (btn.dataset.tab === 'inbox') {
-      renderInbox();
-    }
+/* ============ Navegación ============ */
+// La barra inferior tiene solo tres vistas (Perdí, Mapa, Encontré); el chat y
+// el panel de administración se abren desde el menú de opciones. Esta función
+// es el único punto que cambia de vista: los atajos del icono, las
+// notificaciones y los botones internos llaman aquí y no duplican lógica.
+function mostrarVista(tab) {
+  const vista = document.getElementById('view-' + tab);
+  if (!vista) return;
+  if (tab === 'admin' && !(me && me.is_admin)) return;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  vista.classList.add('active');
+  document.querySelectorAll('.bottom-nav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
+  document.querySelectorAll('.drawer-item[data-vista]').forEach(b => {
+    b.classList.toggle('active', b.dataset.vista === tab);
+  });
+  if (tab === 'home') {
+    setTimeout(() => listMap && listMap.invalidateSize(), 50);
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
+    renderReunions();
+  }
+  if (tab === 'found') {
+    asegurarPicker('found');
+    renderInbox();
+  }
+  if (tab === 'lost') {
+    asegurarPicker('lost');
+    renderInbox();
+  }
+  if (tab === 'chats') {
+    cerrarConversacion();
+    renderThreads();
+  }
+  if (tab === 'admin') {
+    renderAdmin();
+  }
+}
+document.querySelectorAll('.bottom-nav button, .drawer-item[data-vista]').forEach(btn => {
+  btn.addEventListener('click', () => mostrarVista(btn.dataset.tab || btn.dataset.vista));
 });
 
 /* ============ Geolocalización ============ */
@@ -1065,7 +1077,7 @@ async function renderList() {
   await fetchReports();
   const el = document.getElementById('reports-list');
   if (allReports.length === 0) {
-    el.innerHTML = `<div class="empty-state"><div class="big">🐾</div>Todavía no hay avisos.<br>Publica el primero desde las pestañas de arriba.</div>`;
+    el.innerHTML = `<div class="empty-state"><div class="big">🐾</div>Todavía no hay avisos.<br>Publica el primero desde Perdí o Encontré.</div>`;
     return;
   }
   el.innerHTML = allReports.map(reportCard).join('');
@@ -1357,21 +1369,18 @@ document.getElementById('btn-conv-send').addEventListener('click', async () => {
   }
 });
 
-/* ============ Mis avisos / inbox ============ */
-async function renderInbox() {
-  const el = document.getElementById('inbox-list');
-  try {
-    const { reports } = await api('/api/reports/mine/all');
-    myReports = reports;
-    if (reports.length === 0) {
-      el.innerHTML = `<div class="empty-state"><div class="big">📭</div>Todavía no has publicado avisos.</div>`;
-      return;
-    }
-    el.innerHTML = reports
-      .map(
-        r => `
+/* ============ Mis avisos (repartidos por estado) ============ */
+// Antes había una pestaña "Avisos" con todo mezclado. Ahora cada sección
+// (Perdí, Encontré) muestra los suyos, así que la lista se filtra por estado.
+function avisosHTML(reports, vacio) {
+  if (!reports.length) {
+    return `<div class="empty-state"><div class="big">${vacio}</div>Todavía no has publicado avisos aquí.</div>`;
+  }
+  return reports
+    .map(
+      r => `
       <div class="inbox-item" data-id="${esc(r.id)}">
-        <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)} · ${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'}
+        <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}
           ${r.resolved ? '<span class="tag resolved">Resuelto</span>' : ''}
           ${r.unread ? `<span class="unread-dot">${r.unread}</span>` : ''}
         </h4>
@@ -1385,13 +1394,28 @@ async function renderInbox() {
           <button data-action="delete" data-id="${esc(r.id)}">Eliminar</button>
         </div>
       </div>`
-      )
-      .join('');
+    )
+    .join('');
+}
+async function renderInbox() {
+  try {
+    const { reports } = await api('/api/reports/mine/all');
+    myReports = reports;
+    document.getElementById('inbox-lost').innerHTML = avisosHTML(
+      reports.filter(r => r.estado === 'perdido'),
+      '🔎'
+    );
+    document.getElementById('inbox-found').innerHTML = avisosHTML(
+      reports.filter(r => r.estado !== 'perdido'),
+      '🐾'
+    );
   } catch (ex) {
-    el.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+    const error = `<p class="loc-note">${esc(ex.message)}</p>`;
+    document.getElementById('inbox-lost').innerHTML = error;
+    document.getElementById('inbox-found').innerHTML = error;
   }
 }
-document.getElementById('inbox-list').addEventListener('click', async e => {
+async function manejarAccionAviso(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const id = btn.dataset.id;
@@ -1435,9 +1459,11 @@ document.getElementById('inbox-list').addEventListener('click', async e => {
     document.getElementById('edit-modal').classList.remove('hidden');
   }
   if (action === 'open-chat') {
-    document.querySelector('nav.tabs button[data-tab="chats"]').click();
+    mostrarVista('chats');
   }
-});
+}
+document.getElementById('inbox-lost').addEventListener('click', manejarAccionAviso);
+document.getElementById('inbox-found').addEventListener('click', manejarAccionAviso);
 document
   .getElementById('btn-edit-cancel')
   .addEventListener('click', () => document.getElementById('edit-modal').classList.add('hidden'));
@@ -1743,10 +1769,14 @@ document.getElementById('btn-reunion-save').addEventListener('click', async () =
 async function actualizarBotonZona() {
   try {
     const { zone } = await api('/api/push/zone');
+    const label = document.getElementById('zone-label');
+    if (label) {
+      label.textContent = zone
+        ? 'Alertas de zona activadas (toca para desactivar)'
+        : 'Activar alertas de mi zona';
+    }
     const b = document.getElementById('btn-zone');
-    b.innerHTML = zone
-      ? ico('bell') + 'Alertas de zona activadas (toca para desactivar)'
-      : ico('bell') + 'Activar alertas de mi zona';
+    if (b) b.classList.toggle('active', !!zone);
   } catch (e) {
     /* ignore */
   }
@@ -1867,6 +1897,7 @@ document.getElementById('admin-flagged').addEventListener('click', async e => {
 /* ============ Arranque ============ */
 let appIniciada = false;
 let pickersIniciados = { found: false, lost: false };
+let badgeTimer = null;
 // Los mapas de "Encontré/Perdí" se crean recién al abrir su pestaña: si se
 // crean con la vista oculta (display:none), Leaflet les asigna tamaño 0 y el
 // mapa queda gris sin cargar tiles.
@@ -1938,7 +1969,10 @@ function startApp() {
     .then(renderListMap)
     .then(() => abrirDeepLink())
     .catch(() => {});
+  renderReunions();
   actualizarBadgeChats();
+  // El punto verde del chat se revisa cada minuto mientras la app esté abierta.
+  if (!badgeTimer) badgeTimer = setInterval(actualizarBadgeChats, 60000);
   actualizarBotonPush();
 }
 
@@ -1971,15 +2005,14 @@ async function abrirDeepLink() {
 }
 
 /* ============ Bootstrap ============ */
-// Abre la pestaña que pida la URL (?tab=found, ?tab=lost, ?tab=chats, ?tab=inbox).
+// Abre la vista que pida la URL (?tab=home, ?tab=found, ?tab=lost, ?tab=chats).
 // La usan los atajos del icono de la app (manifest.json → shortcuts) y las
-// notificaciones push. Se ignoran las pestañas ocultas, así que ?tab=admin no
-// abre el panel a quien no es administrador.
+// notificaciones push. mostrarVista se encarga de ignorar ?tab=admin a quien no
+// es administrador.
 function abrirTabDeLaUrl(params) {
   const tab = params.get('tab');
   if (!tab) return;
-  const boton = document.querySelector(`nav.tabs button[data-tab="${tab}"]:not(.hidden)`);
-  if (boton) boton.click();
+  if (['home', 'found', 'lost', 'chats', 'admin'].includes(tab)) mostrarVista(tab);
 }
 
 // Comprueba el token guardado antes de entrar. Solo se cierra sesión si el

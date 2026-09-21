@@ -69,10 +69,10 @@
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Mis avisos",
-      "short_name": "Avisos",
-      "description": "Revisa tus avisos publicados y sus coincidencias",
-      "url": "/?tab=inbox",
+      "name": "Chats",
+      "short_name": "Chats",
+      "description": "Tus conversaciones sobre avisos de mascotas",
+      "url": "/?tab=chats",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
