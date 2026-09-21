@@ -8,6 +8,8 @@ const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
 const { radioBusquedaKm, curvaRadio, sugerenciaBusqueda } = require('../busqueda');
+const { hashPerceptual } = require('../src/v2/phash');
+const { cajaBusqueda, coincidenciasDeOtros, duplicadosDeFoto } = require('../src/v2/coincidencias');
 const { requireAuth, optionalAuth, requireVerified } = require('../middleware/auth');
 const { keyPorIp } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
@@ -155,6 +157,70 @@ async function notificarZona(reportId, tipo, color, lat, lng, radioKm, excluirUs
   );
 }
 
+// Cuando nace un aviso, busca en la zona avisos activos del mismo tipo que
+// puedan ser la misma mascota y compara las fotos por hash perceptual. Avisa por
+// push a las dos partes (el autor y el dueño del aviso candidato) sin bloquear
+// la respuesta: si esto falla, el aviso ya está creado.
+function avisarPush(userId, payload) {
+  return push.sendToUser(userId, payload).catch(() => {});
+}
+
+function payloadCoincidencia(nuevo, coincidencia) {
+  const distancia =
+    coincidencia.distancia_km <= 0.5 ? 'a menos de 500 m' : `a ${coincidencia.distancia_km} km`;
+  return {
+    title: '🔎 Un aviso puede coincidir con el tuyo',
+    body: `Publicaron un ${nuevo.estado} de ${nuevo.tipo} ${distancia} de tu aviso. Toca para verlo.`,
+    report_id: nuevo.id,
+    tag: 'coincidencia-' + nuevo.id
+  };
+}
+
+// Avisos para el autor del aviso recién creado: cuántas coincidencias hay y si
+// la foto ya se había publicado.
+function avisosAlAutor(nuevo, coincidencias, duplicados) {
+  const tareas = [];
+  if (coincidencias.length) {
+    tareas.push(
+      avisarPush(nuevo.user_id, {
+        title: '🔎 Encontramos posibles coincidencias',
+        body: `Hay ${coincidencias.length} aviso(s) que podrían ser tu mascota. Toca para verlos.`,
+        report_id: nuevo.id,
+        tag: 'coincidencia-' + nuevo.id
+      })
+    );
+  }
+  if (duplicados.length) {
+    tareas.push(
+      avisarPush(nuevo.user_id, {
+        title: '⚠️ Esa foto ya está en otro aviso',
+        body: 'Ya existe un aviso con la misma foto. Revisa que no sea una publicación repetida.',
+        report_id: nuevo.id,
+        tag: 'duplicado-' + nuevo.id
+      })
+    );
+  }
+  return tareas;
+}
+
+async function revisarCoincidencias(nuevo) {
+  const caja = cajaBusqueda(nuevo.lat, nuevo.lng);
+  const candidatos = (
+    await db.query(
+      `SELECT * FROM reports
+        WHERE tipo = $1 AND active = TRUE AND resolved = FALSE AND id <> $2
+          AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6
+        LIMIT 100`,
+      [nuevo.tipo, nuevo.id, caja.latMin, caja.latMax, caja.lngMin, caja.lngMax]
+    )
+  ).rows;
+
+  const coincidencias = coincidenciasDeOtros(nuevo, candidatos);
+  const duplicados = duplicadosDeFoto(nuevo, candidatos);
+  const tareas = coincidencias.map(c => avisarPush(c.user_id, payloadCoincidencia(nuevo, c)));
+  await Promise.all(tareas.concat(avisosAlAutor(nuevo, coincidencias, duplicados)));
+}
+
 /* ---------- Crear aviso (requiere sesión) ---------- */
 router.post(
   '/',
@@ -198,16 +264,18 @@ router.post(
           : null;
       const radioKm = horasPerdido === null ? null : radioBusquedaKm(tipo, horasPerdido);
       let fotoUrl = null;
+      let fotoHash = null;
       if (req.file) {
         const tipoReal = tipoImagenReal(req.file.buffer);
         if (!tipoReal) return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
+        fotoHash = hashPerceptual(req.file.buffer);
         fotoUrl = await storage.savePhoto(req.file.buffer, tipoReal);
       }
 
       await db.query(
         `INSERT INTO reports
-          (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18)`,
+          (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km,foto_hash)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18,$19)`,
         [
           id,
           req.userId,
@@ -226,7 +294,8 @@ router.post(
           pub.lng,
           Date.now(),
           horasPerdido,
-          radioKm
+          radioKm,
+          fotoHash
         ]
       );
 
@@ -241,6 +310,7 @@ router.post(
       }
 
       const result = await db.query('SELECT * FROM reports WHERE id = $1', [id]);
+      revisarCoincidencias(result.rows[0]).catch(() => {});
       res.status(201).json({ report: publicReport(result.rows[0], req.userId) });
     } catch (err) {
       next(err);

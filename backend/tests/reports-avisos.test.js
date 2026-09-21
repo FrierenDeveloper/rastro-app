@@ -31,6 +31,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db, storage, push, crearApp, pedir, tokenPara } from './helpers/aislar.js';
 import reportsRouter from '../routes/reports.js';
+import { PNG as PNGjs } from 'pngjs';
 
 const app = crearApp({ '/api/reports': reportsRouter });
 
@@ -62,7 +63,7 @@ const CUPO_HORARIO = { error: 'Publicaste demasiados avisos en poco tiempo. Inte
 const IMAGEN_INVALIDA = { error: 'El archivo no es una imagen válida.' };
 const VALOR_INVALIDO = { error: 'Invalid value' };
 
-const SQL_INSERT = `INSERT INTO reports (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18)`;
+const SQL_INSERT = `INSERT INTO reports (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km,foto_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18,$19)`;
 const SQL_AVISOS_24H = 'SELECT COUNT(*)::int AS n FROM reports WHERE user_id = $1 AND created_at > $2';
 
 const TIPOS = ['perro', 'gato', 'ave', 'conejo', 'otro'];
@@ -165,7 +166,8 @@ const COLUMNAS = [
   'lng_public',
   'created_at',
   'perdido_hace_horas',
-  'radio_km'
+  'radio_km',
+  'foto_hash'
 ];
 
 const creados = [];
@@ -438,6 +440,7 @@ describe('POST /api/reports/ · guardado del aviso', () => {
       expect.any(Number),
       expect.any(Number),
       null,
+      null,
       null
     ]);
     expect(typeof creados[0][0]).toBe('string');
@@ -642,6 +645,149 @@ describe('POST /api/reports/ · radio sugerido y aviso a la zona', () => {
 
     expect(res.status).toBe(201);
     expect(push.sendToUser).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ======================================================================== */
+/* POST /api/reports/ · coincidencias y fotos repetidas                     */
+/* ======================================================================== */
+function candidatoZona(cambios = {}) {
+  return {
+    id: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+    user_id: OTRO,
+    estado: 'encontrado',
+    tipo: 'perro',
+    sexo: 'macho',
+    color: 'negro',
+    raza: null,
+    collar: null,
+    lat: -33.45,
+    lng: -70.66,
+    created_at: Date.now(),
+    perdido_hace_horas: null,
+    foto_hash: null,
+    active: true,
+    resolved: false,
+    ...cambios
+  };
+}
+
+// Cuadrado de un color único: su dHash son 64 bits a 0.
+function pngCuadrado() {
+  const png = new PNGjs({ width: 9, height: 8 });
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = 15;
+    png.data[i + 1] = 15;
+    png.data[i + 2] = 15;
+    png.data[i + 3] = 255;
+  }
+  return PNGjs.sync.write(png);
+}
+
+const HASH_CUADRADO = '0000000000000000';
+
+function baseConCandidatos(candidatos, extra = {}) {
+  return base({
+    ...extra,
+    resto: (sql, params) => {
+      void params;
+      return sql.includes('tipo = $1 AND active = TRUE') ? { rows: candidatos } : { rows: [] };
+    }
+  });
+}
+
+describe('POST /api/reports/ · coincidencias entre avisos', () => {
+  it('avisa al dueño del aviso candidato y al autor cuando hay coincidencia', async () => {
+    baseConCandidatos([candidatoZona()]);
+    const res = await crear(AVISO);
+    await reposar();
+
+    expect(res.status).toBe(201);
+    const params = paramsDe('tipo = $1 AND active = TRUE');
+    expect(params[0]).toBe('perro');
+    expect(params[1]).toBe(creados[0][0]);
+    const dLat = 5 / 111.32;
+    const dLng = 5 / (111.32 * Math.cos((-33.45 * Math.PI) / 180));
+    expect(params[2]).toBeCloseTo(-33.45 - dLat, 10);
+    expect(params[3]).toBeCloseTo(-33.45 + dLat, 10);
+    expect(params[4]).toBeCloseTo(-70.66 - dLng, 10);
+    expect(params[5]).toBeCloseTo(-70.66 + dLng, 10);
+    expect(push.sendToUser.mock.calls.map(call => call[0])).toStrictEqual([OTRO, SUB]);
+    expect(push.sendToUser).toHaveBeenCalledWith(OTRO, {
+      title: '🔎 Un aviso puede coincidir con el tuyo',
+      body: 'Publicaron un perdido de perro a menos de 500 m de tu aviso. Toca para verlo.',
+      report_id: creados[0][0],
+      tag: 'coincidencia-' + creados[0][0]
+    });
+    expect(push.sendToUser).toHaveBeenCalledWith(SUB, {
+      title: '🔎 Encontramos posibles coincidencias',
+      body: 'Hay 1 aviso(s) que podrían ser tu mascota. Toca para verlos.',
+      report_id: creados[0][0],
+      tag: 'coincidencia-' + creados[0][0]
+    });
+  });
+
+  it('no avisa de una coincidencia con un aviso del propio usuario', async () => {
+    baseConCandidatos([candidatoZona({ user_id: SUB })]);
+    const res = await crear(AVISO);
+    await reposar();
+
+    expect(res.status).toBe(201);
+    expect(push.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('describe la distancia cuando la coincidencia no está pegada al aviso', async () => {
+    baseConCandidatos([candidatoZona({ lat: -33.4428 })]);
+    const res = await crear(AVISO);
+    await reposar();
+
+    expect(res.status).toBe(201);
+    expect(push.sendToUser).toHaveBeenCalledWith(
+      OTRO,
+      expect.objectContaining({ body: expect.stringContaining('a 0.8 km') })
+    );
+  });
+
+  it('una coincidencia por debajo del puntaje mínimo no avisa a nadie', async () => {
+    // Mismo tipo y fechas, pero lejos del centro del radio y sin nada más en
+    // común: matching.js lo descarta y la ruta no debe mandar push.
+    baseConCandidatos([
+      candidatoZona({ lat: -33.442, color: 'atigrado', sexo: 'hembra', raza: 'beagle', collar: 'azul' })
+    ]);
+    const res = await crear(AVISO);
+    await reposar();
+
+    expect(res.status).toBe(201);
+    expect(push.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('si falla la consulta de candidatos, el aviso igual se crea (201)', async () => {
+    base({
+      resto: sql => {
+        if (sql.includes('tipo = $1 AND active = TRUE')) throw new Error('caída al buscar');
+        return { rows: [] };
+      }
+    });
+    const res = await crear(AVISO);
+    await reposar();
+
+    expect(res.status).toBe(201);
+    expect(push.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('guarda el hash de la foto y avisa si ya estaba publicada', async () => {
+    baseConCandidatos([candidatoZona({ foto_hash: HASH_CUADRADO })]);
+    const res = await crearConFoto(AVISO, { buffer: pngCuadrado(), nombre: 'perro.png', tipo: 'image/png' });
+    await reposar();
+
+    expect(res.status).toBe(201);
+    expect(creados[0][18]).toBe(HASH_CUADRADO);
+    expect(push.sendToUser).toHaveBeenCalledWith(SUB, {
+      title: '⚠️ Esa foto ya está en otro aviso',
+      body: 'Ya existe un aviso con la misma foto. Revisa que no sea una publicación repetida.',
+      report_id: creados[0][0],
+      tag: 'duplicado-' + creados[0][0]
+    });
   });
 });
 

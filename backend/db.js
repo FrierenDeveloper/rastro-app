@@ -43,6 +43,7 @@ async function init() {
       descripcion TEXT,
       nombre_mascota TEXT,
       foto_url TEXT,           -- URL pública (Supabase Storage) o ruta local /uploads/...
+      foto_hash TEXT,          -- dHash de la foto (64 bits en hex) para detectar duplicados
       lat DOUBLE PRECISION NOT NULL,        -- ubicación exacta, nunca se expone públicamente
       lng DOUBLE PRECISION NOT NULL,
       lat_public DOUBLE PRECISION NOT NULL, -- ubicación difuminada (~300m) para el mapa público
@@ -120,6 +121,7 @@ async function init() {
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS reunion_nota TEXT;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS perdido_hace_horas INTEGER;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS radio_km DOUBLE PRECISION;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS foto_hash TEXT;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
@@ -163,6 +165,7 @@ async function init() {
   // Índices (después de las migraciones, para que las columnas nuevas ya existan).
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_reports_estado_tipo ON reports(estado, tipo, active);
+    CREATE INDEX IF NOT EXISTS idx_reports_foto_hash ON reports(foto_hash);
     CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id);
     CREATE INDEX IF NOT EXISTS idx_messages_report ON messages(report_id);
     CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient_user_id);
