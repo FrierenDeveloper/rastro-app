@@ -14,6 +14,9 @@ const {
   distanciaKm,
   emparejar,
   buscarCoincidencias,
+  sugerir,
+  sugerenciasAmplias,
+  SUGERENCIA_MINIMA,
   PESO_TIPO,
   PESO_DISTANCIA_MAX,
   PESO_COLOR_EXACTO,
@@ -312,6 +315,142 @@ describe('regla dura del microchip', () => {
     const r = buscarCoincidencias(perdido({ chip_hash: HUELLA_A }), [perfecto, porChip]);
     expect(r.map(m => m.id)).toEqual(['chip', 'perfecto']);
     expect(PUNTAJE_CHIP).toBe(100);
+  });
+});
+
+describe('sugerencias amplias', () => {
+  // A 300 km: fuera de cualquier radio de búsqueda, que es justo el caso que esto
+  // cubre (el animal se alejó o la descripción fue tan vaga que no hay puntaje).
+  const LEJOS = 42.7;
+
+  it('propone un aviso lejano que solo coincide en el color', () => {
+    const s = sugerir(perdido(), encontrado({ lat: LEJOS, sexo: 'hembra', raza: 'beagle', collar: 'azul' }));
+
+    expect(s.cualidades).toEqual(['color']);
+    expect(s.puntaje).toBe(SUGERENCIA_MINIMA);
+    expect(s.distancia_km).toBeGreaterThan(290);
+    expect(s.por_chip).toBe(false);
+  });
+
+  it('acumula todas las cualidades que coinciden, de la más fuerte a la más débil', () => {
+    const s = sugerir(perdido(), encontrado({ lat: LEJOS }));
+
+    expect(s.cualidades).toEqual(['color', 'raza', 'sexo', 'collar']);
+    expect(s.puntaje).toBe(SUGERENCIA_MINIMA + 3);
+  });
+
+  it('el mismo microchip basta por sí solo', () => {
+    const s = sugerir(
+      perdido({ chip_hash: HUELLA_A }),
+      encontrado({
+        chip_hash: HUELLA_A,
+        lat: LEJOS,
+        color: 'atigrado',
+        sexo: 'hembra',
+        raza: 'beagle',
+        collar: 'azul'
+      })
+    );
+
+    expect(s.cualidades).toEqual(['microchip']);
+    expect(s.por_chip).toBe(true);
+  });
+
+  it('sin ninguna cualidad en común no sugiere nada', () => {
+    const flojo = encontrado({
+      lat: LEJOS,
+      color: 'atigrado',
+      sexo: 'hembra',
+      raza: 'beagle',
+      collar: 'azul'
+    });
+    expect(sugerir(perdido(), flojo)).toBeNull();
+  });
+
+  it('dos avisos sin collar no cuentan como "mismo collar"', () => {
+    const s = sugerir(
+      perdido({ color: 'negro', collar: '', raza: 'labrador' }),
+      encontrado({ lat: LEJOS, color: 'negro', collar: '', raza: 'labrador', sexo: 'hembra' })
+    );
+
+    expect(s.cualidades).toEqual(['color', 'raza']);
+    expect(s.cualidades).not.toContain('collar');
+  });
+
+  it('un sexo desconocido en los dos lados tampoco cuenta', () => {
+    const s = sugerir(
+      perdido({ color: 'negro', sexo: '', raza: 'labrador' }),
+      encontrado({ lat: LEJOS, color: 'negro', sexo: '', raza: 'labrador', collar: 'azul' })
+    );
+
+    expect(s.cualidades).toEqual(['color', 'raza']);
+  });
+
+  it('sigue exigiendo el estado opuesto', () => {
+    expect(sugerir(perdido(), perdido({ lat: LEJOS }))).toBeNull();
+  });
+
+  it('sin tipo y sin chip no hay sugerencia', () => {
+    expect(sugerir(perdido({ tipo: '' }), encontrado({ tipo: '', lat: LEJOS }))).toBeNull();
+  });
+
+  it('otra especie sin el mismo chip no se sugiere', () => {
+    expect(sugerir(perdido(), encontrado({ tipo: 'gato', lat: LEJOS }))).toBeNull();
+  });
+
+  it('descarta un "encontrado" anterior a la pérdida: eso es imposible', () => {
+    expect(sugerir(perdido(), encontrado({ lat: LEJOS, created_at: T0 - 9 * H }))).toBeNull();
+  });
+
+  it('sin aviso base o sin candidato no hay sugerencia', () => {
+    expect(sugerir(null, encontrado())).toBeNull();
+    expect(sugerir(perdido(), null)).toBeNull();
+  });
+
+  it('acepta el momento actual por opciones', () => {
+    const s = sugerir(perdido(), encontrado({ lat: LEJOS }), { ahora: T0 + 24 * H });
+
+    expect(s.cualidades).toEqual(['color', 'raza', 'sexo', 'collar']);
+  });
+});
+
+describe('sugerenciasAmplias', () => {
+  const LEJOS = 42.7;
+
+  it('sin lista devuelve vacío', () => {
+    expect(sugerenciasAmplias(perdido(), null)).toEqual([]);
+    expect(sugerenciasAmplias(perdido(), 'nope')).toEqual([]);
+  });
+
+  it('ordena por número de cualidades y, a igualdad, por cercanía', () => {
+    // Solo el color coincide (exacto): un color "parecido" no cuenta como
+    // cualidad, así que estos dos se quedan con una sola.
+    const soloColor = (id, lat) =>
+      encontrado({ id, color: 'negro con blanco', sexo: 'hembra', raza: 'beagle', collar: 'azul', lat });
+    const todoIgual = encontrado({ id: 'todo-igual', lat: LEJOS });
+
+    const r = sugerenciasAmplias(perdido(), [
+      soloColor('color-lejos', LEJOS),
+      todoIgual,
+      soloColor('color-cerca', 40.02)
+    ]);
+
+    expect(r.map(s => s.id)).toEqual(['todo-igual', 'color-cerca', 'color-lejos']);
+  });
+
+  it('respeta el límite indicado', () => {
+    const lista = [encontrado({ id: 'a' }), encontrado({ id: 'b' }), encontrado({ id: 'c' })];
+    expect(sugerenciasAmplias(perdido(), lista, { limite: 2 })).toHaveLength(2);
+  });
+
+  it('un límite inválido cae al valor por defecto (20)', () => {
+    const lista = Array.from({ length: 25 }, (_, i) => encontrado({ id: 'e' + i }));
+    expect(sugerenciasAmplias(perdido(), lista, { limite: 0 })).toHaveLength(20);
+  });
+
+  it('un límite que no es número también cae al valor por defecto', () => {
+    const lista = Array.from({ length: 25 }, (_, i) => encontrado({ id: 'f' + i }));
+    expect(sugerenciasAmplias(perdido(), lista, { limite: null })).toHaveLength(20);
   });
 });
 

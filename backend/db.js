@@ -106,11 +106,15 @@ async function init() {
 
     -- Alertas por zona: el usuario guarda un punto (su barrio) y recibe avisos
     -- de mascotas perdidas cerca. Una zona por usuario.
+    --   origen 'manual': la fijó el usuario a propósito (manda y no caduca).
+    --   origen 'auto':   la guarda la app al abrirse; caduca a los 30 días.
     CREATE TABLE IF NOT EXISTS zone_alerts (
       user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       lat DOUBLE PRECISION NOT NULL,
       lng DOUBLE PRECISION NOT NULL,
-      created_at BIGINT NOT NULL
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT,
+      origen TEXT NOT NULL DEFAULT 'manual'
     );
   `);
 
@@ -132,6 +136,9 @@ async function init() {
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
+    ALTER TABLE zone_alerts ADD COLUMN IF NOT EXISTS updated_at BIGINT;
+    -- DEFAULT 'manual': las zonas que ya existían las declaró el usuario a mano.
+    ALTER TABLE zone_alerts ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'manual';
   `);
 
   // Normaliza un correo para detectar cuentas duplicadas del MISMO buzón.

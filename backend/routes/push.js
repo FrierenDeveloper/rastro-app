@@ -60,10 +60,29 @@ router.post(
 /* ---------- Alertas por zona ---------- */
 // El usuario guarda un punto (su barrio) y recibe avisos de mascotas perdidas
 // cerca. El radio lo decide el servidor según el tiempo que lleve perdida.
+//
+// Hay dos formas de tener zona:
+//   * 'manual': la fijó el usuario a propósito -> manda siempre y no caduca.
+//   * 'auto':   la guarda la app al abrirse con la última ubicación conocida
+//               (ya difuminada en el cliente) -> se refresca al abrir y caduca
+//               a los 30 días sin abrir (ver ubicacion.js).
 router.get('/zone', requireAuth, async (req, res, next) => {
   try {
-    const r = await db.query('SELECT lat, lng FROM zone_alerts WHERE user_id = $1', [req.userId]);
-    res.json({ zone: r.rows[0] ? { lat: Number(r.rows[0].lat), lng: Number(r.rows[0].lng) } : null });
+    const r = await db.query('SELECT lat, lng, origen, updated_at FROM zone_alerts WHERE user_id = $1', [
+      req.userId
+    ]);
+    if (!r.rows[0]) return res.json({ zone: null });
+    const z = r.rows[0];
+    res.json({
+      zone: {
+        lat: Number(z.lat),
+        lng: Number(z.lng),
+        // Una fila anterior a la migración no tiene origen: era una zona que el
+        // usuario declaró a mano, así que se trata como tal.
+        origen: z.origen || 'manual',
+        updated_at: z.updated_at === null || z.updated_at === undefined ? null : Number(z.updated_at)
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -74,14 +93,24 @@ router.post(
   requireAuth,
   body('lat').isFloat({ min: -90, max: 90 }),
   body('lng').isFloat({ min: -180, max: 180 }),
+  body('origen').optional().isIn(['auto', 'manual']),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: 'Ubicación inválida.' });
+      const origen = req.body.origen === 'auto' ? 'auto' : 'manual';
+      const ahora = Date.now();
+      // El WHERE del UPSERT es la regla de precedencia: una ubicación automática
+      // no pisa la zona que el usuario fijó a mano, pero todo lo que él manda a
+      // mano se guarda (aunque ya hubiera una automática).
       await db.query(
-        `INSERT INTO zone_alerts (user_id, lat, lng, created_at) VALUES ($1,$2,$3,$4)
-         ON CONFLICT (user_id) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng`,
-        [req.userId, parseFloat(req.body.lat), parseFloat(req.body.lng), Date.now()]
+        `INSERT INTO zone_alerts (user_id, lat, lng, created_at, updated_at, origen)
+         VALUES ($1,$2,$3,$4,$4,$5)
+         ON CONFLICT (user_id) DO UPDATE
+           SET lat = EXCLUDED.lat, lng = EXCLUDED.lng,
+               updated_at = EXCLUDED.updated_at, origen = EXCLUDED.origen
+           WHERE zone_alerts.origen <> 'manual' OR EXCLUDED.origen = 'manual'`,
+        [req.userId, parseFloat(req.body.lat), parseFloat(req.body.lng), ahora, origen]
       );
       res.status(201).json({ ok: true });
     } catch (err) {

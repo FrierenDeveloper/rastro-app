@@ -503,6 +503,18 @@ describe('GET /api/reports/:id/chip', () => {
     expect(res.body).toStrictEqual(AJENO_ERROR);
     expect(JSON.stringify(res.body)).not.toContain(CHIP);
   });
+
+  it('si la base falla al leer el aviso responde 500', async () => {
+    base();
+    db.query.mockImplementation(async sql => {
+      if (String(sql).includes('token_version')) return { rows: [{ token_version: 0 }] };
+      throw new Error('caída al leer el aviso');
+    });
+
+    const res = await verChip(UUID);
+
+    expect(res.status).toBe(500);
+  });
 });
 
 /* ======================================================================== */

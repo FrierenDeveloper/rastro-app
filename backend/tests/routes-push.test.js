@@ -312,12 +312,35 @@ describe('GET /zone', () => {
   });
 
   it('devuelve las coordenadas guardadas como números', async () => {
-    prepararBase(() => ({ rows: [{ lat: '12.5', lng: '-70.6' }] }));
+    prepararBase(() => ({
+      rows: [{ lat: '12.5', lng: '-70.6', origen: 'manual', updated_at: '1700000000000' }]
+    }));
     const res = await conToken(pedir(app).get('/api/push/zone'));
 
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ zone: { lat: 12.5, lng: -70.6 } });
-    expect(db.query).toHaveBeenCalledWith('SELECT lat, lng FROM zone_alerts WHERE user_id = $1', [SUB]);
+    expect(res.body).toStrictEqual({
+      zone: { lat: 12.5, lng: -70.6, origen: 'manual', updated_at: 1700000000000 }
+    });
+    expect(db.query).toHaveBeenCalledWith(
+      'SELECT lat, lng, origen, updated_at FROM zone_alerts WHERE user_id = $1',
+      [SUB]
+    );
+  });
+
+  it('una zona automática se anuncia como tal', async () => {
+    prepararBase(() => ({ rows: [{ lat: 1, lng: 2, origen: 'auto', updated_at: '1700000000000' }] }));
+    const res = await conToken(pedir(app).get('/api/push/zone'));
+
+    expect(res.body.zone.origen).toBe('auto');
+  });
+
+  it('sin fecha de actualización devuelve null, no 0', async () => {
+    prepararBase(() => ({ rows: [{ lat: 1, lng: 2, origen: null, updated_at: null }] }));
+    const res = await conToken(pedir(app).get('/api/push/zone'));
+
+    expect(res.body.zone.updated_at).toBeNull();
+    // Una fila anterior a la migración cuenta como zona fijada a mano.
+    expect(res.body.zone.origen).toBe('manual');
   });
 
   it('sin zona guardada devuelve zone null', async () => {
@@ -406,9 +429,36 @@ describe('POST /zone', () => {
     expect(res.status).toBe(201);
     expect(res.body).toStrictEqual({ ok: true });
     const [sql, params] = db.query.mock.calls[1];
-    expect(sql).toContain('INSERT INTO zone_alerts (user_id, lat, lng, created_at) VALUES ($1,$2,$3,$4)');
-    expect(sql).toContain('ON CONFLICT (user_id) DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng');
-    expect(params).toStrictEqual([SUB, 12.5, -70.5, expect.any(Number)]);
+    expect(sql).toContain('INSERT INTO zone_alerts (user_id, lat, lng, created_at, updated_at, origen)');
+    expect(sql).toContain('VALUES ($1,$2,$3,$4,$4,$5)');
+    expect(sql).toContain('ON CONFLICT (user_id) DO UPDATE');
+    expect(sql).toContain('SET lat = EXCLUDED.lat, lng = EXCLUDED.lng');
+    expect(sql).toContain('updated_at = EXCLUDED.updated_at, origen = EXCLUDED.origen');
+    // Sin decir nada, la zona es del usuario: una ubicación automática nunca la
+    // pisa (WHERE), pero lo que él manda a mano siempre se guarda.
+    expect(sql).toContain("WHERE zone_alerts.origen <> 'manual' OR EXCLUDED.origen = 'manual'");
+    expect(params).toStrictEqual([SUB, 12.5, -70.5, expect.any(Number), 'manual']);
+  });
+
+  it('una ubicación automática se marca como auto y no pisa una zona manual', async () => {
+    prepararBase();
+    const res = await conToken(pedir(app).post('/api/push/zone').send({ lat: 1, lng: 2, origen: 'auto' }));
+
+    expect(res.status).toBe(201);
+    const [sql, params] = db.query.mock.calls[1];
+    expect(params[4]).toBe('auto');
+    expect(sql).toContain("zone_alerts.origen <> 'manual'");
+  });
+
+  it('un origen que no existe responde 400 y no guarda', async () => {
+    prepararBase();
+    const res = await conToken(
+      pedir(app).post('/api/push/zone').send({ lat: 1, lng: 2, origen: 'inventado' })
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(UBICACION_INVALIDA);
+    expect(db.query).toHaveBeenCalledTimes(1);
   });
 
   it('la zona se guarda a nombre del dueño del token, no de otro', async () => {

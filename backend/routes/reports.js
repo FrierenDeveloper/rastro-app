@@ -8,9 +8,11 @@ const db = require('../db');
 const storage = require('../storage');
 const push = require('../push');
 const { radioBusquedaKm, curvaRadio, sugerenciaBusqueda } = require('../busqueda');
+const { desdeCuandoVale } = require('../ubicacion');
 const { hashPerceptual } = require('../src/v2/phash');
 const chip = require('../src/v2/chip');
 const { cajaBusqueda, coincidenciasDeOtros, duplicadosDeFoto } = require('../src/v2/coincidencias');
+const { sugerenciasAmplias } = require('../src/v2/matching');
 // Misma constante que usa el cuadro de búsqueda de src/v2: antes aquí estaba
 // escrito 111.32 a mano y el cuadro quedaba más estrecho que el radio.
 const { KM_POR_GRADO, COS_MINIMO } = require('../src/v2/geo');
@@ -204,14 +206,19 @@ function coincideColor(mio, otro) {
 
 // Avisa a quienes pidieron alertas de su zona cuando se pierde una mascota
 // cerca. El radio sale de busqueda.js (cuánto se aleja según el tiempo).
+//
+// Destinatarios: quienes fijaron su barrio a mano (esa intención no caduca) y
+// quienes tienen una última ubicación conocida que aún no ha caducado. Avisar a
+// alguien que pasó por aquí hace ocho meses no es una alerta, es ruido.
 async function notificarZona(reportId, tipo, color, lat, lng, radioKm, excluirUserId) {
   const dLat = radioKm / KM_POR_GRADO;
   const dLng = radioKm / (KM_POR_GRADO * Math.max(COS_MINIMO, Math.cos((lat * Math.PI) / 180)));
   const rows = (
     await db.query(
       `SELECT user_id, lat, lng FROM zone_alerts
-      WHERE lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4`,
-      [lat - dLat, lat + dLat, lng - dLng, lng + dLng]
+      WHERE lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4
+        AND (origen = 'manual' OR COALESCE(updated_at, created_at) >= $5)`,
+      [lat - dLat, lat + dLat, lng - dLng, lng + dLng, desdeCuandoVale(Date.now())]
     )
   ).rows;
   const destinatarios = rows
@@ -707,6 +714,34 @@ router.get('/:id', optionalAuth, param('id').isUUID(), async (req, res, next) =>
 });
 
 /* ---------- Coincidencias posibles para un aviso ---------- */
+// Sugerencias amplias: avisos del estado opuesto que comparten alguna cualidad
+// declarada aunque estén a cientos de kilómetros o no lleguen al puntaje mínimo.
+// Es una consulta SIN caja geográfica (recorre los avisos recientes del tipo),
+// así que solo se hace cuando el cliente la pide con ?amplio=1.
+async function sugerenciasDe(report, opuesto, yaListados) {
+  const filas = (
+    await db.query(
+      `SELECT * FROM reports
+        WHERE estado = $1 AND active = TRUE AND resolved = FALSE
+          AND (tipo = $2 OR chip_hash = $3)
+        ORDER BY created_at DESC
+        LIMIT 200`,
+      [opuesto, report.tipo, report.chip_hash || null]
+    )
+  ).rows;
+  const porId = new Map(filas.map(r => [r.id, r]));
+  return sugerenciasAmplias(report, filas, { limite: 10 })
+    .filter(s => !yaListados.has(s.id))
+    .map(s => ({
+      // publicReport con me = null: son avisos de otra cuenta, así que no llevan
+      // ni la máscara del microchip ni la marca de "es mío".
+      ...publicReport(porId.get(s.id), null),
+      distancia_km: s.distancia_km,
+      cualidades: s.cualidades,
+      por_chip: s.por_chip
+    }));
+}
+
 // Solo el dueño del aviso puede ver las coincidencias (evita que cualquiera use
 // las distancias para triangular ubicaciones). Se acota con un bounding box y
 // un LIMIT para no recorrer toda la tabla.
@@ -757,6 +792,12 @@ router.get('/:id/matches', requireAuth, infoLimiter, param('id').isUUID(), async
         por_chip: c.porChip
       }));
 
+    // Las sugerencias amplias son un extra opcional: sin ?amplio=1 la respuesta es
+    // exactamente la de siempre.
+    if (req.query.amplio === '1') {
+      const yaListados = new Set(matches.map(m => m.id));
+      return res.json({ matches, sugerencias: await sugerenciasDe(report, opuesto, yaListados) });
+    }
     res.json({ matches });
   } catch (err) {
     next(err);

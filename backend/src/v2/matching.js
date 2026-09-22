@@ -237,6 +237,81 @@ function prioridad(m) {
   return m.por_chip ? 1 : 0;
 }
 
+/* ---------- Sugerencias amplias ----------
+ * Para cuando el aviso normal no encuentra nada: o el animal se alejó más de lo
+ * que cubre el radio de la especie, o quien publicó fue tan vago que no llega al
+ * puntaje mínimo. Aquí NO se exige ni distancia ni puntaje: basta con compartir
+ * UNA cualidad de las que el aviso declara (además del tipo o el chip).
+ *
+ * Se entrega aparte de las coincidencias fuertes y con menos peso visual a
+ * propósito: son pistas para mirar, no una afirmación de que sea la misma
+ * mascota. Por eso el objeto dice exactamente en qué coinciden.
+ */
+const SUGERENCIA_MINIMA = 1;
+
+// Cualidades que de verdad coinciden, de la más fuerte a la más débil. Un campo
+// vacío en los dos lados NO cuenta: "los dos sin collar" no es una coincidencia.
+function cualidadesDe(perdido, encontrado) {
+  const lista = [];
+  if (mismoChip(perdido, encontrado)) lista.push('microchip');
+  if (puntosColor(perdido.color, encontrado.color) === PESO_COLOR_EXACTO) lista.push('color');
+  if (puntosRaza(perdido.raza, encontrado.raza) === PESO_RAZA) lista.push('raza');
+  if (puntosSexo(perdido.sexo, encontrado.sexo) === PESO_SEXO) lista.push('sexo');
+  if (puntosCollar(perdido.collar, encontrado.collar) === PESO_COLLAR) lista.push('collar');
+  return lista;
+}
+
+function textoCualidad(c) {
+  return c === 'microchip' ? 'Coincide el microchip' : `Coincide: ${c}`;
+}
+
+/**
+ * Sugerencia amplia (sin radio ni puntaje mínimo), o null si no comparte nada.
+ * @param {object} base aviso de referencia
+ * @param {object} candidato posible pareja
+ * @param {{ahora?:number}} [opciones]
+ */
+function sugerir(base, candidato, opciones) {
+  const op = opciones || {};
+  if (!esPar(base, candidato)) return null;
+
+  const { perdido, encontrado } = orientar(base, candidato);
+  const ahora = Number.isFinite(op.ahora) ? op.ahora : Date.now();
+  // Lo único que sigue siendo imposible: haberlo encontrado antes de perderlo.
+  if (puntosTiempo(perdido, encontrado, ahora) === null) return null;
+
+  const cualidades = cualidadesDe(perdido, encontrado);
+  if (cualidades.length < SUGERENCIA_MINIMA) return null;
+
+  const dist = distanciaKm(perdido.lat, perdido.lng, encontrado.lat, encontrado.lng);
+  return {
+    id: candidato.id,
+    // El "puntaje" de una sugerencia es cuántas cualidades comparten.
+    puntaje: cualidades.length,
+    cualidades,
+    distancia_km: Math.round(dist * 10) / 10,
+    por_chip: cualidades.includes('microchip'),
+    motivos: cualidades.map(textoCualidad).concat(textoDistancia(dist))
+  };
+}
+
+/**
+ * Sugerencias ordenadas por número de cualidades y, a igualdad, por cercanía.
+ * @param {object} base aviso de referencia
+ * @param {object[]} candidatos
+ * @param {{ahora?:number, limite?:number}} [opciones]
+ */
+function sugerenciasAmplias(base, candidatos, opciones) {
+  const op = opciones || {};
+  const lista = Array.isArray(candidatos) ? candidatos : [];
+  const limite = Number.isInteger(op.limite) && op.limite > 0 ? op.limite : 20;
+  return lista
+    .map(c => sugerir(base, c, op))
+    .filter(Boolean)
+    .sort((a, b) => b.puntaje - a.puntaje || a.distancia_km - b.distancia_km)
+    .slice(0, limite);
+}
+
 /**
  * Ordena por puntaje (mayor primero) y, a igualdad, por cercanía.
  * @param {object} base aviso de referencia
@@ -259,6 +334,9 @@ module.exports = {
   distanciaKm,
   emparejar,
   buscarCoincidencias,
+  sugerir,
+  sugerenciasAmplias,
+  SUGERENCIA_MINIMA,
   PUNTAJE_MINIMO,
   PESO_TIPO,
   PESO_DISTANCIA_MAX,

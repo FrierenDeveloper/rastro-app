@@ -34,6 +34,7 @@ import reportsRouter from '../routes/reports.js';
 // La misma constante que usa la ruta: si aquí se volviera a escribir 111.32 a
 // mano, la prueba dejaría de detectar que el cuadro es más estrecho que el radio.
 import { KM_POR_GRADO, COS_MINIMO } from '../src/v2/geo.js';
+import { DIAS_VIGENTE, MS_DIA } from '../ubicacion.js';
 import { PNG as PNGjs } from 'pngjs';
 
 const app = crearApp({ '/api/reports': reportsRouter });
@@ -593,7 +594,9 @@ describe('POST /api/reports/ · radio sugerido y aviso a la zona', () => {
       -33.45 - 0.5 / KM_POR_GRADO,
       -33.45 + 0.5 / KM_POR_GRADO,
       -70.66 - 0.5 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180)),
-      -70.66 + 0.5 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180))
+      -70.66 + 0.5 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180)),
+      // Quinto parámetro: el corte de vigencia de la última ubicación.
+      expect.any(Number)
     ]);
     expect(push.sendToUser.mock.calls.map(call => call[0])).toStrictEqual([OTRO, 'cerca-4']);
     expect(push.sendToUser).toHaveBeenCalledWith(OTRO, {
@@ -647,6 +650,18 @@ describe('POST /api/reports/ · radio sugerido y aviso a la zona', () => {
     expect(latMax).toBeCloseTo(-33.45 + 15 / KM_POR_GRADO, 10);
     expect(lngMin).toBeCloseTo(-70.66 - dLng, 10);
     expect(lngMax).toBeCloseTo(-70.66 + dLng, 10);
+  });
+
+  it('solo avisa a zonas vigentes: la zona a mano o la ubicación reciente', async () => {
+    base({ zonas: [] });
+    await crear({ ...AVISO, perdido_hace_horas: '0' });
+    await reposar();
+
+    const sql = sqlDe('FROM zone_alerts')[0];
+    expect(sql).toContain("origen = 'manual' OR COALESCE(updated_at, created_at) >= $5");
+    const corte = paramsDe('FROM zone_alerts')[4];
+    const esperado = Date.now() - DIAS_VIGENTE * MS_DIA;
+    expect(Math.abs(corte - esperado)).toBeLessThan(5000);
   });
 
   it('si el push falla, la respuesta del aviso sigue siendo 201', async () => {

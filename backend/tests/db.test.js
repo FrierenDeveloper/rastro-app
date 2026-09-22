@@ -231,7 +231,9 @@ describe('init', () => {
       'ALTER TABLE reports ADD COLUMN IF NOT EXISTS foto_hash TEXT',
       'ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE',
       'ALTER TABLE messages ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION',
-      'ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION'
+      'ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION',
+      'ALTER TABLE zone_alerts ADD COLUMN IF NOT EXISTS updated_at BIGINT',
+      "ALTER TABLE zone_alerts ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'manual'"
     ];
     for (const fragmento of fragmentos) expect(sql).toContain(fragmento);
   });
