@@ -14,6 +14,18 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+// El microchip se compara por huella (HMAC) y se enseña descifrado (AES), así que
+// necesita su PROPIO secreto. A propósito NO se cae a JWT_SECRET: si el chip
+// dependiera del secreto de sesión, rotarlo dejaría sin coincidencia —y sin poder
+// verse— todos los chips ya declarados, en silencio y sin arreglo posible. Se
+// aborta el arranque para que ese despliegue no llegue a producirse.
+if (!process.env.CHIP_SECRET) {
+  console.error(
+    'Falta CHIP_SECRET en el archivo .env. Revisa .env.example (es obligatorio y distinto de JWT_SECRET).'
+  );
+  process.exit(1);
+}
+
 const app = express();
 
 // Render (y la mayoría de hostings) van detrás de un proxy que agrega la

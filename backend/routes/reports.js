@@ -161,11 +161,13 @@ async function contarUltimas24h(sql, userId) {
 // Se guarda su huella HMAC (lo único que se compara) y su forma cifrada (para
 // que el dueño pueda verlo con el botón "visualizar").
 //
-// CHIP_SECRET es propio y no JWT_SECRET para poder rotar el secreto de sesión sin
-// perder los chips ya guardados; si no está definido se usa JWT_SECRET para que
-// la app funcione sin configuración extra.
+// El secreto es PROPIO (CHIP_SECRET) y obligatorio: server.js no arranca sin él.
+// No hay respaldo con JWT_SECRET a propósito. Si lo hubiera, rotar el secreto de
+// sesión cambiaría las huellas y dejaría sin coincidencia —y sin poder verse—
+// todos los chips ya declarados, sin ningún error visible y sin forma de
+// recuperarlos. Con un secreto propio, rotar JWT_SECRET no toca los chips.
 function secretoChip() {
-  return process.env.CHIP_SECRET || process.env.JWT_SECRET || '';
+  return process.env.CHIP_SECRET;
 }
 
 // Traduce el chip que llega del formulario a lo que se guarda.

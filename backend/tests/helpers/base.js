@@ -29,6 +29,10 @@ import request from 'supertest';
 // El entorno de pruebas se fija aquí, al evaluarse este módulo: siempre antes
 // que el módulo a probar (por el orden de los imports del test).
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'secreto-de-pruebas-rastro';
+// Secreto propio del microchip (en producción lo exige server.js al arrancar).
+// Es distinto del de sesión a propósito: así ninguna prueba puede pasar por
+// accidente si el chip volviera a depender de JWT_SECRET.
+process.env.CHIP_SECRET = process.env.CHIP_SECRET || 'chip-secreto-de-pruebas';
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://pruebas:pruebas@localhost:5432/pruebas';
 process.env.NODE_ENV = 'test';
 // Con TRUST_PROXY=1, ipReal() usa la cabecera X-Forwarded-For: así cada test de

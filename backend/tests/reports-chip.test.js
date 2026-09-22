@@ -284,6 +284,21 @@ describe('POST /api/reports/ · microchip', () => {
     expect(creados[0][20]).toBeNull();
   });
 
+  it('sin CHIP_SECRET no calcula nada con JWT_SECRET: deja el chip sin huella', async () => {
+    base();
+    // El arranque ya impide este escenario (server.js exige CHIP_SECRET). Si aun
+    // así ocurriera, la respuesta correcta es no guardar NADA comparable con el
+    // secreto de sesión: antes se caía a JWT_SECRET y rotarlo rompía los chips.
+    delete process.env.CHIP_SECRET;
+
+    const res = await crear({ ...AVISO, codigo_chip: CHIP });
+
+    expect(res.status).toBe(201);
+    expect(creados[0][19]).toBeNull();
+    expect(creados[0][20]).toBeNull();
+    expect(res.body.report.tiene_chip).toBe(false);
+  });
+
   it.each([
     ['letras', '98102030405060A'],
     ['ocho digitos', '12345678'],
