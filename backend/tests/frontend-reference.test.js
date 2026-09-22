@@ -19,7 +19,7 @@ describe('pantalla principal de referencia', () => {
     expect(html).toContain('<span>Mi PetSeñal</span>');
     expect(html).toContain('<symbol id="i-petsenal-pin"');
     expect(html).toMatch(/class="brand-logo sm"[\s\S]*viewBox="0 0 40 48"[\s\S]*href="#i-petsenal-pin"/);
-    expect(html).toMatch(/home-map-stage[\s\S]*home-map-tools[\s\S]*id="list-map"/);
+    expect(html).toMatch(/home-map-stage[\s\S]*id="list-map"/);
   });
 
   it('incluye los estados visuales de mapa, lista y tema oscuro', () => {

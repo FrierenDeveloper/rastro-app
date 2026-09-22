@@ -1610,16 +1610,10 @@ document.getElementById('search-text').addEventListener('input', () => {
       .catch(() => {});
   }, 350);
 });
-document.getElementById('btn-refresh').addEventListener('click', async () => {
-  await renderList();
-  await renderListMap();
-  toast('Lista actualizada.');
-});
-// "Mapa" y "Lista" cambian lo que se ve en la pantalla principal: el mapa
-// arriba (con el listado debajo) o solo el listado de avisos.
+// La pantalla principal tiene dos modos (mapa o lista) y se eligen desde la
+// barra inferior: "Mapa" y "Buscar". Antes había además un botón Mapa/Lista
+// flotante sobre el mapa, que duplicaba esa elección; se quitó.
 function mostrarVistaHome(conMapa) {
-  document.getElementById('btn-view-map').classList.toggle('active', conMapa);
-  document.getElementById('btn-view-list').classList.toggle('active', !conMapa);
   document.getElementById('view-home').classList.toggle('home-list-mode', !conMapa);
   document.querySelectorAll('.bottom-nav button[data-home-mode]').forEach(button => {
     button.classList.toggle('active', button.dataset.homeMode === (conMapa ? 'map' : 'list'));
@@ -1627,8 +1621,6 @@ function mostrarVistaHome(conMapa) {
   document.getElementById('list-map').style.display = conMapa ? 'block' : 'none';
   if (conMapa) setTimeout(() => listMap && listMap.invalidateSize(), 50);
 }
-document.getElementById('btn-view-map').addEventListener('click', () => mostrarVistaHome(true));
-document.getElementById('btn-view-list').addEventListener('click', () => mostrarVistaHome(false));
 
 /* ============ Zona de búsqueda sugerida (mapa) ============ */
 // Al tocar un aviso de mascota perdida se dibuja en el mapa la zona donde los
@@ -2721,6 +2713,20 @@ document.getElementById('admin-flagged').addEventListener('click', async e => {
     }
     toast('Hecho.');
     renderAdmin();
+  } catch (ex) {
+    toast(ex.message);
+  }
+});
+document.getElementById('btn-admin-purge-reports').addEventListener('click', async () => {
+  if (!confirm('¿Borrar TODOS los avisos? Se eliminan también sus fotos.')) return;
+  if (!confirm('Última confirmación: esto deja la app en cero y no se puede deshacer.')) return;
+  try {
+    const r = await api('/api/admin/reports', { method: 'DELETE' });
+    toast(`Se borraron ${r.borrados} aviso(s).`);
+    renderAdmin();
+    renderList()
+      .then(renderListMap)
+      .catch(() => {});
   } catch (ex) {
     toast(ex.message);
   }

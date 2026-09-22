@@ -336,6 +336,9 @@
         <p class="link-note">
           <a href="#" id="link-privacy">Privacidad: qué se ve y qué no</a>
         </p>
+        <p class="link-note">
+          ¿Eres veterinario o refugio? <a href="mailto:contacto@petsenal.com">Escríbenos aquí</a>.
+        </p>
       </div>
       <div class="auth-install" id="auth-install">
         <button type="button" class="auth-install-btn" id="btn-install-auth">
@@ -447,24 +450,6 @@
             </select>
           </div>
           <div class="home-map-stage">
-            <div class="toolbar home-map-tools">
-              <button class="icon-btn active" id="btn-view-map">
-                <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg>Mapa
-              </button>
-              <button class="icon-btn" id="btn-view-list">
-                <svg class="ic" aria-hidden="true"><use href="#i-list" /></svg>Lista
-              </button>
-              <button
-                class="icon-btn hidden"
-                id="btn-seguir"
-                title="Mantener tu punto actualizado mientras te mueves (gasta más batería)"
-              >
-                <svg class="ic" aria-hidden="true"><use href="#i-radar" /></svg>Seguir
-              </button>
-              <button class="icon-btn" id="btn-refresh">
-                <svg class="ic" aria-hidden="true"><use href="#i-refresh" /></svg>Actualizar
-              </button>
-            </div>
             <div id="list-map"></div>
             <button class="map-my-location" id="btn-my-loc">
               <svg class="ic" aria-hidden="true"><use href="#i-crosshair" /></svg>
@@ -900,6 +885,17 @@
             <svg class="ic" aria-hidden="true"><use href="#i-user" /></svg>Usuarios recientes
           </h2>
           <div id="admin-users"></div>
+
+          <div class="danger-zone">
+            <h2 class="admin-title">
+              <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>Zona de peligro
+            </h2>
+            <p class="loc-note">
+              Borra <b>todos</b> los avisos (perdidos y encontrados) y sus fotos. Deja la app en cero. No se
+              puede deshacer.
+            </p>
+            <button id="btn-admin-purge-reports">Borrar TODOS los avisos</button>
+          </div>
         </section>
       </main>
 

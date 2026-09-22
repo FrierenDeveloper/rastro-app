@@ -123,6 +123,22 @@ router.delete('/reports/:id', requireAuth, requireAdmin, param('id').isUUID(), a
   }
 });
 
+/* ---------- Eliminar TODOS los avisos (limpieza) ---------- */
+// Borra todos los avisos y sus fotos de una vez, para dejar la app en cero tras
+// pruebas. Los mensajes y reportes asociados se van por ON DELETE CASCADE.
+router.delete('/reports', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const fotos = await db.query('SELECT foto_url, reunion_foto_url FROM reports');
+    await Promise.all(
+      fotos.rows.flatMap(r => [storage.deletePhoto(r.foto_url), storage.deletePhoto(r.reunion_foto_url)])
+    );
+    const borrados = await db.query('DELETE FROM reports');
+    res.json({ borrados: borrados.rowCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /* ---------- Usuarios (para revisar cuentas sospechosas) ---------- */
 router.get('/users', requireAuth, requireAdmin, async (req, res, next) => {
   try {

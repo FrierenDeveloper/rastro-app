@@ -92,6 +92,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   min-height: 100vh;
+  overscroll-behavior-y: none;
 }
 
 h1,
@@ -142,7 +143,9 @@ button:disabled {
 #app {
   max-width: 520px;
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   background: var(--paper);
   display: flex;
   flex-direction: column;
@@ -537,6 +540,8 @@ nav.bottom-nav button[data-tab='found'].active {
 main {
   padding: 16px;
   flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .home-actions {
   display: grid;
@@ -2370,6 +2375,11 @@ body.theme-dark .mode-toggle {
   display: flex;
   margin-inline: 16px;
 }
+/* En "Buscar" (modo lista) los botones grandes de Perdí/Encontré sobran: la
+   lista de avisos ya es el contenido. Solo se muestran en el mapa. */
+#view-home.home-list-mode > .home-actions {
+  display: none;
+}
 .home-actions {
   gap: 10px;
   margin: 0;
@@ -2502,9 +2512,9 @@ body.theme-dark .mode-toggle {
 #view-home:not(.home-list-mode) .report-card {
   flex: 0 0 100%;
   min-width: 0;
-  min-height: 111px;
+  min-height: 86px;
   margin: 0;
-  padding: 13px;
+  padding: 11px;
   border: 0;
   border-radius: 17px;
   background: rgba(250, 255, 255, 0.93);
@@ -2517,11 +2527,11 @@ body.theme-dark .mode-toggle {
 }
 #view-home:not(.home-list-mode) .report-card .ph-placeholder,
 #view-home:not(.home-list-mode) .report-card img {
-  width: 72px;
-  height: 72px;
-  border-radius: 15px;
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
   background: #dceff0;
-  font-size: 38px;
+  font-size: 30px;
 }
 .report-time {
   color: var(--ink-soft);
