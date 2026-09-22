@@ -944,6 +944,74 @@ function limpiarZonaFoto(zone, input) {
   zone.appendChild(hint);
 }
 
+/* ============ Publicar por pasos ============ */
+// El formulario de publicar va en cuatro pasos dentro de un carril (el mismo
+// gesto que el onboarding). Cada paso valida lo suyo antes de dejar avanzar: así
+// nadie llega al final con el formulario a medias sin saber qué falta.
+const PASOS_PUBLICAR = 4;
+const wizardPaso = { found: 0, lost: 0 };
+
+function ultimoPaso(key) {
+  return wizardPaso[key] === PASOS_PUBLICAR - 1;
+}
+
+// Mismo criterio que el backend: fuera separadores y el prefijo ISO, y de 9 a 15
+// dígitos. Se avisa aquí para no hacer esperar una ida al servidor.
+function chipMalEscrito(valor) {
+  if (!valor) return false;
+  const digitos = valor.replace(/^iso/i, '').replace(/[\s\-._/]/g, '');
+  return !/^[0-9]{9,15}$/.test(digitos);
+}
+
+// Qué le falta al paso para poder avanzar. Cadena vacía = se puede pasar.
+function problemaDelPaso(key, paso) {
+  const valor = id => (document.getElementById(id + '-' + key).value || '').trim();
+  if (paso === 0 && !valor('tipo')) return 'Elige el tipo de animal.';
+  if (paso === 1 && !valor('color')) return 'Escribe el color del animal.';
+  if (paso === 1 && chipMalEscrito(valor('chip'))) return 'El microchip debe tener entre 9 y 15 dígitos.';
+  return '';
+}
+
+function pintarPaso(key) {
+  const paso = wizardPaso[key];
+  document.getElementById('wizard-track-' + key).style.transform = `translateX(${-100 * paso}%)`;
+  document
+    .querySelectorAll('#wizard-dots-' + key + ' i')
+    .forEach((d, i) => d.classList.toggle('active', i === paso));
+  document.getElementById('wizard-prev-' + key).classList.toggle('hidden', paso === 0);
+  document.getElementById('wizard-next-' + key).classList.toggle('hidden', paso === PASOS_PUBLICAR - 1);
+  document.getElementById('wizard-submit-' + key).classList.toggle('hidden', !ultimoPaso(key));
+}
+
+function irAlPaso(key, paso) {
+  wizardPaso[key] = Math.min(Math.max(paso, 0), PASOS_PUBLICAR - 1);
+  pintarPaso(key);
+}
+
+// Avanzar solo si el paso está completo; retroceder nunca bloquea (lo escrito se
+// queda donde estaba: los campos no se vacían al moverse por el carril).
+function avanzarPaso(key) {
+  const problema = problemaDelPaso(key, wizardPaso[key]);
+  if (problema) {
+    toast(problema);
+    return;
+  }
+  irAlPaso(key, wizardPaso[key] + 1);
+}
+
+function initWizard(key) {
+  document
+    .getElementById('wizard-prev-' + key)
+    .addEventListener('click', () => irAlPaso(key, wizardPaso[key] - 1));
+  document.getElementById('wizard-next-' + key).addEventListener('click', () => avanzarPaso(key));
+  activarSwipeOnboarding(
+    document.getElementById('wizard-track-' + key),
+    paso => irAlPaso(key, paso),
+    () => wizardPaso[key]
+  );
+  pintarPaso(key);
+}
+
 /* ============ Publicar aviso ============ */
 function resetForm(key) {
   document.getElementById('form-' + key).reset();
@@ -952,18 +1020,40 @@ function resetForm(key) {
   const input = document.getElementById('photo-input-' + key);
   input.value = '';
   limpiarZonaFoto(zone, input);
+  // Tras publicar se vuelve al primer paso, no se queda en el último.
+  irAlPaso(key, 0);
 }
-function renderMatchBanner(containerId, matches) {
+// Sugerencias amplias: avisos que coinciden en algo aunque estén a cientos de
+// kilómetros o la descripción fuera corta. Van con menos peso visual y dicen en
+// qué coinciden, para que nadie las tome por una coincidencia confirmada.
+function htmlSugerencias(sugerencias) {
+  if (!sugerencias || !sugerencias.length) return '';
+  const filas = sugerencias
+    .map(
+      s =>
+        `<div class="match-item">${TIPO_ICON[s.tipo] || '🐾'} ${esc(s.color)} · ${esc(s.distancia_km)} km · ${esc((s.cualidades || []).join(', '))}</div>`
+    )
+    .join('');
+  return `<div class="sugerencias">
+    <p class="loc-note">Nada cerca por ahora. Mira estos avisos: coinciden en algo, aunque estén lejos o la descripción fuera corta.</p>
+    ${filas}
+  </div>`;
+}
+function renderMatchBanner(containerId, matches, sugerencias) {
   const el = document.getElementById(containerId);
-  if (matches.length === 0) {
+  const extra = htmlSugerencias(sugerencias);
+  if (matches.length === 0 && !extra) {
     el.innerHTML = '';
     return;
   }
-  el.innerHTML = `<div class="match-banner">
+  const fuertes = matches.length
+    ? `<div class="match-banner">
     <h3>${ico('paw')} ${matches.length} posible${matches.length > 1 ? 's' : ''} coincidencia${matches.length > 1 ? 's' : ''} cerca</h3>
-    <p>Mismo tipo de animal, color parecido y a menos de 5 km. Ábrelo desde "Mapa" para contactar dentro de la app.</p>
-    ${matches.map(m => `<div class="match-item">${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`).join('')}
-  </div>`;
+    <p>Mismo tipo de animal, color parecido y a menos de 5 km; o el mismo microchip, aunque esté lejos. Ábrelo desde "Mapa" para contactar dentro de la app.</p>
+    ${matches.map(m => `<div class="match-item">${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${m.por_chip ? 'mismo microchip' : esc(m.distancia_km) + ' km'}</div>`).join('')}
+  </div>`
+    : '';
+  el.innerHTML = fuertes + extra;
 }
 async function handleSubmit(estado, key) {
   const get = id => document.getElementById(id + '-' + key).value.trim();
@@ -980,7 +1070,9 @@ async function handleSubmit(estado, key) {
   }
 
   const loc = pickedLoc[key] || userLoc;
-  const btn = document.querySelector(`#form-${key} .submit-btn`);
+  // Por id, no por clase: dentro del formulario hay otro botón con la clase
+  // .submit-btn (el "Siguiente" del wizard) y querySelector devolvería ese.
+  const btn = document.getElementById('wizard-submit-' + key);
   btn.disabled = true;
   btn.textContent = 'Publicando…';
 
@@ -1000,14 +1092,17 @@ async function handleSubmit(estado, key) {
       const horas = document.getElementById('perdido-hace-lost').value;
       if (horas) fd.append('perdido_hace_horas', horas);
     }
+    // El microchip es opcional y privado: solo viaja si su dueño lo declara.
+    const chipValor = get('chip');
+    if (chipValor) fd.append('codigo_chip', chipValor);
     if (photoFile[key]) fd.append('foto', photoFile[key], 'foto.jpg');
 
     const { report } = await api('/api/reports', { method: 'POST', isForm: true, body: fd });
     toast('¡Aviso publicado!');
     resetForm(key);
     try {
-      const { matches } = await api(`/api/reports/${report.id}/matches`);
-      renderMatchBanner('match-area-' + key, matches);
+      const { matches, sugerencias } = await api(`/api/reports/${report.id}/matches?amplio=1`);
+      renderMatchBanner('match-area-' + key, matches, sugerencias);
     } catch (e) {
       /* el aviso ya se publicó; las coincidencias son un extra */
     }
@@ -1022,12 +1117,16 @@ async function handleSubmit(estado, key) {
       estado === 'encontrado' ? 'Publicar aviso de animal encontrado' : 'Publicar aviso de mascota perdida';
   }
 }
+// Publicar solo desde el último paso: con Enter en los pasos intermedios no se
+// envía nada (el botón de publicar está oculto hasta el final).
 document.getElementById('form-found').addEventListener('submit', e => {
   e.preventDefault();
+  if (!ultimoPaso('found')) return;
   handleSubmit('encontrado', 'found');
 });
 document.getElementById('form-lost').addEventListener('submit', e => {
   e.preventDefault();
+  if (!ultimoPaso('lost')) return;
   handleSubmit('perdido', 'lost');
 });
 document.getElementById('tipo-lost').addEventListener('change', actualizarRadioHint);
@@ -1092,12 +1191,15 @@ async function toggleMatches(id) {
   box.style.display = 'block';
   box.innerHTML = '<span class="none">Buscando…</span>';
   try {
-    const { matches } = await api(`/api/reports/${id}/matches`);
-    box.innerHTML = matches.length
-      ? matches
-          .map(m => `<div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${esc(m.distancia_km)} km</div>`)
-          .join('')
-      : `<span class="none">Sin coincidencias por ahora.</span>`;
+    const { matches, sugerencias } = await api(`/api/reports/${id}/matches?amplio=1`);
+    const fuertes = matches
+      .map(
+        m =>
+          `<div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${m.por_chip ? 'mismo microchip' : esc(m.distancia_km) + ' km'}</div>`
+      )
+      .join('');
+    box.innerHTML =
+      (fuertes || `<span class="none">Sin coincidencias cercanas.</span>`) + htmlSugerencias(sugerencias);
   } catch (ex) {
     box.innerHTML = `<span class="none">${esc(ex.message)}</span>`;
   }
@@ -1390,6 +1492,7 @@ function avisosHTML(reports, vacio) {
           <button data-action="resolve" data-id="${esc(r.id)}" data-resolved="${r.resolved ? 'false' : 'true'}">${r.resolved ? 'Reabrir' : 'Marcar resuelto'}</button>
           <button data-action="edit" data-id="${esc(r.id)}">Editar</button>
           <button data-action="poster" data-id="${esc(r.id)}">Cartel</button>
+          ${r.tiene_chip ? `<button data-action="chip" data-id="${esc(r.id)}">Ver microchip</button>` : ''}
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
           <button data-action="delete" data-id="${esc(r.id)}">Eliminar</button>
         </div>
@@ -1413,6 +1516,33 @@ async function renderInbox() {
     const error = `<p class="loc-note">${esc(ex.message)}</p>`;
     document.getElementById('inbox-lost').innerHTML = error;
     document.getElementById('inbox-found').innerHTML = error;
+  }
+}
+// El número del microchip solo se pide cuando su dueño lo pide a propósito: en el
+// listado solo viaja la máscara. El botón alterna ver y volver a ocultar.
+async function mostrarChip(id, btn) {
+  const caja = btn.parentElement.querySelector('.chip-valor');
+  if (caja && caja.dataset.visible === '1') {
+    caja.dataset.visible = '0';
+    caja.textContent = caja.dataset.mascara || '';
+    btn.textContent = 'Ver microchip';
+    return;
+  }
+  try {
+    const datos = await api(`/api/reports/${id}/chip`);
+    if (!datos.chip) return toast('Este aviso no tiene microchip declarado.');
+    let destino = caja;
+    if (!destino) {
+      destino = document.createElement('span');
+      destino.className = 'chip-valor';
+      btn.parentElement.appendChild(destino);
+    }
+    destino.dataset.visible = '1';
+    destino.dataset.mascara = datos.enmascarado || '';
+    destino.textContent = datos.chip;
+    btn.textContent = 'Ocultar microchip';
+  } catch (ex) {
+    toast(ex.message);
   }
 }
 async function manejarAccionAviso(e) {
@@ -1456,8 +1586,16 @@ async function manejarAccionAviso(e) {
     document.getElementById('edit-collar').value = r.collar || '';
     document.getElementById('edit-nombre').value = r.nombre_mascota || '';
     document.getElementById('edit-desc').value = r.descripcion || '';
+    // El microchip no se rellena (el número no viaja en los listados): se dice si
+    // existe y se deja el campo solo para cambiarlo.
+    document.getElementById('edit-chip').value = '';
+    document.getElementById('edit-chip-borrar').checked = false;
+    document.getElementById('edit-chip-estado').textContent = r.tiene_chip
+      ? `Tiene microchip declarado${r.chip_enmascarado ? ' (' + r.chip_enmascarado + ')' : ''}. Solo lo ves tú.`
+      : 'Este aviso no tiene microchip declarado.';
     document.getElementById('edit-modal').classList.remove('hidden');
   }
+  if (action === 'chip') return mostrarChip(id, btn);
   if (action === 'open-chat') {
     mostrarVista('chats');
   }
@@ -1479,6 +1617,11 @@ document.getElementById('form-edit').addEventListener('submit', async e => {
     nombre_mascota: document.getElementById('edit-nombre').value.trim(),
     descripcion: document.getElementById('edit-desc').value.trim()
   };
+  // El chip solo se manda si el usuario lo cambia o pide borrarlo: si no, se
+  // conserva el que ya tenía (mandar la cadena vacía lo borraría).
+  const chipNuevo = document.getElementById('edit-chip').value.trim();
+  if (document.getElementById('edit-chip-borrar').checked) body.codigo_chip = '';
+  else if (chipNuevo) body.codigo_chip = chipNuevo;
   try {
     await api(`/api/reports/${editingId}`, { method: 'PATCH', body });
     document.getElementById('edit-modal').classList.add('hidden');
@@ -1651,6 +1794,11 @@ function initOnboarding() {
 function activarSwipeOnboarding(track, ir, pasoActual) {
   let x0 = null;
   let dx = 0;
+  // Desde dentro de un control (el mapa, un campo, la zona de la foto) el gesto
+  // es del control, no del carril: si no, arrastrar el mapa movería los pasos.
+  const desdeControl = objetivo =>
+    Boolean(objetivo.closest) &&
+    Boolean(objetivo.closest('.mini-map, input, textarea, select, button, .photo-zone, .addr-results'));
   const pintarArrastre = () => {
     track.style.transform = `translateX(calc(${-100 * pasoActual()}% + ${dx}px))`;
   };
@@ -1665,6 +1813,7 @@ function activarSwipeOnboarding(track, ir, pasoActual) {
     dx = 0;
   };
   track.addEventListener('pointerdown', e => {
+    if (desdeControl(e.target)) return;
     x0 = e.clientX;
     dx = 0;
     track.style.transition = 'none';
@@ -1765,15 +1914,76 @@ document.getElementById('btn-reunion-save').addEventListener('click', async () =
   }
 });
 
+/* ============ Ubicación para las alertas de zona ============ */
+// Al abrir la app se guarda la última ubicación conocida para poder avisar de
+// mascotas perdidas cerca. Tres reglas:
+//   1. Sale DIFUMINADA (~300 m): para avisar "cerca de tu zona" sobra, y así el
+//      servidor no guarda dónde vives exactamente.
+//   2. Solo se reenvía si pasaron 6 h o si te moviste más de 500 m: no hay una
+//      escritura en la base por cada vez que se abre la app.
+//   3. Si el usuario desactivó las alertas, no se vuelve a guardar sola.
+const ZONA_AUTO_KEY = 'rastro_zona_auto';
+const ZONA_OFF_KEY = 'rastro_zona_off';
+const ZONA_MIN_MS = 6 * 60 * 60 * 1000;
+const ZONA_MIN_M = 500;
+const DIFUMINADO_M = 300;
+
+function distanciaAproxM(a, b) {
+  const dLat = (b.lat - a.lat) * 111320;
+  const dLng = (b.lng - a.lng) * 111320 * Math.max(0.1, Math.cos((a.lat * Math.PI) / 180));
+  return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
+// Corre el punto un poco (mismo criterio que la ubicación pública de los avisos).
+function difuminarPunto(loc, metros = DIFUMINADO_M) {
+  const angulo = Math.random() * 2 * Math.PI;
+  const radio = Math.random() * metros;
+  return {
+    lat: loc.lat + (radio * Math.cos(angulo)) / 111320,
+    lng: loc.lng + (radio * Math.sin(angulo)) / (111320 * Math.max(0.1, Math.cos((loc.lat * Math.PI) / 180)))
+  };
+}
+
+function leerZonaAuto() {
+  try {
+    return JSON.parse(localStorage.getItem(ZONA_AUTO_KEY) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+async function guardarUbicacionDeZona() {
+  if (!token || localStorage.getItem(ZONA_OFF_KEY) === '1') return;
+  const previa = leerZonaAuto();
+  if (previa && Date.now() - previa.fecha < ZONA_MIN_MS) return;
+  const loc = await getCurrentLocOrNull();
+  if (!loc) return;
+  if (previa && distanciaAproxM(previa, loc) < ZONA_MIN_M) {
+    // Sigue siendo el mismo sitio: basta con anotar que se comprobó hoy.
+    localStorage.setItem(ZONA_AUTO_KEY, JSON.stringify({ ...previa, fecha: Date.now() }));
+    return;
+  }
+  // El servidor decide: si el usuario fijó su barrio a mano, esto no lo pisa.
+  const difuminado = difuminarPunto(loc);
+  try {
+    await api('/api/push/zone', { method: 'POST', body: { ...difuminado, origen: 'auto' } });
+    localStorage.setItem(ZONA_AUTO_KEY, JSON.stringify({ lat: loc.lat, lng: loc.lng, fecha: Date.now() }));
+  } catch (e) {
+    /* es un extra silencioso: la app funciona igual sin esto */
+  }
+}
+
 /* ============ Alertas por zona ============ */
 async function actualizarBotonZona() {
   try {
     const { zone } = await api('/api/push/zone');
     const label = document.getElementById('zone-label');
     if (label) {
-      label.textContent = zone
-        ? 'Alertas de zona activadas (toca para desactivar)'
-        : 'Activar alertas de mi zona';
+      if (!zone) label.textContent = 'Activar alertas de mi zona';
+      else if (zone.origen === 'auto') {
+        label.textContent =
+          'Alertas de tu zona activadas con tu última ubicación (toca para fijar tu barrio)';
+      } else label.textContent = 'Alertas de tu zona activadas con tu barrio (toca para desactivar)';
     }
     const b = document.getElementById('btn-zone');
     if (b) b.classList.toggle('active', !!zone);
@@ -1785,14 +1995,30 @@ document.getElementById('btn-zone').addEventListener('click', async () => {
   try {
     const { zone } = await api('/api/push/zone');
     if (zone) {
+      // Con la ubicación automática, el primer toque fija el barrio a mano (es lo
+      // que el usuario está pidiendo); ya con su barrio fijado, desactiva.
+      if (zone.origen === 'auto') {
+        await api('/api/push/zone', {
+          method: 'POST',
+          body: { lat: userLoc.lat, lng: userLoc.lng, origen: 'manual' }
+        });
+        localStorage.removeItem(ZONA_OFF_KEY);
+        toast('Listo: tu barrio queda fijado para las alertas. Toca de nuevo para desactivarlas.');
+        actualizarBotonZona();
+        return;
+      }
       if (!confirm('¿Desactivar las alertas de mascotas perdidas cerca de tu zona?')) return;
       await api('/api/push/zone', { method: 'DELETE' });
+      // Sin esto, la próxima vez que abras la app se volvería a guardar sola.
+      localStorage.setItem(ZONA_OFF_KEY, '1');
+      localStorage.removeItem(ZONA_AUTO_KEY);
       toast('Alertas de zona desactivadas.');
       actualizarBotonZona();
       return;
     }
     const loc = (await getCurrentLocOrNull()) || userLoc;
-    await api('/api/push/zone', { method: 'POST', body: { lat: loc.lat, lng: loc.lng } });
+    await api('/api/push/zone', { method: 'POST', body: { lat: loc.lat, lng: loc.lng, origen: 'manual' } });
+    localStorage.removeItem(ZONA_OFF_KEY);
     toast('Listo: avisaremos aquí cuando se pierda una mascota cerca.');
     // Las alertas llegan por notificación push: recordar activarlas si faltan.
     if (config.pushEnabled && 'serviceWorker' in navigator && 'PushManager' in window) {
@@ -1922,6 +2148,10 @@ function startApp() {
     initPhotoZone('photo-zone-found', 'photo-input-found', 'found');
     initPhotoZone('photo-zone-lost', 'photo-input-lost', 'lost');
     initPhotoZone('photo-zone-reunion', 'photo-input-reunion', 'reunion');
+    // Publicar va por pasos: el carril se prepara al arrancar, con los mapas ya
+    // dentro del DOM (si no, Leaflet mediría un contenedor oculto).
+    initWizard('found');
+    initWizard('lost');
     initAddressSearch('addr-found', 'addr-results-found', (lat, lng) => elegirUbicacion('found', lat, lng));
     initAddressSearch('addr-lost', 'addr-results-lost', (lat, lng) => elegirUbicacion('lost', lat, lng));
     initAddressSearch('addr-home', 'addr-results-home', (lat, lng) => {
@@ -1962,6 +2192,9 @@ function startApp() {
     appIniciada = true;
   }
   locateUser();
+  // Guarda la última ubicación (difuminada) para las alertas de zona. Es
+  // silencioso y con umbral: no bloquea ni escribe en cada apertura.
+  guardarUbicacionDeZona();
   actualizarBannerVerificacion();
   mostrarTabAdmin();
   actualizarBotonZona();

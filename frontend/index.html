@@ -418,86 +418,122 @@
             <h2>Encontré un animal</h2>
             <p class="sub">Sube una foto y sus características para avisar a quien lo esté buscando.</p>
             <form id="form-found">
-              <label>Foto del animal</label>
-              <div class="photo-zone" id="photo-zone-found">
-                <div class="hint">
-                  <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para tomar o subir una
-                  foto
+              <!-- Publicar va por pasos dentro de un carril que se arrastra con el
+                   dedo. Cada paso valida lo suyo antes de dejar pasar, así no se
+                   publica a medias ni se pierde nada. -->
+              <div class="wizard-viewport">
+                <div class="wizard-track" id="wizard-track-found">
+                  <div class="wizard-step" data-step="0">
+                    <label class="required">Tipo de animal</label>
+                    <select id="tipo-found" required>
+                      <option value="">Selecciona…</option>
+                      <option value="perro">Perro</option>
+                      <option value="gato">Gato</option>
+                      <option value="ave">Ave</option>
+                      <option value="conejo">Conejo</option>
+                      <option value="otro">Otro</option>
+                    </select>
+
+                    <label class="required">Sexo</label>
+                    <select id="sexo-found" required>
+                      <option value="desconocido">No estoy seguro/a</option>
+                      <option value="macho">Macho</option>
+                      <option value="hembra">Hembra</option>
+                    </select>
+                  </div>
+
+                  <div class="wizard-step" data-step="1">
+                    <label class="required">Color</label>
+                    <input type="text" id="color-found" placeholder="Ej: café y blanco" required />
+
+                    <div class="row2">
+                      <div>
+                        <label>Raza</label
+                        ><input
+                          type="text"
+                          id="raza-found"
+                          list="razas-comunes"
+                          placeholder="Si la conoces"
+                        />
+                      </div>
+                      <div>
+                        <label>Color del collar</label>
+                        <select id="collar-found">
+                          <option value="">Sin collar</option>
+                          <option value="rojo">Rojo</option>
+                          <option value="azul">Azul</option>
+                          <option value="negro">Negro</option>
+                          <option value="verde">Verde</option>
+                          <option value="otro">Otro color</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <label>Microchip</label>
+                    <input
+                      type="text"
+                      id="chip-found"
+                      inputmode="numeric"
+                      autocomplete="off"
+                      placeholder="15 dígitos, si pudiste leerlo"
+                    />
+                    <p class="loc-note">
+                      Es privado: solo se usa para detectar coincidencias. Nadie más ve el número.
+                    </p>
+                  </div>
+
+                  <div class="wizard-step" data-step="2">
+                    <label>Foto del animal</label>
+                    <div class="photo-zone" id="photo-zone-found">
+                      <div class="hint">
+                        <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para tomar o
+                        subir una foto
+                      </div>
+                      <input type="file" accept="image/*" capture="environment" id="photo-input-found" />
+                    </div>
+
+                    <label>Descripción</label>
+                    <textarea
+                      id="desc-found"
+                      placeholder="Tamaño, señas particulares, actitud, estado de salud…"
+                    ></textarea>
+                  </div>
+
+                  <div class="wizard-step" data-step="3">
+                    <label>Buscar dirección</label>
+                    <div class="addr-search">
+                      <div class="search-field">
+                        <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
+                        <input
+                          type="text"
+                          id="addr-found"
+                          placeholder="Ej: Av. Providencia 1234, Santiago"
+                          autocomplete="off"
+                        />
+                      </div>
+                      <div class="addr-results hidden" id="addr-results-found"></div>
+                    </div>
+
+                    <label class="required">Ubicación donde lo encontraste</label>
+                    <div class="mini-map" id="map-found"></div>
+                    <p class="loc-note">
+                      Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros
+                      usuarios.
+                    </p>
+                  </div>
                 </div>
-                <input type="file" accept="image/*" capture="environment" id="photo-input-found" />
               </div>
 
-              <label class="required">Tipo de animal</label>
-              <select id="tipo-found" required>
-                <option value="">Selecciona…</option>
-                <option value="perro">Perro</option>
-                <option value="gato">Gato</option>
-                <option value="ave">Ave</option>
-                <option value="conejo">Conejo</option>
-                <option value="otro">Otro</option>
-              </select>
-
-              <div class="row2">
-                <div>
-                  <label class="required">Sexo</label>
-                  <select id="sexo-found" required>
-                    <option value="desconocido">No estoy seguro/a</option>
-                    <option value="macho">Macho</option>
-                    <option value="hembra">Hembra</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="required">Color</label>
-                  <input type="text" id="color-found" placeholder="Ej: café y blanco" required />
-                </div>
+              <div class="wizard-dots" id="wizard-dots-found">
+                <i class="active"></i><i></i><i></i><i></i>
               </div>
-
-              <div class="row2">
-                <div>
-                  <label>Raza</label
-                  ><input type="text" id="raza-found" list="razas-comunes" placeholder="Si la conoces" />
-                </div>
-                <div>
-                  <label>Color del collar</label>
-                  <select id="collar-found">
-                    <option value="">Sin collar</option>
-                    <option value="rojo">Rojo</option>
-                    <option value="azul">Azul</option>
-                    <option value="negro">Negro</option>
-                    <option value="verde">Verde</option>
-                    <option value="otro">Otro color</option>
-                  </select>
-                </div>
+              <div class="wizard-actions">
+                <button type="button" class="icon-btn hidden" id="wizard-prev-found">‹ Atrás</button>
+                <button type="button" class="submit-btn found" id="wizard-next-found">Siguiente</button>
+                <button type="submit" class="submit-btn found hidden" id="wizard-submit-found">
+                  Publicar aviso de animal encontrado
+                </button>
               </div>
-
-              <label>Descripción</label>
-              <textarea
-                id="desc-found"
-                placeholder="Tamaño, señas particulares, actitud, estado de salud…"
-              ></textarea>
-
-              <label>Buscar dirección</label>
-              <div class="addr-search">
-                <div class="search-field">
-                  <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
-                  <input
-                    type="text"
-                    id="addr-found"
-                    placeholder="Ej: Av. Providencia 1234, Santiago"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="addr-results hidden" id="addr-results-found"></div>
-              </div>
-
-              <label class="required">Ubicación donde lo encontraste</label>
-              <div class="mini-map" id="map-found"></div>
-              <p class="loc-note">
-                Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros
-                usuarios.
-              </p>
-
-              <button type="submit" class="submit-btn found">Publicar aviso de animal encontrado</button>
               <div id="match-area-found"></div>
             </form>
           </div>
@@ -517,98 +553,130 @@
             <h2>Perdí a mi mascota</h2>
             <p class="sub">Cuéntanos cómo es para avisarte si alguien la encuentra cerca.</p>
             <form id="form-lost">
-              <label>Nombre de tu mascota</label>
-              <input type="text" id="nombre-lost" placeholder="Ej: Firulais" />
+              <!-- Misma lógica de pasos que en "Encontré": lo primero es lo que
+                   identifica al animal, y la ubicación se pide al final, cuando
+                   ya está todo lo demás. -->
+              <div class="wizard-viewport">
+                <div class="wizard-track" id="wizard-track-lost">
+                  <div class="wizard-step" data-step="0">
+                    <label class="required">Tipo de animal</label>
+                    <select id="tipo-lost" required>
+                      <option value="">Selecciona…</option>
+                      <option value="perro">Perro</option>
+                      <option value="gato">Gato</option>
+                      <option value="ave">Ave</option>
+                      <option value="conejo">Conejo</option>
+                      <option value="otro">Otro</option>
+                    </select>
 
-              <label>Foto de tu mascota</label>
-              <div class="photo-zone" id="photo-zone-lost">
-                <div class="hint">
-                  <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para tomar o subir una
-                  foto
+                    <label class="required">Sexo</label>
+                    <select id="sexo-lost" required>
+                      <option value="desconocido">No estoy seguro/a</option>
+                      <option value="macho">Macho</option>
+                      <option value="hembra">Hembra</option>
+                    </select>
+                  </div>
+
+                  <div class="wizard-step" data-step="1">
+                    <label class="required">Color</label>
+                    <input type="text" id="color-lost" placeholder="Ej: café y blanco" required />
+
+                    <div class="row2">
+                      <div>
+                        <label>Raza</label
+                        ><input type="text" id="raza-lost" list="razas-comunes" placeholder="Si la conoces" />
+                      </div>
+                      <div>
+                        <label>Color del collar</label>
+                        <select id="collar-lost">
+                          <option value="">Sin collar</option>
+                          <option value="rojo">Rojo</option>
+                          <option value="azul">Azul</option>
+                          <option value="negro">Negro</option>
+                          <option value="verde">Verde</option>
+                          <option value="otro">Otro color</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <label>Microchip</label>
+                    <input
+                      type="text"
+                      id="chip-lost"
+                      inputmode="numeric"
+                      autocomplete="off"
+                      placeholder="15 dígitos, si lo tienes a mano"
+                    />
+                    <p class="loc-note">
+                      Es privado: solo se usa para detectar coincidencias. Nadie más ve el número.
+                    </p>
+                  </div>
+
+                  <div class="wizard-step" data-step="2">
+                    <label>Nombre de tu mascota</label>
+                    <input type="text" id="nombre-lost" placeholder="Ej: Firulais" />
+
+                    <label>Foto de tu mascota</label>
+                    <div class="photo-zone" id="photo-zone-lost">
+                      <div class="hint">
+                        <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>Toca para tomar o
+                        subir una foto
+                      </div>
+                      <input type="file" accept="image/*" capture="environment" id="photo-input-lost" />
+                    </div>
+
+                    <label>Descripción</label>
+                    <textarea
+                      id="desc-lost"
+                      placeholder="Tamaño, señas particulares, temperamento…"
+                    ></textarea>
+                  </div>
+
+                  <div class="wizard-step" data-step="3">
+                    <label>Buscar dirección</label>
+                    <div class="addr-search">
+                      <div class="search-field">
+                        <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
+                        <input
+                          type="text"
+                          id="addr-lost"
+                          placeholder="Ej: Plaza Ñuñoa, Santiago"
+                          autocomplete="off"
+                        />
+                      </div>
+                      <div class="addr-results hidden" id="addr-results-lost"></div>
+                    </div>
+
+                    <label class="required">Última vez visto en</label>
+                    <div class="mini-map" id="map-lost"></div>
+                    <p class="loc-note">
+                      Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros
+                      usuarios.
+                    </p>
+
+                    <label class="required">¿Hace cuánto se perdió?</label>
+                    <select id="perdido-hace-lost" required>
+                      <option value="">Selecciona…</option>
+                      <option value="2">Menos de 6 horas</option>
+                      <option value="12">Entre 6 y 24 horas</option>
+                      <option value="48">1 a 3 días</option>
+                      <option value="120">3 a 7 días</option>
+                      <option value="336">Más de una semana</option>
+                    </select>
+                    <p class="loc-note" id="radio-hint-lost"></p>
+                    <div id="radio-chart-lost"></div>
+                  </div>
                 </div>
-                <input type="file" accept="image/*" capture="environment" id="photo-input-lost" />
               </div>
 
-              <label class="required">Tipo de animal</label>
-              <select id="tipo-lost" required>
-                <option value="">Selecciona…</option>
-                <option value="perro">Perro</option>
-                <option value="gato">Gato</option>
-                <option value="ave">Ave</option>
-                <option value="conejo">Conejo</option>
-                <option value="otro">Otro</option>
-              </select>
-
-              <div class="row2">
-                <div>
-                  <label class="required">Sexo</label>
-                  <select id="sexo-lost" required>
-                    <option value="desconocido">No estoy seguro/a</option>
-                    <option value="macho">Macho</option>
-                    <option value="hembra">Hembra</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="required">Color</label>
-                  <input type="text" id="color-lost" placeholder="Ej: café y blanco" required />
-                </div>
+              <div class="wizard-dots" id="wizard-dots-lost"><i class="active"></i><i></i><i></i><i></i></div>
+              <div class="wizard-actions">
+                <button type="button" class="icon-btn hidden" id="wizard-prev-lost">‹ Atrás</button>
+                <button type="button" class="submit-btn lost" id="wizard-next-lost">Siguiente</button>
+                <button type="submit" class="submit-btn lost hidden" id="wizard-submit-lost">
+                  Publicar aviso de mascota perdida
+                </button>
               </div>
-
-              <div class="row2">
-                <div>
-                  <label>Raza</label
-                  ><input type="text" id="raza-lost" list="razas-comunes" placeholder="Si la conoces" />
-                </div>
-                <div>
-                  <label>Color del collar</label>
-                  <select id="collar-lost">
-                    <option value="">Sin collar</option>
-                    <option value="rojo">Rojo</option>
-                    <option value="azul">Azul</option>
-                    <option value="negro">Negro</option>
-                    <option value="verde">Verde</option>
-                    <option value="otro">Otro color</option>
-                  </select>
-                </div>
-              </div>
-
-              <label>Descripción</label>
-              <textarea id="desc-lost" placeholder="Tamaño, señas particulares, temperamento…"></textarea>
-
-              <label>Buscar dirección</label>
-              <div class="addr-search">
-                <div class="search-field">
-                  <svg class="ic" aria-hidden="true"><use href="#i-search" /></svg>
-                  <input
-                    type="text"
-                    id="addr-lost"
-                    placeholder="Ej: Plaza Ñuñoa, Santiago"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="addr-results hidden" id="addr-results-lost"></div>
-              </div>
-
-              <label class="required">Última vez visto en</label>
-              <div class="mini-map" id="map-lost"></div>
-              <p class="loc-note">
-                Toca el mapa para ajustar el punto exacto. Solo se muestra un área aproximada a otros
-                usuarios.
-              </p>
-
-              <label class="required">¿Hace cuánto se perdió?</label>
-              <select id="perdido-hace-lost" required>
-                <option value="">Selecciona…</option>
-                <option value="2">Menos de 6 horas</option>
-                <option value="12">Entre 6 y 24 horas</option>
-                <option value="48">1 a 3 días</option>
-                <option value="120">3 a 7 días</option>
-                <option value="336">Más de una semana</option>
-              </select>
-              <p class="loc-note" id="radio-hint-lost"></p>
-              <div id="radio-chart-lost"></div>
-
-              <button type="submit" class="submit-btn lost">Publicar aviso de mascota perdida</button>
               <div id="match-area-lost"></div>
             </form>
           </div>
@@ -758,6 +826,21 @@
           <input type="text" id="edit-nombre" />
           <label>Descripción</label>
           <textarea id="edit-desc"></textarea>
+          <!-- El microchip es privado: aquí solo se cambia. El número declarado
+               no se rellena en el campo (no se manda al navegador en los
+               listados); para verlo está el botón de "Mis avisos". -->
+          <label>Microchip</label>
+          <input
+            type="text"
+            id="edit-chip"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="Solo si quieres cambiarlo"
+          />
+          <label class="check"
+            ><input type="checkbox" id="edit-chip-borrar" /> Borrar el microchip declarado</label
+          >
+          <p class="loc-note" id="edit-chip-estado"></p>
           <div class="modal-actions">
             <button type="button" class="icon-btn" id="btn-edit-cancel">Cancelar</button>
             <button type="submit" class="submit-btn auth" style="margin-top: 0">Guardar</button>

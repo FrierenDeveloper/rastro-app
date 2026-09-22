@@ -794,6 +794,33 @@ input[type='file'] {
 .report-actions button:hover {
   color: var(--ink);
 }
+/* Sugerencias amplias: pistas que coinciden en algo aunque estén lejos o la
+   descripción fuera corta. Se distinguen de las coincidencias fuertes. */
+.sugerencias {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line);
+}
+.sugerencias .loc-note {
+  margin: 0 0 6px;
+}
+.sugerencias .match-item {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+/* Número del microchip ya revelado a su dueño: en una caja propia y con dígitos
+   separados, para poder leerlo o copiarlo sin confundirlos. */
+.report-actions .chip-valor {
+  flex-basis: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
 .matches-box {
   margin-top: 8px;
   font-size: 12.5px;
@@ -1606,6 +1633,58 @@ input[type='file'] {
 }
 .onboard .modal-actions {
   justify-content: space-between;
+}
+
+/* ---------- Publicar un aviso por pasos ---------- */
+/* Mismo carril que el onboarding, pero con formularios dentro: el alto lo marca
+   el paso más alto, así el carril no salta al deslizar, y los botones de
+   navegación viven fuera del carril (no se desplazan con él). */
+.wizard-viewport {
+  overflow: hidden;
+}
+.wizard-track {
+  display: flex;
+  align-items: stretch;
+  transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Deja el gesto vertical (scroll) al navegador y se queda el horizontal. */
+  touch-action: pan-y;
+}
+.wizard-step {
+  flex: 0 0 100%;
+  min-width: 100%;
+}
+/* El primer campo de cada paso no arrastra el margen de los campos anteriores. */
+.wizard-step > label:first-child {
+  margin-top: 0;
+}
+.wizard-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 0 14px;
+}
+.wizard-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+  transition:
+    background var(--ease),
+    width var(--ease);
+}
+.wizard-dots i.active {
+  width: 18px;
+  border-radius: var(--r-pill);
+  background: var(--green);
+}
+.wizard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wizard-actions .icon-btn {
+  align-self: flex-start;
 }
 
 /* ---------- Muro de reencuentros ---------- */
