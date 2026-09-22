@@ -373,12 +373,29 @@ function onAuthSuccess(newToken) {
 }
 
 /* ============ Auth screen ============ */
+let registerChallenge = null;
+let registerChallengeStartedAt = 0;
+
+function prepararRetoRegistro() {
+  registerChallengeStartedAt = Date.now();
+  registerChallenge = api('/api/auth/challenge', { auth: false }).then(({ challenge }) => challenge);
+  return registerChallenge;
+}
+
+async function retoRegistroListo() {
+  const challenge = registerChallenge || prepararRetoRegistro();
+  const elapsed = Date.now() - registerChallengeStartedAt;
+  if (elapsed < 1500) await new Promise(resolve => setTimeout(resolve, 1500 - elapsed));
+  return challenge;
+}
+
 document.querySelectorAll('.auth-tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.auth-tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
     document.getElementById('form-' + btn.dataset.auth).classList.add('active');
+    if (btn.dataset.auth === 'register') prepararRetoRegistro();
   });
 });
 document.getElementById('link-forgot').addEventListener('click', e => {
@@ -437,7 +454,7 @@ document.getElementById('form-register').addEventListener('submit', async e => {
   const err = document.getElementById('register-error');
   err.classList.remove('show');
   try {
-    const { challenge } = await api('/api/auth/challenge', { auth: false });
+    const challenge = await retoRegistroListo();
     const data = await api('/api/auth/register', {
       method: 'POST',
       auth: false,

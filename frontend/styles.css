@@ -525,6 +525,43 @@ main {
   gap: 10px;
   margin: 2px 0 14px;
 }
+.home-location-search,
+.home-search-secondary {
+  margin-bottom: 10px;
+}
+.home-search-secondary .search-field > input {
+  font-size: 14px;
+}
+.home-filters {
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.home-filters select {
+  min-width: 0;
+  border-radius: 10px;
+  padding: 10px 11px;
+  background: var(--card);
+}
+.home-map-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.home-map-tools .icon-btn {
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 11px;
+}
+.home-map-tools .icon-btn:nth-child(1),
+.home-map-tools .icon-btn:nth-child(2) {
+  border-radius: 10px;
+}
+.home-map-tools .icon-btn:nth-child(3),
+.home-map-tools .icon-btn:nth-child(4),
+.home-map-tools .icon-btn:nth-child(5) {
+  padding-inline: 10px;
+}
 .home-action {
   display: flex;
   align-items: center;
@@ -865,11 +902,20 @@ input[type='file'] {
 }
 
 #list-map {
-  height: 330px;
+  height: 390px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
   margin-bottom: 14px;
+}
+.leaflet-container {
+  background: var(--paper-2);
+}
+body:not(.theme-dark) #list-map .leaflet-layer {
+  filter: saturate(0.72) hue-rotate(145deg) brightness(1.03) contrast(0.92);
+}
+body.theme-dark #list-map .leaflet-layer {
+  filter: brightness(0.62) saturate(0.8) hue-rotate(145deg) contrast(1.08);
 }
 
 .report-card {
