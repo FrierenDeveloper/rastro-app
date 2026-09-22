@@ -32,6 +32,21 @@ let currentConv = { reportId: null, peerId: null, esMio: false, poll: null };
 let editingId = null;
 
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
+const TIPO_MARKER = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', otro: '🐾' };
+const COLLAR_COLOR = { rojo: '#e05252', azul: '#438bd1', negro: '#263238', verde: '#3da879' };
+
+function markerIcon(report) {
+  const animal = TIPO_MARKER[report.tipo] || TIPO_MARKER.otro;
+  const collar = COLLAR_COLOR[report.collar] || 'transparent';
+  const estado = report.estado === 'perdido' ? 'lost' : 'found';
+  return L.divIcon({
+    className: 'animal-marker-wrap',
+    html: `<span class="animal-marker ${estado}"><span class="animal-face">${animal}</span><span class="animal-collar" style="background:${collar}"></span></span>`,
+    iconSize: [42, 48],
+    iconAnchor: [21, 44],
+    popupAnchor: [0, -42]
+  });
+}
 
 // Iconos de línea del sprite de index.html. Solo para textos que arma el JS:
 // el resto de la interfaz los lleva ya en el HTML. Son cadenas propias, sin
@@ -1397,14 +1412,7 @@ async function renderListMap() {
   }
   clusterGroup.clearLayers();
   allReports.forEach(r => {
-    const color = r.estado === 'perdido' ? '#D98A2B' : '#3F8361';
-    const marker = L.circleMarker([r.lat, r.lng], {
-      radius: 9,
-      fillColor: color,
-      fillOpacity: 0.9,
-      color: '#fff',
-      weight: 2
-    });
+    const marker = L.marker([r.lat, r.lng], { icon: markerIcon(r) });
     marker.bindPopup(
       `<b>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}</b><br>${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'} · ${timeAgo(r.created_at)}`
     );

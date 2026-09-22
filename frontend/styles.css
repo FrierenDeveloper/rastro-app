@@ -9,28 +9,28 @@
 
 :root {
   /* --- Superficies (cálidas, nunca blanco puro salvo inputs) --- */
-  --paper: #f5f2eb;
-  --paper-2: #efebe1;
-  --card: #fcfbf7;
+  --paper: oklch(97% 0.012 190);
+  --paper-2: oklch(93% 0.02 190);
+  --card: oklch(98% 0.01 190);
   --surface: #ffffff;
 
   /* --- Tinta --- */
-  --ink: #2a312f;
-  --ink-soft: #6a7573;
-  --ink-faint: #9aa29f;
+  --ink: oklch(22% 0.02 190);
+  --ink-soft: oklch(50% 0.02 190);
+  --ink-faint: oklch(70% 0.02 190);
 
   /* --- Líneas --- */
-  --line: #e6e0d4;
-  --line-soft: #efeae0;
+  --line: oklch(85% 0.02 190);
+  --line-soft: oklch(90% 0.02 190);
 
   /* --- Acentos desaturados (saturación conservadora) --- */
-  --green: #6f8f7b;
-  --green-ink: #4f6d5b;
-  --green-soft: #e6ede7;
+  --green: oklch(48% 0.12 190);
+  --green-ink: oklch(40% 0.1 190);
+  --green-soft: oklch(93% 0.02 190);
 
-  --amber: #be9a63;
-  --amber-ink: #8a6c3c;
-  --amber-soft: #f4ecdd;
+  --amber: oklch(70% 0.11 70);
+  --amber-ink: oklch(43% 0.09 70);
+  --amber-soft: oklch(94% 0.035 85);
 
   --rust: #b08370;
   --rust-ink: #8d5f4c;
@@ -531,17 +531,18 @@ main {
 .card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  border-radius: 10px;
   padding: 20px;
   box-shadow: var(--shadow);
   margin-bottom: 14px;
 }
 .card h2 {
-  font-size: 21px;
+  font-size: 27px;
+  font-weight: 600;
   margin: 0 0 4px;
 }
 .card .sub {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--ink-soft);
   margin: 0 0 18px;
   line-height: 1.5;
@@ -566,8 +567,8 @@ select,
 textarea {
   width: 100%;
   padding: 11px 13px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line);
+  border-radius: 10px;
+  border: 1.5px solid var(--line);
   background: var(--surface);
   font-family: inherit;
   font-size: 15px;
@@ -675,7 +676,7 @@ input[type='file'] {
   margin-top: 20px;
   padding: 14px;
   border: none;
-  border-radius: var(--r-md);
+  border-radius: 10px;
   color: var(--on-accent);
   font-weight: 600;
   font-size: 15px;
@@ -746,9 +747,9 @@ input[type='file'] {
   padding: 9px 10px;
 }
 .toolbar .icon-btn {
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   background: var(--card);
-  border-radius: var(--r-pill);
+  border-radius: 20px;
   padding: 9px 13px;
   font-size: 13px;
   font-weight: 600;
@@ -765,7 +766,41 @@ input[type='file'] {
 .toolbar .icon-btn.active {
   background: var(--green-soft);
   color: var(--green-ink);
-  border-color: transparent;
+  border-color: var(--green);
+}
+
+.animal-marker-wrap {
+  background: transparent;
+  border: 0;
+}
+.animal-marker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--surface);
+  border-radius: 50% 50% 50% 8px;
+  transform: rotate(-45deg);
+  background: var(--green);
+  box-shadow: 0 2px 6px rgba(0, 30, 35, 0.3);
+}
+.animal-marker.lost {
+  background: var(--amber);
+}
+.animal-face {
+  transform: rotate(45deg);
+  font-size: 21px;
+  line-height: 1;
+}
+.animal-collar {
+  position: absolute;
+  width: 16px;
+  height: 4px;
+  bottom: 7px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
 #list-map {
@@ -1757,10 +1792,10 @@ input[type='file'] {
 /* «Paso 2 de 4 · Cómo es»: en móvil se lee mejor que cuatro puntos de 7 px. */
 .wizard-paso {
   margin: 0 0 10px;
-  font-size: 12.5px;
-  letter-spacing: 0.02em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--green-ink);
 }
 /* Campo que falta por completar: se ve cuál es, no solo que falta algo. */
 .campo-error {
@@ -1937,10 +1972,10 @@ input[type='file'] {
 
 /* ---------- Modo oscuro ---------- */
 body.theme-dark {
-  --paper: #14181a;
-  --paper-2: #1b2124;
-  --card: #1d2427;
-  --surface: #232b2e;
+  --paper: #102a2e;
+  --paper-2: #15343a;
+  --card: #183b40;
+  --surface: #20474c;
 
   --ink: #e9e7e0;
   --ink-soft: #a1aaa7;
@@ -1949,9 +1984,9 @@ body.theme-dark {
   --line: #2c3538;
   --line-soft: #262e31;
 
-  --green: #8fb49b;
-  --green-ink: #a8c6b2;
-  --green-soft: #22302a;
+  --green: #79e1cc;
+  --green-ink: #a3f0df;
+  --green-soft: #1c4c4d;
 
   --amber: #d2b07e;
   --amber-ink: #e0c398;
