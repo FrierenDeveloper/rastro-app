@@ -398,6 +398,26 @@ button:disabled {
   font-size: 12px;
   line-height: 1.45;
 }
+/* Descarga directa del APK (alternativa a instalar la PWA desde el navegador). */
+.auth-apk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.auth-apk .ic {
+  width: 17px;
+  height: 17px;
+}
 
 /* ---------- Header ---------- */
 header {
@@ -1728,6 +1748,7 @@ body.theme-dark #list-map .leaflet-layer {
   font-size: 14.5px;
   color: var(--ink);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 .drawer-item:hover {

@@ -56,7 +56,7 @@ describe('pantalla principal de referencia', () => {
   it('ofrece instalar PetSeñal directamente desde la pantalla de acceso', () => {
     expect(html).toContain('id="btn-install-auth"');
     expect(html).toContain('Instalar PetSeñal');
-    expect(html).toContain('Sin descargar APK');
+    expect(html).toContain('/descargar/petsenal.apk');
     expect(javascript).toContain("['btn-install', 'btn-install-auth']");
     expect(javascript).toContain("'(display-mode: standalone)'");
     expect(javascript).toContain('Añadir a pantalla de inicio');
