@@ -55,21 +55,21 @@ afterEach(() => {
 describe('configuración leída al cargarse', () => {
   it('sin RESEND_API_KEY, usingEmail es false y mailFrom el valor por defecto', () => {
     expect(mailer.usingEmail).toBe(false);
-    expect(mailer.mailFrom).toBe('Rastro <onboarding@resend.dev>');
+    expect(mailer.mailFrom).toBe('PetSeñal <onboarding@resend.dev>');
   });
 
   it('con RESEND_API_KEY, usingEmail es true y MAIL_FROM manda', () => {
-    const conClave = cargarMailer({ apiKey: 're_clave_secreta', from: 'Rastro <hola@rastro.cl>' });
+    const conClave = cargarMailer({ apiKey: 're_clave_secreta', from: 'PetSeñal <hola@petsenal.cl>' });
 
     expect(conClave.usingEmail).toBe(true);
-    expect(conClave.mailFrom).toBe('Rastro <hola@rastro.cl>');
+    expect(conClave.mailFrom).toBe('PetSeñal <hola@petsenal.cl>');
   });
 
   it('una clave vacía o un MAIL_FROM vacío caen a los valores por defecto', () => {
     const vacio = cargarMailer({ apiKey: '', from: '' });
 
     expect(vacio.usingEmail).toBe(false);
-    expect(vacio.mailFrom).toBe('Rastro <onboarding@resend.dev>');
+    expect(vacio.mailFrom).toBe('PetSeñal <onboarding@resend.dev>');
   });
 });
 
@@ -140,7 +140,7 @@ describe('con clave (Resend)', () => {
     const respuesta = { ok: true, status: 200, json: vi.fn().mockResolvedValue({ id: 'correo-1' }) };
     const falso = vi.fn().mockResolvedValue(respuesta);
     vi.stubGlobal('fetch', falso);
-    const mailerConClave = cargarMailer({ apiKey: 're_abc123', from: 'Rastro <hola@rastro.cl>' });
+    const mailerConClave = cargarMailer({ apiKey: 're_abc123', from: 'PetSeñal <hola@petsenal.cl>' });
 
     await expect(mailerConClave.sendMail(CORREO)).resolves.toEqual({ id: 'correo-1' });
 
@@ -154,7 +154,7 @@ describe('con clave (Resend)', () => {
     });
     expect(opciones.body).toBe(
       JSON.stringify({
-        from: 'Rastro <hola@rastro.cl>',
+        from: 'PetSeñal <hola@petsenal.cl>',
         to: ['ana@ejemplo.cl'],
         subject: 'Recupera tu contraseña',
         text: 'Enlace de recuperación: https://rastro.cl/reset?token=abc',
@@ -189,7 +189,7 @@ describe('con clave (Resend)', () => {
 
     await mailerConClave.sendMail(CORREO);
 
-    expect(JSON.parse(falso.mock.calls[0][1].body).from).toBe('Rastro <onboarding@resend.dev>');
+    expect(JSON.parse(falso.mock.calls[0][1].body).from).toBe('PetSeñal <onboarding@resend.dev>');
   });
 
   it('si la respuesta no es ok lanza un Error con el estado y el cuerpo', async () => {

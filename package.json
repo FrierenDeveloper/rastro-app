@@ -1,8 +1,8 @@
 {
-  "name": "rastro-app",
+  "name": "petsenal-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Rastro — mascotas perdidas y encontradas. Monorepo: backend (API + Postgres) y frontend (PWA).",
+  "description": "PetSeñal — mascotas perdidas y encontradas. Monorepo: backend (API + Postgres) y frontend (PWA).",
   "type": "commonjs",
   "scripts": {
     "start": "npm --prefix backend start",

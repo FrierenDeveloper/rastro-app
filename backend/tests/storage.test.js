@@ -13,6 +13,11 @@ vi.hoisted(() => {
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   delete process.env.SUPABASE_BUCKET;
+  delete process.env.R2_ACCOUNT_ID;
+  delete process.env.R2_ACCESS_KEY_ID;
+  delete process.env.R2_SECRET_ACCESS_KEY;
+  delete process.env.R2_BUCKET;
+  delete process.env.R2_PUBLIC_URL;
 });
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -22,6 +27,10 @@ import {
   urlsFalsas,
   clienteSupabaseFalso,
   supabaseFalso,
+  enviarR2Falso,
+  S3ClientFalso,
+  PutObjectCommandFalso,
+  DeleteObjectCommandFalso,
   olvidar,
   requerir,
   RUTAS
@@ -32,9 +41,36 @@ import storage from '../storage.js';
 
 const URL_SUPABASE = 'https://proyecto.supabase.co';
 const CLAVE_SERVICIO = 'llave-de-servicio';
+const R2 = {
+  accountId: 'cuenta-r2',
+  accessKeyId: 'acceso-r2',
+  secretAccessKey: 'secreto-r2',
+  bucket: 'fotos-rastro',
+  publicUrl: 'https://fotos.rastro.test'
+};
+
+function limpiarR2() {
+  for (const key of [
+    'R2_ACCOUNT_ID',
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY',
+    'R2_BUCKET',
+    'R2_PUBLIC_URL'
+  ])
+    delete process.env[key];
+}
+
+function configurarR2(valores = R2) {
+  process.env.R2_ACCOUNT_ID = valores.accountId;
+  process.env.R2_ACCESS_KEY_ID = valores.accessKeyId;
+  process.env.R2_SECRET_ACCESS_KEY = valores.secretAccessKey;
+  process.env.R2_BUCKET = valores.bucket;
+  process.env.R2_PUBLIC_URL = valores.publicUrl;
+}
 
 // Recarga storage.js con el modo pedido (undefined = variable ausente).
 function cargarStorage({ supabase = false, bucket } = {}) {
+  limpiarR2();
   if (supabase) {
     process.env.SUPABASE_URL = URL_SUPABASE;
     process.env.SUPABASE_SERVICE_ROLE_KEY = CLAVE_SERVICIO;
@@ -85,6 +121,9 @@ beforeEach(() => {
   bajasFalsas.remove.mockResolvedValue({ error: null });
   urlsFalsas.getPublicUrl.mockReset();
   urlsFalsas.getPublicUrl.mockReturnValue({ data: { publicUrl: 'https://cdn.test/foto.jpg' } });
+  S3ClientFalso.mockClear();
+  enviarR2Falso.mockReset();
+  enviarR2Falso.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -94,6 +133,94 @@ afterEach(() => {
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   delete process.env.SUPABASE_BUCKET;
+  limpiarR2();
+});
+
+describe('modo Cloudflare R2', () => {
+  function cargarR2(valores) {
+    configurarR2(valores);
+    olvidar(RUTAS.storage);
+    return requerir(RUTAS.storage);
+  }
+
+  it('crea el cliente S3 de R2 con credenciales sólo del backend', () => {
+    const recargado = cargarR2(R2);
+
+    expect(recargado.usingR2).toBe(true);
+    expect(recargado.usingSupabase).toBe(false);
+    expect(S3ClientFalso).toHaveBeenCalledWith({
+      region: 'auto',
+      endpoint: 'https://cuenta-r2.r2.cloudflarestorage.com',
+      credentials: { accessKeyId: 'acceso-r2', secretAccessKey: 'secreto-r2' }
+    });
+  });
+
+  it('sube una imagen y devuelve su URL pública codificada', async () => {
+    const recargado = cargarR2({ ...R2, publicUrl: `${R2.publicUrl}/` });
+    const buffer = Buffer.from('foto');
+
+    const url = await recargado.savePhoto(buffer, 'image/webp');
+
+    expect(url).toMatch(new RegExp(`^${R2.publicUrl}/fotos/${RE_UUID}\\.webp$`));
+    const comando = enviarR2Falso.mock.calls[0][0];
+    expect(comando).toBeInstanceOf(PutObjectCommandFalso);
+    expect(comando.input).toMatchObject({
+      Bucket: R2.bucket,
+      Body: buffer,
+      ContentType: 'image/webp',
+      CacheControl: 'public, max-age=31536000, immutable'
+    });
+    expect(comando.input.Key).toMatch(new RegExp(`^fotos/${RE_UUID}\\.webp$`));
+  });
+
+  it('R2 tiene prioridad sobre Supabase cuando ambos están configurados', () => {
+    process.env.SUPABASE_URL = URL_SUPABASE;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = CLAVE_SERVICIO;
+
+    const recargado = cargarR2(R2);
+
+    expect(recargado.usingR2).toBe(true);
+    expect(recargado.usingSupabase).toBe(false);
+    expect(supabaseFalso.createClient).not.toHaveBeenCalled();
+  });
+
+  it('si falta una credencial no activa R2 ni crea un cliente parcial', () => {
+    const recargado = cargarR2({ ...R2, secretAccessKey: '' });
+
+    expect(recargado.usingR2).toBe(false);
+    expect(S3ClientFalso).not.toHaveBeenCalled();
+  });
+
+  it('propaga un error claro si R2 rechaza la subida', async () => {
+    const recargado = cargarR2(R2);
+    enviarR2Falso.mockRejectedValue(new Error('sin permisos'));
+
+    await expect(recargado.savePhoto(Buffer.from('x'), 'image/jpeg')).rejects.toThrow(
+      'No se pudo subir la foto a Cloudflare R2: sin permisos'
+    );
+  });
+
+  it('borra sólo objetos pertenecientes a la URL pública configurada', async () => {
+    const recargado = cargarR2({ ...R2, publicUrl: `${R2.publicUrl}/media` });
+
+    await recargado.deletePhoto(`${R2.publicUrl}/media/fotos/carpeta%20uno/foto.jpg`);
+    await recargado.deletePhoto('https://sitio-ajeno.test/fotos/foto.jpg');
+    await recargado.deletePhoto(`${R2.publicUrl}/otra-ruta/foto.jpg`);
+    await recargado.deletePhoto('no-es-una-url');
+    await recargado.deletePhoto(`${R2.publicUrl}/media/`);
+
+    expect(enviarR2Falso).toHaveBeenCalledTimes(1);
+    const comando = enviarR2Falso.mock.calls[0][0];
+    expect(comando).toBeInstanceOf(DeleteObjectCommandFalso);
+    expect(comando.input).toEqual({ Bucket: R2.bucket, Key: 'fotos/carpeta uno/foto.jpg' });
+  });
+
+  it('un error al borrar en R2 no bloquea la operación principal', async () => {
+    const recargado = cargarR2(R2);
+    enviarR2Falso.mockRejectedValue(new Error('sin permisos'));
+
+    await expect(recargado.deletePhoto(`${R2.publicUrl}/fotos/foto.jpg`)).resolves.toBeUndefined();
+  });
 });
 
 describe('modo disco local', () => {

@@ -103,9 +103,9 @@ async function avisarPorCorreo(registro) {
       subject: `Alguien escaneó el microchip de ${registro.pet_name}`,
       text:
         `Hola:\n\n` +
-        `Alguien acaba de escanear el microchip que registraste en Rastro para ${registro.pet_name}.\n\n` +
+        `Alguien acaba de escanear el microchip que registraste en PetSeñal para ${registro.pet_name}.\n\n` +
         `Entra en la app para verlo. Por tu privacidad, no compartimos tus datos de contacto con quien lo escaneó.\n\n` +
-        `— Rastro`
+        `— PetSeñal`
     });
   } catch (e) {
     /* el correo es un extra del aviso */
@@ -117,7 +117,7 @@ function avisarAlDueno(registro) {
   push
     .sendToUser(registro.owner_user_id, {
       title: '🐾 Alguien escaneó el microchip de tu mascota',
-      body: `Escanearon el chip de ${registro.pet_name}. Si la encontraste, entra a Rastro para avisar a su familia.`,
+      body: `Escanearon el chip de ${registro.pet_name}. Si la encontraste, entra a PetSeñal para avisar a su familia.`,
       tag: 'chip-scan-' + registro.id
     })
     .catch(() => {});
@@ -160,7 +160,7 @@ router.post(
       );
       // No se sobrescribe en silencio: el flujo de "reclamar" queda para después.
       if (yaEsta.rows.length)
-        return res.status(409).json({ error: 'Ese microchip ya está registrado en Rastro.' });
+        return res.status(409).json({ error: 'Ese microchip ya está registrado en PetSeñal.' });
 
       const id = uuidv4();
       const ahora = Date.now();

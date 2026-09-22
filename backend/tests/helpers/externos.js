@@ -47,3 +47,26 @@ export const clienteSupabaseFalso = {
 export const supabaseFalso = inyectar('@supabase/supabase-js', {
   createClient: vi.fn(() => clienteSupabaseFalso)
 });
+
+/* ----------------------------- Cloudflare R2 ---------------------------- */
+export const enviarR2Falso = vi.fn(async () => ({}));
+export const clienteR2Falso = { send: enviarR2Falso };
+export const S3ClientFalso = vi.fn(function (opciones) {
+  this.opciones = opciones;
+  return clienteR2Falso;
+});
+export class PutObjectCommandFalso {
+  constructor(input) {
+    this.input = input;
+  }
+}
+export class DeleteObjectCommandFalso {
+  constructor(input) {
+    this.input = input;
+  }
+}
+export const r2Falso = inyectar('@aws-sdk/client-s3', {
+  S3Client: S3ClientFalso,
+  PutObjectCommand: PutObjectCommandFalso,
+  DeleteObjectCommand: DeleteObjectCommandFalso
+});

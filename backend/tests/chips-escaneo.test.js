@@ -352,7 +352,7 @@ describe('POST /api/chips/scan · parámetros y avisos exactos', () => {
     expect(correo.text).toContain('Alguien acaba de escanear el microchip');
     expect(correo.text).toContain('Firulais');
     expect(correo.text).toContain('no compartimos tus datos de contacto');
-    expect(correo.text).toContain('Rastro');
+    expect(correo.text).toContain('PetSeñal');
   });
 
   it('el push lleva una etiqueta propia del registro, para no repetir avisos', async () => {

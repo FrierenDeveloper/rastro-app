@@ -1,4 +1,4 @@
-# Desplegar Rastro gratis: Render + Supabase
+# Desplegar PetSeñal gratis: Render + Supabase
 
 Con esto, tu app queda en una URL pública con HTTPS, y los avisos, cuentas y
 fotos **persisten de verdad** (no se borran cuando el servidor se reinicia).
@@ -24,7 +24,7 @@ almacenamiento de archivos — de sobra para empezar.
 
 ## Parte 2 — Desplegar el backend en Render
 
-1. Sube la carpeta `rastro-app` a un repositorio de GitHub (puede ser privado).
+1. Sube la carpeta `petsenal-app` a un repositorio de GitHub (puede ser privado).
 2. Entra a [render.com](https://render.com) → crea una cuenta gratis (no pide
    tarjeta) → **New → Web Service** → conecta tu repositorio de GitHub.
 3. Configura:
@@ -40,7 +40,7 @@ almacenamiento de archivos — de sobra para empezar.
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `SUPABASE_BUCKET` → `fotos`
-   - `APP_URL` → la URL de tu app en Render (ej. `https://rastro-xxxx.onrender.com`)
+   - `APP_URL` → la URL de tu app en Render (ej. `https://petsenal-xxxx.onrender.com`)
      — se usa para el enlace de recuperar contraseña. Si la dejas vacía, el
      código usa `RENDER_EXTERNAL_URL`, que Render inyecta sola.
    - `ADMIN_EMAILS` → tu correo (el que quieras que administre la app). Sin
@@ -63,7 +63,7 @@ almacenamiento de archivos — de sobra para empezar.
      el mismo cupo. Si algún día expones la app SIN proxy, ponlo en `0`.
    - `NODE_ENV` → `production`
 5. **Create Web Service**. Render construye y despliega — toma unos minutos.
-   Al terminar te da una URL tipo `https://rastro-xxxx.onrender.com`.
+   Al terminar te da una URL tipo `https://petsenal-xxxx.onrender.com`.
 6. Abre esa URL en tu navegador: ahí está tu app completa (backend + frontend),
    con HTTPS, y ahora sí con los datos guardados de forma persistente en
    Supabase.
@@ -74,10 +74,10 @@ almacenamiento de archivos — de sobra para empezar.
   la "duerme". La primera visita después de eso tarda 30-50 segundos en cargar.
   Es normal, no es que algo esté roto.
 - **Actualizar la app**: cada vez que subas cambios a GitHub, Render vuelve a
-  desplegar automáticamente (revisa que *Auto-Deploy* esté activado en
+  desplegar automáticamente (revisa que _Auto-Deploy_ esté activado en
   Settings → Build & Deploy; se ha visto que a veces queda apagado).
 - **Revisar que Supabase esté conectado**: en los logs de Render (pestaña
-  *Logs*), si ves `Rastro API escuchando en puerto...` sin errores antes, la
+  _Logs_), si ves `PetSeñal API escuchando en puerto...` sin errores antes, la
   conexión a la base de datos funcionó. Si falla, revisa que copiaste bien la
   contraseña en `DATABASE_URL`.
 - **Recuperar contraseña**: el enlace se arma con `APP_URL`. Si no la defines,

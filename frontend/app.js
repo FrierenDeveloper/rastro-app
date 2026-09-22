@@ -11,7 +11,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ============ Configuración ============
-const API_BASE = window.RASTRO_API_BASE || '';
+const API_BASE = window.PETSENAL_API_BASE || window.RASTRO_API_BASE || '';
 const DEMO_MODE =
   ['localhost', '127.0.0.1'].includes(location.hostname) &&
   new URLSearchParams(location.search).get('demo') === '1';
@@ -275,7 +275,7 @@ function agregarCapaTiles(map) {
       fallos++;
       // Varios fallos seguidos = ese proveedor no sirve en esta red: probamos el siguiente.
       if (fallos >= 3 && idx < TILE_PROVIDERS.length - 1) {
-        console.warn('Rastro: los tiles de ' + p.url + ' fallaron; probando un proveedor de respaldo…');
+        console.warn('PetSeñal: los tiles de ' + p.url + ' fallaron; probando un proveedor de respaldo…');
         map.removeLayer(capa);
         idx++;
         montar();
@@ -1461,7 +1461,7 @@ async function sendContact(id) {
 }
 async function shareReport(id) {
   const url = location.origin + '/?r=' + id;
-  const shareData = { title: 'Rastro', text: 'Mira este aviso de mascota en Rastro', url };
+  const shareData = { title: 'PetSeñal', text: 'Mira este aviso de mascota en PetSeñal', url };
   if (navigator.share) {
     try {
       await navigator.share(shareData);
@@ -1964,7 +1964,7 @@ function ayudaInstalacionManual() {
 
 async function instalarApp() {
   if (appEstaInstalada()) {
-    toast('Rastro ya está instalada en este dispositivo.');
+    toast('PetSeñal ya está instalada en este dispositivo.');
     actualizarControlesInstalacion();
     return;
   }
@@ -2421,7 +2421,7 @@ document.getElementById('btn-chip-scan').addEventListener('click', async () => {
           <h3>✅ Microchip registrado</h3>
           <p>Está a nombre de <b>${esc(r.pet_name)}</b>. Ya avisamos a su familia. Por su privacidad, no te damos sus datos: si lo encontraste, publica un aviso en «Encontré» para que puedan contactarte.</p>
         </div>`
-      : `<p class="loc-note">Ese microchip no está registrado en Rastro. Publica un aviso en «Encontré»: es la vía para que su familia lo vea.</p>`;
+      : `<p class="loc-note">Ese microchip no está registrado en PetSeñal. Publica un aviso en «Encontré»: es la vía para que su familia lo vea.</p>`;
   } catch (ex) {
     caja.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
   }

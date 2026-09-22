@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Rastro - Mascotas perdidas y encontradas",
-  "short_name": "Rastro",
+  "name": "PetSeñal - Mascotas perdidas y encontradas",
+  "short_name": "PetSeñal",
   "description": "Ayuda a los animales de tu barrio a volver a casa.",
   "lang": "es",
   "dir": "ltr",
@@ -36,7 +36,7 @@
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Entra o crea tu cuenta en Rastro"
+      "label": "Entra o crea tu cuenta en PetSeñal"
     },
     {
       "src": "screenshots/privacidad.png",

@@ -656,7 +656,7 @@ router.get('/:id/poster', optionalAuth, param('id').isUUID(), async (req, res, n
     res.type('html').send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cartel · Rastro</title>
+<title>Cartel · PetSeñal</title>
 <style>
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f2efe7;color:#1B2A2F;padding:18px;}
@@ -702,7 +702,7 @@ router.get('/:id/poster', optionalAuth, param('id').isUUID(), async (req, res, n
         <div class="enlace">O escríbelo a mano:<br><span>${escHtml(enlace)}</span></div>
       </div>
     </div>
-    <div class="pie">Publicado en Rastro · el contacto se hace dentro de la app</div>
+    <div class="pie">Publicado en PetSeñal · el contacto se hace dentro de la app</div>
   </div>
 </div>
 <p class="nota">Para guardarlo: usa Imprimir → "Guardar como PDF".</p>
@@ -961,7 +961,7 @@ router.post(
       // Notificación push al destinatario (no bloquea ni rompe si falla).
       push
         .sendToUser(recipient, {
-          title: me === owner ? 'Respondieron tu aviso' : 'Nuevo mensaje en Rastro',
+          title: me === owner ? 'Respondieron tu aviso' : 'Nuevo mensaje en PetSeñal',
           body: req.body.mensaje.slice(0, 90),
           report_id: report.id,
           peer_id: me,

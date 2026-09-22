@@ -10,7 +10,7 @@
 //     console.error. NUNCA se puede confundir con un envío correcto, porque el
 //     silencio anterior dejaba tokens de reseteo vivos que nadie recibía.
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const MAIL_FROM = process.env.MAIL_FROM || 'Rastro <onboarding@resend.dev>';
+const MAIL_FROM = process.env.MAIL_FROM || 'PetSeñal <onboarding@resend.dev>';
 
 async function sendMail({ to, subject, text, html }) {
   if (!RESEND_API_KEY) {

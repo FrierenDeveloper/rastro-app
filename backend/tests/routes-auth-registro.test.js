@@ -587,7 +587,7 @@ describe('POST /register · correo de confirmación', () => {
     expect(mailer.sendMail).toHaveBeenCalledTimes(1);
     const aviso = mailer.sendMail.mock.calls[0][0];
     expect(aviso.to).toBe(correo);
-    expect(aviso.subject).toBe('Confirma tu correo en Rastro');
+    expect(aviso.subject).toBe('Confirma tu correo en PetSeñal');
     const enlace = aviso.text.match(/\/\?verify=([0-9a-f]{64})/);
     expect(enlace).not.toBeNull();
     expect(parametros[0]).toBe(crypto.createHash('sha256').update(enlace[1]).digest('hex'));

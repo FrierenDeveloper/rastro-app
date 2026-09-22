@@ -1,11 +1,11 @@
-# Rastro — mascotas perdidas y encontradas
+# PetSeñal — mascotas perdidas y encontradas
 
 Proyecto completo: backend (API + base de datos + autenticación) y frontend (PWA)
 listos para desplegar como una app real, más los documentos que Google Play pide
 antes de publicar.
 
 ```
-rastro-app/
+petsenal-app/
 ├── backend/     API en Node.js/Express + Postgres (auth, avisos, mensajería, fotos)
 ├── frontend/    PWA (HTML/CSS/JS) instalable, habla con la API
 └── docs/        Política de privacidad, Data Safety form, checklist de Play Store,
@@ -27,6 +27,7 @@ cp .env.example .env
 ```
 
 Abre `.env` y completa:
+
 - `JWT_SECRET`: cualquier texto largo y aleatorio (`openssl rand -hex 32`).
 - `DATABASE_URL`: la cadena de conexión de tu proyecto de Supabase (o de
   cualquier Postgres al que tengas acceso).
@@ -37,9 +38,11 @@ Abre `.env` y completa:
   `Host`, que la controla quien hace la petición).
 - `TRUST_PROXY`: déjalo en `1` si tu app va detrás de un proxy que reescribe
   `X-Forwarded-For` (Render). Si la expones directo a internet, ponlo en `0`.
-- `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: opcionales. Si los dejas
-  vacíos, las fotos se guardan en el disco local del servidor (sirve para
-  probar, pero no persiste en hosting gratuito).
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` y
+  `R2_PUBLIC_URL`: recomendados para guardar las fotos en Cloudflare R2. El
+  token debe tener acceso de lectura/escritura sólo al bucket elegido.
+- `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`: respaldo opcional cuando R2 no
+  está configurado. Sin ninguno, las fotos se guardan en disco local.
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: para las notificaciones push.
   Genera las tuyas con `npm run gen:vapid` (el `.env` de ejemplo ya trae unas
   de prueba).
@@ -60,6 +63,7 @@ Abre `http://localhost:3000` — el mismo servidor sirve la app completa (crea
 una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
 
 ## Qué incluye
+
 - Cuentas con contraseña **cifrada** (bcrypt), sesiones con JWT, y **recuperar
   contraseña** por correo (funciona con Resend; sin configurar, el enlace se
   imprime en la consola del servidor).
@@ -115,8 +119,8 @@ una cuenta, publica un aviso, tómale una foto, muévete en el mapa).
 - Cabeceras de seguridad HTTP (Helmet), CORS restringible a tu dominio.
 - El usuario puede **eliminar su cuenta y todos sus datos** en cualquier
   momento (requisito de Google Play): se borran avisos, fotos y mensajes.
-- Fotos guardadas en **Supabase Storage** cuando está configurado (persisten de
-  verdad); si no lo configuras, caen a disco local como respaldo para pruebas.
+- Fotos guardadas prioritariamente en **Cloudflare R2**, con Supabase Storage y
+  disco local como respaldos compatibles con instalaciones anteriores.
 - `npm audit`: 0 vulnerabilidades en las dependencias al momento de construir esto.
 
 ## Probarlo y verificar que no se ha roto nada
@@ -152,6 +156,7 @@ persistente, todo en capas gratuitas. Después:
 2. Sigue `docs/CHECKLIST_GOOGLE_PLAY.md` paso a paso para llegar a Play Store.
 
 ## Limitaciones que debes saber
+
 - El plan gratis de Render "duerme" el servidor tras 15 min sin uso; la
   primera visita después de eso tarda 30-50 segundos en responder.
 - Los planes gratis de Supabase (500 MB de base de datos, 1 GB de

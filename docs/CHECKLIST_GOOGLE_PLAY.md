@@ -1,4 +1,4 @@
-# Checklist para publicar Rastro en Google Play (2026)
+# Checklist para publicar PetSeñal en Google Play (2026)
 
 Basado en los requisitos vigentes de Google Play al 31 de agosto de 2026. Google
 actualiza estas reglas con frecuencia — antes de enviar tu app a revisión, confirma
@@ -11,7 +11,7 @@ que nada cambió.
       (Render, Railway, Fly.io, o tu propio servidor con un certificado TLS).
 - [ ] Configurar `CORS_ORIGIN` en el `.env` de producción con el dominio real de tu app.
 - [x] Publicar `docs/POLITICA_DE_PRIVACIDAD.md` en una URL pública y accesible sin login:
-      https://rastro-app.onrender.com/privacidad/ (vive en `frontend/privacidad/index.html`).
+      https://tu-dominio.com/privacidad/ (vive en `frontend/privacidad/index.html`).
 - [ ] Decidir el nombre final, ícono y capturas de pantalla de la app.
       Nombre e ícono ya están (normales + maskable en `frontend/icons/`); faltan las capturas.
 
@@ -23,7 +23,7 @@ Tienes dos caminos razonables:
       [PWABuilder](https://www.pwabuilder.com) o `bubblewrap` para envolver el
       `frontend/` (ya es un PWA válido: tiene `manifest.json` y `sw.js`) en un
       Android App Bundle (`.aab`) mediante Trusted Web Activity.
-      Paso a paso: `docs/EMPAQUETAR_CON_PWABUILDER.md` (package id `com.rastro.app`).
+      Paso a paso: `docs/EMPAQUETAR_CON_PWABUILDER.md` (package id `com.petsenal.app`).
 - [ ] **Opción B — App nativa/híbrida**: reconstruir la UI en Flutter o React
       Native, reutilizando la misma API del backend. Más trabajo, mejor
       integración con funciones nativas (notificaciones push, cámara nativa).

@@ -200,7 +200,7 @@ describe('GET /api/reports/:id/poster', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/html');
-    expect(res.text).toContain('<title>Cartel · Rastro</title>');
+    expect(res.text).toContain('<title>Cartel · PetSeñal</title>');
     expect(res.text).toContain('<h1>SE BUSCA</h1>');
     expect(res.text).toContain('background:#D98A2B');
     expect(res.text).toContain(
@@ -1179,7 +1179,7 @@ describe('POST /api/reports/:id/messages', () => {
     // Quien no es la dueña no necesita comprobar la conversación previa.
     expect(consultaCon('SELECT 1 FROM messages WHERE report_id')).toBeUndefined();
     expect(push.sendToUser).toHaveBeenCalledWith(DUENO, {
-      title: 'Nuevo mensaje en Rastro',
+      title: 'Nuevo mensaje en PetSeñal',
       body: 'Lo vi en el parque',
       report_id: UUID,
       peer_id: VISITA,
@@ -1199,7 +1199,7 @@ describe('POST /api/reports/:id/messages', () => {
     expect(res.status).toBe(201);
     expect(consultaCon('INSERT INTO messages')[1][4]).toBe(largo);
     expect(push.sendToUser).toHaveBeenCalledWith(DUENO, {
-      title: 'Nuevo mensaje en Rastro',
+      title: 'Nuevo mensaje en PetSeñal',
       body: 'x'.repeat(90),
       report_id: UUID,
       peer_id: VISITA,

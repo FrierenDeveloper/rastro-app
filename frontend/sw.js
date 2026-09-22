@@ -2,7 +2,7 @@
 // Así, si publicas una corrección, el navegador la recibe de inmediato en vez
 // de quedarse pegado con una versión vieja guardada en caché.
 // La caché queda solo como respaldo para cuando no hay conexión.
-const CACHE = 'rastro-shell-v15';
+const CACHE = 'petsenal-shell-v1';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json', '/icons/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -59,12 +59,12 @@ self.addEventListener('push', e => {
   } catch (_) {
     /* payload no JSON */
   }
-  const title = data.title || 'Rastro';
+  const title = data.title || 'PetSeñal';
   const options = {
-    body: data.body || 'Tienes novedades en Rastro.',
+    body: data.body || 'Tienes novedades en PetSeñal.',
     icon: 'icons/icon-192.png',
     badge: 'icons/icon-192.png',
-    tag: data.tag || 'rastro',
+    tag: data.tag || 'petsenal',
     data: { report_id: data.report_id || null, peer_id: data.peer_id || null }
   };
   e.waitUntil(self.registration.showNotification(title, options));

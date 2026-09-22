@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Rastro — Mascotas perdidas y encontradas</title>
+    <title>PetSeñal — Mascotas perdidas y encontradas</title>
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" id="meta-theme" content="#f5f2eb" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
     <!-- iOS: sin estos metas, "Añadir a pantalla de inicio" abre con la barra de
-         Safari a la vista y con el nombre de la web en vez de "Rastro". -->
+         Safari a la vista y con el nombre de la web en vez de "PetSeñal". -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Rastro" />
+    <meta name="apple-mobile-web-app-title" content="PetSeñal" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
@@ -35,39 +35,11 @@
          Trazos de 1.7 px con extremos redondeados. Heredan color y grosor de
          la clase .ic, así que se adaptan al tema claro/oscuro sin duplicar. -->
     <svg class="sprite" aria-hidden="true" focusable="false">
-      <!-- La marca es un CAMINO: tres pisadas que se alejan hacia arriba a la
-           izquierda, cada vez más pequeñas y tenues, y alternando el pie (la
-           del medio va espejada y girada al otro lado), como un caminar real.
-           Va RELLENA (silueta), no a trazo: a 32 px el trazo fino pegaría los
-           dedos entre sí y la huella dejaría de leerse. -->
       <symbol id="i-huella" viewBox="0 0 12 12">
         <ellipse cx="4.1" cy="4.8" rx="1.1" ry="1.4" fill="currentColor" stroke="none" />
         <ellipse cx="6.3" cy="3.4" rx="1.15" ry="1.55" fill="currentColor" stroke="none" />
         <ellipse cx="8.6" cy="4.6" rx="1.05" ry="1.35" fill="currentColor" stroke="none" />
         <ellipse cx="6.5" cy="8.1" rx="2.6" ry="2.2" fill="currentColor" stroke="none" />
-      </symbol>
-      <symbol id="i-logo" viewBox="0 0 24 24">
-        <use href="#i-huella" transform="translate(17.4 17) rotate(-8) scale(1.1) translate(-6.3 -6.1)" />
-        <use
-          href="#i-huella"
-          opacity="0.55"
-          transform="translate(11.4 10.6) rotate(16) scale(-0.68 0.68) translate(-6.3 -6.1)"
-        />
-        <use
-          href="#i-huella"
-          opacity="0.3"
-          transform="translate(5.6 4.6) rotate(-26) scale(0.44) translate(-6.3 -6.1)"
-        />
-      </symbol>
-      <!-- Versión reducida para la cabecera (32 px): con tres pisadas los dedos
-           no llegan a leerse, así que allí van solo las dos primeras. -->
-      <symbol id="i-logo-min" viewBox="0 0 24 24">
-        <use href="#i-huella" transform="translate(15.6 15.6) rotate(-8) scale(1.12) translate(-6.3 -6.1)" />
-        <use
-          href="#i-huella"
-          opacity="0.5"
-          transform="translate(7.4 7) rotate(14) scale(-0.68 0.68) translate(-6.3 -6.1)"
-        />
       </symbol>
       <symbol id="i-paw" viewBox="0 0 24 24">
         <ellipse cx="5.3" cy="9" rx="1.9" ry="2.5" />
@@ -76,13 +48,13 @@
         <ellipse cx="18.7" cy="9" rx="1.9" ry="2.5" />
         <path d="M6.6 16.7c0-3.5 2.3-6 5.4-6s5.4 2.5 5.4 6c0 2.4-2.2 3.7-5.4 3.7s-5.4-1.3-5.4-3.7Z" />
       </symbol>
-      <symbol id="i-rastro-pin" viewBox="0 0 40 48">
+      <symbol id="i-petsenal-pin" viewBox="0 0 40 48">
         <path
-          class="rastro-pin-shape"
+          class="petsenal-pin-shape"
           fill="currentColor"
           d="M20 1.5C9.2 1.5 2 9.2 2 19.8 2 33 20 46.5 20 46.5S38 33 38 19.8C38 9.2 30.8 1.5 20 1.5Z"
         />
-        <g class="rastro-pin-paw" fill="var(--logo-paw, #f5fffc)">
+        <g class="petsenal-pin-paw" fill="var(--logo-paw, #f5fffc)">
           <ellipse cx="11.8" cy="14.7" rx="2.5" ry="3.4" transform="rotate(-18 11.8 14.7)" />
           <ellipse cx="17.1" cy="11.8" rx="2.6" ry="3.6" transform="rotate(-7 17.1 11.8)" />
           <ellipse cx="22.9" cy="11.8" rx="2.6" ry="3.6" transform="rotate(7 22.9 11.8)" />
@@ -225,21 +197,18 @@
     </svg>
 
     <!-- ===================== ARRANQUE ===================== -->
-    <div id="boot-screen" role="status" aria-live="polite" aria-label="Cargando Rastro">
+    <div id="boot-screen" role="status" aria-live="polite" aria-label="Cargando PetSeñal">
       <div class="boot-brand" aria-hidden="true">
-        <svg class="boot-paw boot-paw-1"><use href="#i-paw" /></svg>
-        <svg class="boot-paw boot-paw-2"><use href="#i-paw" /></svg>
-        <svg class="boot-paw boot-paw-3"><use href="#i-paw" /></svg>
-        <svg class="boot-paw boot-paw-4"><use href="#i-paw" /></svg>
+        <svg class="boot-logo" viewBox="0 0 40 48"><use href="#i-petsenal-pin" /></svg>
       </div>
-      <p>Rastro</p>
+      <p>PetSeñal</p>
     </div>
 
     <!-- ===================== RESET SCREEN ===================== -->
     <div id="reset-screen" class="hidden">
       <div class="brand">
-        <svg class="brand-logo lg" aria-hidden="true"><use href="#i-logo" /></svg>
-        <h1 class="serif">Rastro</h1>
+        <svg class="brand-logo lg" viewBox="0 0 40 48" aria-hidden="true"><use href="#i-petsenal-pin" /></svg>
+        <h1 class="serif">PetSeñal</h1>
         <p class="tag">Elige una contraseña nueva</p>
       </div>
       <div class="auth-card">
@@ -259,8 +228,8 @@
     <!-- ===================== AUTH SCREEN ===================== -->
     <div id="auth-screen" class="hidden">
       <div class="brand">
-        <svg class="brand-logo lg" aria-hidden="true"><use href="#i-logo" /></svg>
-        <h1 class="serif">Rastro</h1>
+        <svg class="brand-logo lg" viewBox="0 0 40 48" aria-hidden="true"><use href="#i-petsenal-pin" /></svg>
+        <h1 class="serif">PetSeñal</h1>
         <p class="tag">Ayuda a los animales de tu barrio a volver a casa</p>
       </div>
       <div class="auth-card">
@@ -338,7 +307,7 @@
       <div class="auth-install" id="auth-install">
         <button type="button" class="auth-install-btn" id="btn-install-auth">
           <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
-          <span>Instalar Rastro</span>
+          <span>Instalar PetSeñal</span>
         </button>
         <p>Instálala desde el navegador. Sin descargar APK ni avisos de Play Protect.</p>
       </div>
@@ -370,11 +339,11 @@
               preserveAspectRatio="xMidYMid meet"
               aria-hidden="true"
             >
-              <use href="#i-rastro-pin" />
+              <use href="#i-petsenal-pin" />
             </svg>
           </span>
           <span class="header-brand-copy">
-            <h1>Rastro</h1>
+            <h1>PetSeñal</h1>
             <small>Más patas, más reencuentros</small>
           </span>
         </div>
@@ -848,10 +817,10 @@
               <label class="check chip-consentimiento">
                 <input type="checkbox" id="chip-reg-consent" />
                 <span>
-                  Doy mi consentimiento para que Rastro guarde el código de microchip de mi mascota, su nombre
-                  y su especie con la única finalidad de avisarme si alguien lo escanea. Entiendo que mi
-                  teléfono y mi correo no se muestran nunca a quien escanea, y que puedo ver, corregir o dar
-                  de baja este registro cuando quiera desde «Mis microchips».
+                  Doy mi consentimiento para que PetSeñal guarde el código de microchip de mi mascota, su
+                  nombre y su especie con la única finalidad de avisarme si alguien lo escanea. Entiendo que
+                  mi teléfono y mi correo no se muestran nunca a quien escanea, y que puedo ver, corregir o
+                  dar de baja este registro cuando quiera desde «Mis microchips».
                 </span>
               </label>
               <p class="loc-note">
@@ -913,7 +882,7 @@
           <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg><span>Mapa</span>
         </button>
         <button data-tab="chips" data-nav="chips">
-          <svg class="ic paw-filled" aria-hidden="true"><use href="#i-paw" /></svg><span>Mi Rastro</span>
+          <svg class="ic paw-filled" aria-hidden="true"><use href="#i-paw" /></svg><span>Mi PetSeñal</span>
         </button>
       </nav>
     </div>
@@ -1152,7 +1121,7 @@
         <div class="danger-zone">
           <h4 class="priv-title">Eliminar tu cuenta</h4>
           <p class="loc-note">
-            Si ya no quieres usar Rastro, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos, tus
+            Si ya no quieres usar PetSeñal, puedes eliminar tu cuenta. Esto borra tu cuenta, tus avisos, tus
             fotos y tus mensajes de forma permanente.
           </p>
           <button id="btn-delete-account">Eliminar mi cuenta y mis datos</button>
@@ -1176,9 +1145,9 @@
           <div class="onboard-track" id="onboard-track">
             <div class="onboard-step" data-step="0">
               <div class="onboard-emoji">
-                <svg class="ic" aria-hidden="true"><use href="#i-logo-min" /></svg>
+                <svg class="ic" aria-hidden="true"><use href="#i-petsenal-pin" /></svg>
               </div>
-              <h3>Bienvenido a Rastro</h3>
+              <h3>Bienvenido a PetSeñal</h3>
               <p class="sub">
                 El mapa de mascotas perdidas y encontradas de tu barrio. Publica un aviso o ayuda a alguien a
                 reencontrarse con su mascota.

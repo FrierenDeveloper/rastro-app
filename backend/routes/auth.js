@@ -140,8 +140,8 @@ async function enviarVerificacion(userId, email, req) {
   try {
     await mailer.sendMail({
       to: email,
-      subject: 'Confirma tu correo en Rastro',
-      text: `Confirma tu correo para poder publicar avisos en Rastro:\n${link}${rawToken}\n\nEl enlace vence en 24 horas. Si no creaste esta cuenta, ignora este correo.`
+      subject: 'Confirma tu correo en PetSeñal',
+      text: `Confirma tu correo para poder publicar avisos en PetSeñal:\n${link}${rawToken}\n\nEl enlace vence en 24 horas. Si no creaste esta cuenta, ignora este correo.`
     });
   } catch (e) {
     console.error('No se pudo enviar el correo de verificación:', e.message);
@@ -315,7 +315,7 @@ router.post(
         try {
           await mailer.sendMail({
             to: user.email,
-            subject: 'Recuperar tu contraseña de Rastro',
+            subject: 'Recuperar tu contraseña de PetSeñal',
             text: `Para elegir una contraseña nueva entra a: ${link}${rawToken}\n\nEl enlace vence en 1 hora. Si no lo pediste, ignora este correo.`
           });
         } catch (e) {

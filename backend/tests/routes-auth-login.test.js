@@ -452,7 +452,7 @@ describe('POST /forgot · respuesta y envío', () => {
     expect(mailer.sendMail).toHaveBeenCalledTimes(1);
     const aviso = mailer.sendMail.mock.calls[0][0];
     expect(aviso.to).toBe('ana@test.local');
-    expect(aviso.subject).toBe('Recuperar tu contraseña de Rastro');
+    expect(aviso.subject).toBe('Recuperar tu contraseña de PetSeñal');
     expect(aviso.text).toContain('El enlace vence en 1 hora. Si no lo pediste, ignora este correo.');
     const enlace = aviso.text.match(/\/\?reset=([0-9a-f]{64})/);
     expect(enlace).not.toBeNull();

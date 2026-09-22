@@ -140,7 +140,7 @@ app.get('/api/config', (req, res) => {
 // vista (deja de parecer una app).
 //
 // Se configura por variables de entorno, así no hay que tocar código:
-//   ANDROID_PACKAGE_NAME              ej: com.rastro.app
+//   ANDROID_PACKAGE_NAME              ej: com.petsenal.app
 //   ANDROID_SHA256_CERT_FINGERPRINTS  uno o varios SHA-256 separados por coma
 // Los dos datos los entrega PWABuilder, o se sacan con:
 //   keytool -list -v -keystore mi.keystore
@@ -211,7 +211,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 db.init()
-  .then(() => app.listen(PORT, () => console.log(`Rastro API escuchando en puerto ${PORT}`)))
+  .then(() => app.listen(PORT, () => console.log(`PetSeñal API escuchando en puerto ${PORT}`)))
   .catch(err => {
     console.error('No se pudo inicializar la base de datos:', err.message);
     process.exit(1);

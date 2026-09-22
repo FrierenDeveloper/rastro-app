@@ -1,5 +1,5 @@
 /* ============================================================================
-   Rastro — hoja de estilos
+   PetSeñal — hoja de estilos
    Estética: cálida minimalista suave. Superficies tonales (nada de blanco puro
    sobre blanco puro), acentos desaturados tipo salvia / arcilla / arena,
    radios generosos, sombras difusas de bajo contraste e iconografía de línea.
@@ -173,56 +173,33 @@ button:disabled {
   letter-spacing: -0.02em;
 }
 .boot-brand {
-  position: relative;
-  width: 154px;
-  height: 112px;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 92px;
 }
-.boot-paw {
-  position: absolute;
-  width: 30px;
-  height: 30px;
+.boot-logo {
+  width: 64px;
+  height: 77px;
   color: var(--green);
-  opacity: 0;
-  transform: scale(0.55) rotate(-24deg);
-  animation: boot-paw-step 1.8s ease-in-out infinite;
+  animation: boot-logo-pulse 1.8s ease-in-out infinite;
 }
-.boot-paw-1 {
-  left: 112px;
-  top: 66px;
-  animation-delay: 0s;
-}
-.boot-paw-2 {
-  left: 78px;
-  top: 42px;
-  animation-delay: 0.18s;
-}
-.boot-paw-3 {
-  left: 44px;
-  top: 22px;
-  animation-delay: 0.36s;
-}
-.boot-paw-4 {
-  left: 18px;
-  top: 4px;
-  animation-delay: 0.54s;
-}
-@keyframes boot-paw-step {
+@keyframes boot-logo-pulse {
   0%,
   100% {
-    opacity: 0;
-    transform: scale(0.55) rotate(-24deg);
+    opacity: 0.55;
+    transform: scale(0.92);
   }
-  18%,
-  64% {
-    opacity: 0.85;
-    transform: scale(1) rotate(-24deg);
+  45% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .boot-paw {
+  .boot-logo {
     animation: none;
-    opacity: 0.7;
-    transform: scale(0.9) rotate(-24deg);
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -246,8 +223,7 @@ button:disabled {
   height: 1.5em;
 }
 
-/* --- Marca / logo: silueta del sendero de huellas (los iconos de la interfaz
-       sí van a trazo: eso los hace ligeros, la marca necesita peso) --- */
+/* --- Marca / logo: huella dentro de un pin GPS. --- */
 .brand-logo {
   width: 48px;
   height: 48px;
@@ -2296,10 +2272,10 @@ header {
   stroke: none;
   animation: none !important;
 }
-.header-brand .rastro-pin-shape {
+.header-brand .petsenal-pin-shape {
   fill: currentColor;
 }
-.header-brand .rastro-pin-paw {
+.header-brand .petsenal-pin-paw {
   fill: var(--logo-paw);
   stroke: none;
 }

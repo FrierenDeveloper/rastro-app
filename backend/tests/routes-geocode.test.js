@@ -53,7 +53,7 @@ const FALLO_BUSQUEDA = { error: 'No se pudo buscar la dirección. Intenta de nue
 const DEMASIADAS = { error: 'Demasiadas búsquedas seguidas. Espera un momento.' };
 const PHOTON = 'https://photon.komoot.io/api/?q=';
 const COLA = '&lat=-33.4489&lon=-70.6693&limit=8';
-const AGENTE = 'Rastro/1.0 (+https://github.com/FrierenDeveloper/rastro-app)';
+const AGENTE = 'PetSeñal/1.0 (+https://github.com/FrierenDeveloper/rastro-app)';
 const TTL = 24 * 60 * 60 * 1000;
 
 /* ------------------------------- utilidades ------------------------------- */

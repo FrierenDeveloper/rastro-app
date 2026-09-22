@@ -6,9 +6,12 @@
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const { crearR2 } = require('./src/v2/r2-storage');
 
 const BUCKET = process.env.SUPABASE_BUCKET || 'fotos';
-const useSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+const r2 = crearR2();
+const useR2 = Boolean(r2);
+const useSupabase = !useR2 && !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 let supabase = null;
 if (useSupabase) {
@@ -29,6 +32,8 @@ const EXT_BY_MIME = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '
 async function savePhoto(buffer, mimetype) {
   const ext = EXT_BY_MIME[mimetype] || '';
   const filename = uuidv4() + ext;
+
+  if (useR2) return r2.guardar(filename, buffer, mimetype);
 
   if (useSupabase) {
     const { error } = await supabase.storage.from(BUCKET).upload(filename, buffer, {
@@ -61,6 +66,7 @@ function partesDeUrlSupabase(fotoUrl) {
 async function deletePhoto(fotoUrl) {
   if (!fotoUrl) return;
   try {
+    if (useR2 && (await r2.borrar(fotoUrl))) return;
     const partes = partesDeUrlSupabase(fotoUrl);
     if (useSupabase && partes) {
       await supabase.storage.from(partes.bucket).remove([partes.ruta]);
@@ -73,4 +79,4 @@ async function deletePhoto(fotoUrl) {
   }
 }
 
-module.exports = { savePhoto, deletePhoto, usingSupabase: useSupabase, localDir };
+module.exports = { savePhoto, deletePhoto, usingR2: useR2, usingSupabase: useSupabase, localDir };

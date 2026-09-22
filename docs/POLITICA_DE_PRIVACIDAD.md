@@ -1,9 +1,9 @@
-# Política de privacidad de Rastro
+# Política de privacidad de PetSeñal
 
 > **Estado (19 de septiembre de 2026)**: la versión **publicada** y con los datos
 > reales (responsable, correo de contacto, proveedores) es
 > `frontend/privacidad/index.html`, servida en
-> <https://rastro-app.onrender.com/privacidad/>. Este archivo queda como borrador y
+> <https://tu-dominio.com/privacidad/>. Este archivo queda como borrador y
 > notas de partida: si cambias la política, cambia el HTML (incluida la fecha de
 > "última actualización" de arriba).
 
@@ -17,7 +17,7 @@ abogado, especialmente si vas a operar en varios países.
 
 ## 1. Quiénes somos
 
-[Nombre de la persona u organización responsable de la app], en adelante "Rastro",
+[Nombre de la persona u organización responsable de la app], en adelante "PetSeñal",
 "nosotros". Contacto: [correo de contacto].
 
 ## 2. Qué datos recolectamos
@@ -44,7 +44,7 @@ crear una cuenta y publicar un aviso.
 
 ## 4. Ubicación (dato sensible)
 
-Rastro solicita acceso a tu ubicación para:
+PetSeñal solicita acceso a tu ubicación para:
 
 - Sugerir el punto donde encontraste o perdiste un animal.
 - Calcular qué avisos están cerca de un punto dado.
@@ -85,7 +85,7 @@ solicitudes adicionales, contáctanos a [correo de contacto].
 
 ## 8. Menores de edad
 
-Rastro no está dirigido a menores de 13 años. Si detectamos una cuenta de un menor
+PetSeñal no está dirigido a menores de 13 años. Si detectamos una cuenta de un menor
 de esa edad, la eliminaremos.
 
 ## 9. Seguridad

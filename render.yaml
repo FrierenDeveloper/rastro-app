@@ -2,7 +2,7 @@
 # Los valores marcados con "sync: false" se completan al crear el Blueprint.
 services:
   - type: web
-    name: rastro-app
+    name: petsenal-app
     runtime: node
     plan: free
     rootDir: backend
@@ -22,6 +22,18 @@ services:
       # dejarían de coincidir entre ellos y sus dueños no podrían ver el número.
       # Pega aquí un valor largo y aleatorio (openssl rand -hex 32) y guárdalo.
       - key: CHIP_SECRET
+        sync: false
+      # R2 es el almacenamiento preferido. Completa las cinco variables desde
+      # Cloudflare; Supabase queda como respaldo si R2 no está configurado.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        value: fotos-petsenal
+      - key: R2_PUBLIC_URL
         sync: false
       - key: SUPABASE_BUCKET
         value: fotos
@@ -56,6 +68,6 @@ services:
       # Los entrega PWABuilder al generar el paquete. Sin esto, el APK abre con
       # la barra del navegador a la vista (deja de parecer una app).
       - key: ANDROID_PACKAGE_NAME
-        sync: false
+        value: com.petsenal.app
       - key: ANDROID_SHA256_CERT_FINGERPRINTS
         sync: false

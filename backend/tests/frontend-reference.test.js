@@ -16,9 +16,9 @@ describe('pantalla principal de referencia', () => {
     expect(html).toContain('class="home-map-stage"');
     expect(html).toContain('class="map-my-location"');
     expect(html).toContain('<span>Buscar</span>');
-    expect(html).toContain('<span>Mi Rastro</span>');
-    expect(html).toContain('<symbol id="i-rastro-pin"');
-    expect(html).toMatch(/class="brand-logo sm"[\s\S]*viewBox="0 0 40 48"[\s\S]*href="#i-rastro-pin"/);
+    expect(html).toContain('<span>Mi PetSeñal</span>');
+    expect(html).toContain('<symbol id="i-petsenal-pin"');
+    expect(html).toMatch(/class="brand-logo sm"[\s\S]*viewBox="0 0 40 48"[\s\S]*href="#i-petsenal-pin"/);
     expect(html).toMatch(/home-map-stage[\s\S]*home-map-tools[\s\S]*id="list-map"/);
   });
 
@@ -46,20 +46,26 @@ describe('pantalla principal de referencia', () => {
 
   it('dibuja una pata vectorial con cuatro dedos y una almohadilla', () => {
     const paw = html.match(/<symbol id="i-paw"[\s\S]*?<\/symbol>/)?.[0] || '';
-    const pin = html.match(/<symbol id="i-rastro-pin"[\s\S]*?<\/symbol>/)?.[0] || '';
+    const pin = html.match(/<symbol id="i-petsenal-pin"[\s\S]*?<\/symbol>/)?.[0] || '';
     expect(paw.match(/<ellipse/g)).toHaveLength(4);
     expect(paw).toContain('<path');
     expect(pin.match(/<ellipse/g)).toHaveLength(4);
     expect(pin).not.toContain('href="#i-paw"');
   });
 
-  it('ofrece instalar Rastro directamente desde la pantalla de acceso', () => {
+  it('ofrece instalar PetSeñal directamente desde la pantalla de acceso', () => {
     expect(html).toContain('id="btn-install-auth"');
-    expect(html).toContain('Instalar Rastro');
+    expect(html).toContain('Instalar PetSeñal');
     expect(html).toContain('Sin descargar APK');
     expect(javascript).toContain("['btn-install', 'btn-install-auth']");
     expect(javascript).toContain("'(display-mode: standalone)'");
     expect(javascript).toContain('Añadir a pantalla de inicio');
+  });
+
+  it('usa el pin de GPS con huella como logo en acceso y recuperación', () => {
+    expect(html).toMatch(/id="auth-screen"[\s\S]*class="brand-logo lg"[\s\S]*href="#i-petsenal-pin"/);
+    expect(html).toMatch(/id="reset-screen"[\s\S]*class="brand-logo lg"[\s\S]*href="#i-petsenal-pin"/);
+    expect(html).toContain('<h1 class="serif">PetSeñal</h1>');
   });
 
   it('conserva un paquete web instalable e independiente', () => {

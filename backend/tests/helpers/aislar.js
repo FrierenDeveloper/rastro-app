@@ -39,5 +39,5 @@ export const push = inyectar(RUTAS.push, {
 export const mailer = inyectar(RUTAS.mailer, {
   sendMail: vi.fn(async () => ({ id: 'correo-de-prueba' })),
   usingEmail: true,
-  mailFrom: 'Rastro <pruebas@test.local>'
+  mailFrom: 'PetSeñal <pruebas@test.local>'
 });

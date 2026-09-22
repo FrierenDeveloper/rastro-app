@@ -80,7 +80,7 @@ router.get(
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 8000);
         const r = await fetch(url, {
-          headers: { 'User-Agent': 'Rastro/1.0 (+https://github.com/FrierenDeveloper/rastro-app)' },
+          headers: { 'User-Agent': 'PetSeñal/1.0 (+https://github.com/FrierenDeveloper/rastro-app)' },
           signal: controller.signal
         });
         clearTimeout(timer);
