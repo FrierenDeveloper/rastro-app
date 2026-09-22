@@ -14,6 +14,15 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
+      # Secreto PROPIO del microchip. OBLIGATORIO: sin él el servidor no arranca.
+      #
+      # Va con "sync: false" (y NO con generateValue, como JWT_SECRET) a propósito:
+      # el número del chip no se guarda en claro, se guarda su huella calculada con
+      # ESTE valor. Si se perdiera o se regenerara, los chips ya registrados
+      # dejarían de coincidir entre ellos y sus dueños no podrían ver el número.
+      # Pega aquí un valor largo y aleatorio (openssl rand -hex 32) y guárdalo.
+      - key: CHIP_SECRET
+        sync: false
       - key: SUPABASE_BUCKET
         value: fotos
       # Obligatoria: se usa para armar el enlace de "recuperar contraseña".
