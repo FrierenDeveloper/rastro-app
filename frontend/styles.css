@@ -2588,6 +2588,44 @@ body.theme-dark .mode-toggle {
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
+/* Coincidencias con foto: el dueño ve la imagen del aviso "encontrado" y puede
+   confirmar el avistamiento desde ahí. */
+.match-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.match-row:first-child {
+  border-top: 0;
+}
+.match-thumb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #dceff0;
+  object-fit: cover;
+  font-size: 24px;
+}
+.match-info {
+  min-width: 0;
+  font-size: 12.5px;
+}
+.match-info button {
+  margin-top: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
 .map-carousel-dots {
   position: absolute;
   bottom: 18px;

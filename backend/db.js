@@ -181,6 +181,12 @@ async function init() {
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS foto_hash TEXT;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS chip_hash TEXT;
     ALTER TABLE reports ADD COLUMN IF NOT EXISTS chip_cifrado TEXT;
+    -- Avistamiento confirmado por el dueño: punto y hora donde alguien vio a su
+    -- mascota perdida (a partir de un aviso "encontrado"). Re-centra la zona de
+    -- búsqueda, más acotada por el tiempo transcurrido desde el avistamiento.
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS sighting_lat DOUBLE PRECISION;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS sighting_lng DOUBLE PRECISION;
+    ALTER TABLE reports ADD COLUMN IF NOT EXISTS sighting_at BIGINT;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id UUID REFERENCES users(id) ON DELETE CASCADE;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;

@@ -103,7 +103,7 @@ function jitter(lat, lng, meters = 300) {
 
 function publicReport(r, me) {
   const esMio = !!me && r.user_id === me;
-  return {
+  const report = {
     id: r.id,
     estado: r.estado,
     tipo: r.tipo,
@@ -130,6 +130,12 @@ function publicReport(r, me) {
     lng: r.lng_public,
     created_at: Number(r.created_at)
   };
+  // El avistamiento (si el dueño lo confirmó) solo aparece cuando existe, para no
+  // cambiar la forma del objeto en los avisos que no lo tienen.
+  if (r.sighting_at) {
+    report.sighting = { lat: r.sighting_lat, lng: r.sighting_lng, at: Number(r.sighting_at) };
+  }
+  return report;
 }
 
 // Solo para el dueño del aviso: los últimos 4 dígitos del chip que declaró. Se
@@ -820,6 +826,47 @@ router.get('/:id/matches', requireAuth, infoLimiter, param('id').isUUID(), async
     next(err);
   }
 });
+
+/* ---------- Confirmar un avistamiento ---------- */
+// El dueño de una mascota perdida ve las coincidencias (con la foto del aviso
+// "encontrado") y, si reconoce a su mascota, autoriza el avistamiento: se guarda
+// ese punto y hora y la zona de búsqueda se re-centra ahí. El radio se recalcula
+// con la misma fórmula que el resto, pero desde el avistamiento, así que parte
+// más acotado y se amplía con el tiempo hasta parecerse a la zona original.
+router.post(
+  '/:id/sighting',
+  requireAuth,
+  requireVerified,
+  infoLimiter,
+  param('id').isUUID(),
+  body('found_report_id').isUUID(),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ error: 'Datos inválidos.' });
+
+      const perdido = await findReport(req.params.id);
+      if (!perdido || !perdido.active) return res.status(404).json({ error: 'Aviso no encontrado.' });
+      if (perdido.user_id !== req.userId)
+        return res.status(403).json({ error: 'Solo el dueño del aviso puede confirmar el avistamiento.' });
+      if (perdido.estado !== 'perdido')
+        return res.status(400).json({ error: 'Solo un aviso de mascota perdida puede tener avistamientos.' });
+
+      const encontrado = await findReport(req.body.found_report_id);
+      if (!encontrado || !encontrado.active || encontrado.estado !== 'encontrado')
+        return res.status(404).json({ error: 'El aviso encontrado no existe.' });
+
+      await db.query(
+        'UPDATE reports SET sighting_lat = $1, sighting_lng = $2, sighting_at = $3 WHERE id = $4',
+        [encontrado.lat_public, encontrado.lng_public, encontrado.created_at, perdido.id]
+      );
+      const actualizado = await findReport(perdido.id);
+      res.json({ report: publicReport(actualizado, req.userId) });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /* ---------- Ver el microchip de un aviso propio ---------- */
 // El número completo solo sale por aquí, solo para el dueño y solo cuando lo pide

@@ -1429,7 +1429,7 @@ function reportCard(r) {
         <div class="report-actions">
           ${
             r.es_mio
-              ? `<button data-action="matches" data-id="${esc(r.id)}">Coincidencias</button>`
+              ? `<button data-action="matches" data-id="${esc(r.id)}" data-estado="${esc(r.estado)}">Coincidencias</button>`
               : `<button data-action="contact" data-id="${esc(r.id)}">Contactar</button><button data-action="flag" data-id="${esc(r.id)}">Reportar</button>`
           }
           ${r.estado === 'perdido' ? `<button data-action="heat" data-id="${esc(r.id)}">Zona de búsqueda</button>` : ''}
@@ -1460,7 +1460,7 @@ async function renderList() {
   el.innerHTML = allReports.map(reportCard).join('');
 }
 
-async function toggleMatches(id) {
+async function toggleMatches(id, estado) {
   const box = document.getElementById('matches-' + id);
   if (box.style.display === 'block') {
     box.style.display = 'none';
@@ -1470,16 +1470,52 @@ async function toggleMatches(id) {
   box.innerHTML = '<span class="none">Buscando…</span>';
   try {
     const { matches, sugerencias } = await api(`/api/reports/${id}/matches?amplio=1`);
+    // Solo el dueño de un aviso PERDIDO puede confirmar un avistamiento (la
+    // coincidencia es un aviso "encontrado" que él reconoce como su mascota).
+    const puedeConfirmar = estado === 'perdido';
     const fuertes = matches
       .map(
-        m =>
-          `<div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${m.por_chip ? 'mismo microchip' : esc(m.distancia_km) + ' km'}</div>`
+        m => `
+        <div class="match-row">
+          ${
+            m.foto_url
+              ? `<img class="match-thumb" src="${esc(fotoSrc(m.foto_url))}" alt="" loading="lazy">`
+              : `<span class="match-thumb">${TIPO_ICON[m.tipo] || '🐾'}</span>`
+          }
+          <div class="match-info">
+            <div>${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${m.por_chip ? 'mismo microchip' : esc(m.distancia_km) + ' km'}</div>
+            ${
+              puedeConfirmar
+                ? `<button data-action="sighting" data-id="${esc(id)}" data-found="${esc(m.id)}">Es mi mascota: confirmar avistamiento</button>`
+                : ''
+            }
+          </div>
+        </div>`
       )
       .join('');
     box.innerHTML =
       (fuertes || `<span class="none">Sin coincidencias cercanas.</span>`) + htmlSugerencias(sugerencias);
   } catch (ex) {
     box.innerHTML = `<span class="none">${esc(ex.message)}</span>`;
+  }
+}
+// El dueño autoriza que un aviso "encontrado" es su mascota vista: se guarda el
+// punto del avistamiento y la zona de búsqueda se re-centra ahí (más acotada).
+async function confirmarAvistamiento(lostId, foundId) {
+  if (
+    !confirm(
+      '¿Confirmas que este aviso es tu mascota? Se marcará el punto donde la vieron y la zona de búsqueda se ajustará a ese lugar.'
+    )
+  )
+    return;
+  try {
+    await api(`/api/reports/${lostId}/sighting`, { method: 'POST', body: { found_report_id: foundId } });
+    toast('Avistamiento confirmado. Ajustamos la zona de búsqueda.');
+    await renderList();
+    renderListMap();
+    if (zonaCalor.id !== lostId) toggleHeat(lostId);
+  } catch (ex) {
+    toast(ex.message);
   }
 }
 function toggleContact(id) {
@@ -1552,7 +1588,7 @@ document.getElementById('reports-list').addEventListener('click', e => {
     const id = btn.dataset.id;
     switch (btn.dataset.action) {
       case 'matches':
-        toggleMatches(id);
+        toggleMatches(id, btn.dataset.estado);
         break;
       case 'contact':
         toggleContact(id);
@@ -1565,6 +1601,9 @@ document.getElementById('reports-list').addEventListener('click', e => {
         break;
       case 'flag':
         flagReport(id);
+        break;
+      case 'sighting':
+        confirmarAvistamiento(id, btn.dataset.found);
         break;
       case 'heat':
         toggleHeat(id);
@@ -1639,15 +1678,36 @@ function limpiarZonaCalor() {
 }
 
 // Tres anillos concéntricos: el degradado hace de "mapa de calor" sin librerías.
+// Si el dueño confirmó un avistamiento, la zona se centra ahí y el radio sale de
+// la MISMA fórmula pero contando desde el avistamiento (por eso es más acotada);
+// la zona original queda de referencia, punteada y tenue.
 function dibujarZonaCalor(r) {
-  const km = r.radio_km || radioBusquedaKm(r.tipo, r.perdido_hace_horas || 0);
-  const centro = [r.lat, r.lng];
+  const originalKm = r.radio_km || radioBusquedaKm(r.tipo, r.perdido_hace_horas || 0);
+  const capas = [];
+  let centro = [r.lat, r.lng];
+  let km = originalKm;
+  if (r.sighting) {
+    centro = [r.sighting.lat, r.sighting.lng];
+    const horas = Math.max(0, (Date.now() - r.sighting.at) / 3600000);
+    km = radioBusquedaKm(r.tipo, horas);
+    capas.push(
+      L.circle([r.lat, r.lng], {
+        radius: originalKm * 1000,
+        color: '#9bb6b8',
+        weight: 1,
+        opacity: 0.55,
+        dashArray: '5 7',
+        fill: false,
+        interactive: false
+      }).addTo(listMap)
+    );
+  }
   const anillos = [
     { f: 1, color: '#f2a03d', op: 0.1 },
     { f: 0.66, color: '#e8763a', op: 0.13 },
     { f: 0.33, color: '#d84a2f', op: 0.16 }
   ];
-  return anillos.map(a =>
+  const anillosCapas = anillos.map(a =>
     L.circle(centro, {
       radius: km * 1000 * a.f,
       color: '#c8452c',
@@ -1658,6 +1718,7 @@ function dibujarZonaCalor(r) {
       interactive: false
     }).addTo(listMap)
   );
+  return { capas: [...capas, ...anillosCapas], borde: anillosCapas[0] };
 }
 
 function toggleHeat(id) {
@@ -1670,8 +1731,8 @@ function toggleHeat(id) {
   limpiarZonaCalor();
   mostrarVistaHome(true);
   zonaCalor.id = id;
-  zonaCalor.capas = dibujarZonaCalor(r);
-  const borde = zonaCalor.capas[0];
+  const { capas, borde } = dibujarZonaCalor(r);
+  zonaCalor.capas = capas;
   setTimeout(() => {
     if (listMap && borde) listMap.fitBounds(borde.getBounds(), { padding: [40, 40], maxZoom: 15 });
   }, 120);
