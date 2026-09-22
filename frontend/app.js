@@ -12,6 +12,9 @@ if ('serviceWorker' in navigator) {
 
 // ============ Configuración ============
 const API_BASE = window.RASTRO_API_BASE || '';
+const DEMO_MODE =
+  ['localhost', '127.0.0.1'].includes(location.hostname) &&
+  new URLSearchParams(location.search).get('demo') === '1';
 
 let token = localStorage.getItem('rastro_token') || null;
 let me = null;
@@ -34,6 +37,60 @@ let editingId = null;
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
 const TIPO_MARKER = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', otro: '🐾' };
 const COLLAR_COLOR = { rojo: '#e05252', azul: '#438bd1', negro: '#263238', verde: '#3da879' };
+const DEMO_REPORTS = [
+  {
+    id: 'demo-coco',
+    nombre: 'Coco',
+    ubicacion: 'Palermo, CABA',
+    tipo: 'perro',
+    estado: 'perdido',
+    color: 'Marrón',
+    raza: 'Mestizo',
+    collar: 'rojo',
+    sexo: 'macho',
+    descripcion: 'Coco es amistoso y responde cuando lo llaman.',
+    lat: -34.5834,
+    lng: -58.4147,
+    created_at: Date.now() - 2 * 60 * 60 * 1000,
+    foto_url: '',
+    es_mio: false,
+    radio_km: 1.2
+  },
+  {
+    id: 'demo-luna',
+    nombre: 'Luna',
+    ubicacion: 'Recoleta, CABA',
+    tipo: 'gato',
+    estado: 'encontrado',
+    color: 'Negro',
+    raza: 'Doméstico',
+    collar: 'azul',
+    sexo: 'hembra',
+    descripcion: 'Encontrada cerca de una plaza; está tranquila y cuidada.',
+    lat: -34.5865,
+    lng: -58.3972,
+    created_at: Date.now() - 4 * 60 * 60 * 1000,
+    foto_url: '',
+    es_mio: false
+  },
+  {
+    id: 'demo-nube',
+    nombre: 'Nube',
+    ubicacion: 'Almagro, CABA',
+    tipo: 'perro',
+    estado: 'encontrado',
+    color: 'Blanco',
+    raza: 'Poodle',
+    collar: 'verde',
+    sexo: 'macho',
+    descripcion: 'Muy cariñoso. Tiene una mancha pequeña sobre un ojo.',
+    lat: -34.6095,
+    lng: -58.4274,
+    created_at: Date.now() - 7 * 60 * 60 * 1000,
+    foto_url: '',
+    es_mio: false
+  }
+];
 
 function markerIcon(report) {
   const animal = TIPO_MARKER[report.tipo] || TIPO_MARKER.otro;
@@ -41,7 +98,7 @@ function markerIcon(report) {
   const estado = report.estado === 'perdido' ? 'lost' : 'found';
   return L.divIcon({
     className: 'animal-marker-wrap',
-    html: `<span class="animal-marker ${estado}"><span class="animal-face">${animal}</span><span class="animal-collar" style="background:${collar}"></span></span>`,
+    html: `<span class="animal-marker ${estado}"><span class="animal-face"><span class="animal-emoji">${animal}</span><span class="animal-collar" style="background:${collar}"></span></span></span>`,
     iconSize: [42, 48],
     iconAnchor: [21, 44],
     popupAnchor: [0, -42]
@@ -627,7 +684,8 @@ function mostrarVista(tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   vista.classList.add('active');
   document.querySelectorAll('.bottom-nav button').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === tab);
+    const esMapaPrincipal = tab === 'home' && b.dataset.homeMode === 'map';
+    b.classList.toggle('active', esMapaPrincipal || (!b.dataset.homeMode && b.dataset.tab === tab));
   });
   document.querySelectorAll('.drawer-item[data-vista]').forEach(b => {
     b.classList.toggle('active', b.dataset.vista === tab);
@@ -665,7 +723,10 @@ function mostrarVista(tab) {
 document
   .querySelectorAll('.bottom-nav button, .drawer-item[data-vista], .home-action[data-tab]')
   .forEach(btn => {
-    btn.addEventListener('click', () => mostrarVista(btn.dataset.tab || btn.dataset.vista));
+    btn.addEventListener('click', () => {
+      mostrarVista(btn.dataset.tab || btn.dataset.vista);
+      if (btn.dataset.homeMode) mostrarVistaHome(btn.dataset.homeMode === 'map');
+    });
   });
 
 /* ============ Geolocalización ============ */
@@ -1278,6 +1339,15 @@ async function fetchReports() {
   const tipo = document.getElementById('filter-tipo').value;
   const estado = document.getElementById('filter-estado').value;
   const q = (document.getElementById('search-text').value || '').trim();
+  if (DEMO_MODE) {
+    allReports = DEMO_REPORTS.filter(
+      report =>
+        (!tipo || report.tipo === tipo) &&
+        (!estado || report.estado === estado) &&
+        (!q || `${report.color} ${report.raza} ${report.descripcion}`.toLowerCase().includes(q.toLowerCase()))
+    );
+    return;
+  }
   const qs = new URLSearchParams();
   if (tipo) qs.set('tipo', tipo);
   if (estado) qs.set('estado', estado);
@@ -1286,15 +1356,23 @@ async function fetchReports() {
   allReports = reports.sort((a, b) => b.created_at - a.created_at);
 }
 function reportCard(r) {
+  const nombre = r.nombre ? esc(r.nombre) : `${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}`;
+  const ubicacion = r.ubicacion ? esc(r.ubicacion) : '';
+  const avatar = TIPO_MARKER[r.tipo] || TIPO_MARKER.otro;
+  const colorCollar = COLLAR_COLOR[String(r.collar || '').toLowerCase()] || '';
+  const collarAvatar = colorCollar
+    ? `<span class="pet-avatar-collar" style="background:${colorCollar}"></span>`
+    : '';
   return `
     <div class="report-card ${r.estado === 'perdido' ? 'lost' : ''}" data-id="${esc(r.id)}">
-      ${r.foto_url ? `<img src="${esc(fotoSrc(r.foto_url))}" alt="" loading="lazy">` : `<div class="ph-placeholder">${TIPO_ICON[r.tipo] || '🐾'}</div>`}
+      ${r.foto_url ? `<img src="${esc(fotoSrc(r.foto_url))}" alt="" loading="lazy">` : `<div class="ph-placeholder pet-avatar"><span class="pet-avatar-face"><span class="pet-avatar-emoji">${avatar}</span>${collarAvatar}</span></div>`}
       <div class="report-body">
         <div class="report-top">
-          <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}${r.raza ? ' · ' + esc(r.raza) : ''}</h4>
-          <span class="tag ${r.estado === 'perdido' ? 'lost' : 'found'}">${r.estado === 'perdido' ? 'Perdido' : 'Encontrado'}</span>
+          <h4>${nombre}</h4>
+          <span class="report-time">${timeAgo(r.created_at)}</span>
         </div>
-        <div class="report-meta">${r.sexo !== 'desconocido' ? { macho: 'Macho', hembra: 'Hembra' }[r.sexo] + ' · ' : ''}${r.collar ? 'Collar ' + esc(r.collar) + ' · ' : ''}${timeAgo(r.created_at)}${r.radio_km ? ' · 🔍 ~' + esc(r.radio_km) + ' km' : ''}</div>
+        <div class="report-meta report-summary">${TIPO_ICON[r.tipo] || '🐾'} ${r.raza ? esc(r.raza) : esc(r.tipo)} · ${esc(r.color)}${r.collar ? ' · Collar ' + esc(r.collar) : ''}</div>
+        ${ubicacion ? `<div class="report-location">${ico('pin')} ${ubicacion}</div>` : ''}
         ${r.descripcion ? `<div class="report-meta">${esc(r.descripcion)}</div>` : ''}
         <div class="report-actions">
           ${
@@ -1311,6 +1389,7 @@ function reportCard(r) {
           <button data-action="send" data-id="${esc(r.id)}">Enviar mensaje</button>
         </div>
       </div>
+      <span class="report-chevron" aria-hidden="true">›</span>
     </div>`;
 }
 async function renderList() {
@@ -1433,9 +1512,9 @@ document.getElementById('reports-list').addEventListener('click', e => {
 
 async function renderListMap() {
   if (!listMap) {
-    listMap = L.map('list-map').setView([userLoc.lat, userLoc.lng], 12);
+    listMap = L.map('list-map').setView([userLoc.lat, userLoc.lng], DEMO_MODE ? 13 : 12);
     agregarCapaTiles(listMap);
-    clusterGroup = L.markerClusterGroup();
+    clusterGroup = DEMO_MODE ? L.layerGroup() : L.markerClusterGroup();
     listMap.addLayer(clusterGroup);
     setTimeout(() => listMap.invalidateSize(), 200);
     pintarMarcadorUsuario();
@@ -1475,6 +1554,10 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
 function mostrarVistaHome(conMapa) {
   document.getElementById('btn-view-map').classList.toggle('active', conMapa);
   document.getElementById('btn-view-list').classList.toggle('active', !conMapa);
+  document.getElementById('view-home').classList.toggle('home-list-mode', !conMapa);
+  document.querySelectorAll('.bottom-nav button[data-home-mode]').forEach(button => {
+    button.classList.toggle('active', button.dataset.homeMode === (conMapa ? 'map' : 'list'));
+  });
   document.getElementById('list-map').style.display = conMapa ? 'block' : 'none';
   if (conMapa) setTimeout(() => listMap && listMap.invalidateSize(), 50);
 }
@@ -1843,14 +1926,15 @@ function aplicarTema(tema) {
   if (icono) icono.innerHTML = ico(oscuro ? 'sun' : 'moon');
   const btn = document.getElementById('btn-theme');
   if (btn) btn.title = oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+  const etiqueta = document.getElementById('theme-label');
+  if (etiqueta) etiqueta.innerHTML = oscuro ? 'Modo<br>claro' : 'Modo<br>nocturno';
   // La barra del sistema (Android) sigue al tema elegido.
   const meta = document.getElementById('meta-theme');
   if (meta) meta.content = oscuro ? '#14181a' : '#f5f2eb';
 }
 function initTema() {
   const guardado = localStorage.getItem('rastro_tema');
-  const prefiereOscuro = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  aplicarTema(guardado || (prefiereOscuro ? 'dark' : 'light'));
+  aplicarTema(guardado || 'light');
 }
 document.getElementById('btn-theme').addEventListener('click', () => {
   const nuevo = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
@@ -1860,30 +1944,57 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 
 /* ============ Instalar como app (PWA) ============ */
 let deferredInstall = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredInstall = e;
-  document.getElementById('btn-install').classList.remove('hidden');
-});
-window.addEventListener('appinstalled', () => {
-  deferredInstall = null;
-  document.getElementById('btn-install').classList.add('hidden');
-});
-document.getElementById('btn-install').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-install');
+
+function appEstaInstalada() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function actualizarControlesInstalacion() {
+  const instalada = appEstaInstalada();
+  document.getElementById('auth-install').classList.toggle('hidden', instalada);
+  document.getElementById('btn-install').classList.toggle('hidden', instalada || !deferredInstall);
+}
+
+function ayudaInstalacionManual() {
+  const apple = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  return apple
+    ? 'En Safari, toca Compartir y luego “Añadir a pantalla de inicio”.'
+    : 'Abre el menú del navegador y elige “Instalar aplicación” o “Añadir a pantalla de inicio”.';
+}
+
+async function instalarApp() {
+  if (appEstaInstalada()) {
+    toast('Rastro ya está instalada en este dispositivo.');
+    actualizarControlesInstalacion();
+    return;
+  }
   if (!deferredInstall) {
-    btn.classList.add('hidden');
+    toast(ayudaInstalacionManual());
     return;
   }
   deferredInstall.prompt();
   try {
     await deferredInstall.userChoice;
-  } catch (e) {
-    /* ignore */
+  } catch (_) {
+    /* El navegador cerró el diálogo de instalación. */
   }
   deferredInstall = null;
-  btn.classList.add('hidden');
+  actualizarControlesInstalacion();
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  actualizarControlesInstalacion();
 });
+window.addEventListener('appinstalled', () => {
+  deferredInstall = null;
+  actualizarControlesInstalacion();
+});
+['btn-install', 'btn-install-auth'].forEach(id =>
+  document.getElementById(id).addEventListener('click', instalarApp)
+);
+actualizarControlesInstalacion();
 
 /* ============ Privacidad ============ */
 // El modal está fuera de #app: se abre tanto desde el menú de Opciones como
@@ -2534,7 +2645,7 @@ function startApp() {
     }
     appIniciada = true;
   }
-  locateUser();
+  if (!DEMO_MODE) locateUser();
   // Guarda la última ubicación (difuminada) para las alertas de zona. Es
   // silencioso y con umbral: no bloquea ni escribe en cada apertura.
   guardarUbicacionDeZona();
@@ -2615,6 +2726,13 @@ async function validarSesion(intentos = 2) {
   await loadConfig();
 
   const params = new URLSearchParams(location.search);
+  if (DEMO_MODE) {
+    userLoc = { lat: -34.6037, lng: -58.4218 };
+    document.body.classList.add('demo-mode');
+    showApp();
+    startApp();
+    return;
+  }
   if (params.get('verified') === '1') toast('¡Correo confirmado! Ya puedes publicar.');
   if (params.get('verified') === '0') toast('El enlace de confirmación venció o ya se usó.');
   if (params.get('reset')) {
