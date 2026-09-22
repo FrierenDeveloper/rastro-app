@@ -2563,6 +2563,31 @@ body.theme-dark .mode-toggle {
   font-weight: 300;
   line-height: 1;
 }
+/* En los avisos de mascota perdida, a la derecha va el termómetro: recuerda que
+   la tarjeta enciende la zona de búsqueda sugerida al tocarla. */
+.report-heat {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 58px;
+  flex: none;
+  color: #b5462a;
+  text-align: center;
+}
+.report-heat .ic {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.9;
+}
+.report-heat small {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
 .map-carousel-dots {
   position: absolute;
   bottom: 18px;

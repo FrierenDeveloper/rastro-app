@@ -1442,7 +1442,11 @@ function reportCard(r) {
           <button data-action="send" data-id="${esc(r.id)}">Enviar mensaje</button>
         </div>
       </div>
-      <span class="report-chevron" aria-hidden="true">›</span>
+      ${
+        r.estado === 'perdido'
+          ? `<span class="report-heat" title="Zona de búsqueda sugerida">${ico('thermometer')}<small>Zona posible</small></span>`
+          : '<span class="report-chevron" aria-hidden="true">›</span>'
+      }
     </div>`;
 }
 async function renderList() {
