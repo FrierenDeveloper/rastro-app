@@ -33,6 +33,7 @@ let allReports = [];
 let myReports = [];
 let currentConv = { reportId: null, peerId: null, esMio: false, poll: null };
 let editingId = null;
+let zonaCalor = { id: null, capas: [] };
 
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
 const TIPO_MARKER = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', otro: '🐾' };
@@ -1397,7 +1398,14 @@ async function fetchReports() {
   if (estado) qs.set('estado', estado);
   if (q) qs.set('q', q);
   const { reports } = await api('/api/reports?' + qs.toString());
-  allReports = reports.sort((a, b) => b.created_at - a.created_at);
+  allReports = reports.sort((a, b) => b.created_at - a.created_at).map(conNombre);
+}
+
+// La API expone el nombre de la mascota como `nombre_mascota`; las tarjetas y
+// los datos de demostración leen `r.nombre`. Se unifica en un solo punto para
+// que el nombre se vea siempre, sin tocar cada lugar que lo usa.
+function conNombre(r) {
+  return { ...r, nombre: r.nombre_mascota || r.nombre || null };
 }
 function reportCard(r) {
   const nombre = r.nombre ? esc(r.nombre) : `${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}`;
@@ -1424,6 +1432,7 @@ function reportCard(r) {
               ? `<button data-action="matches" data-id="${esc(r.id)}">Coincidencias</button>`
               : `<button data-action="contact" data-id="${esc(r.id)}">Contactar</button><button data-action="flag" data-id="${esc(r.id)}">Reportar</button>`
           }
+          ${r.estado === 'perdido' ? `<button data-action="heat" data-id="${esc(r.id)}">Zona de búsqueda</button>` : ''}
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
         </div>
         <div class="matches-box" id="matches-${esc(r.id)}" style="display:none;"></div>
@@ -1437,6 +1446,7 @@ function reportCard(r) {
     </div>`;
 }
 async function renderList() {
+  limpiarZonaCalor();
   await fetchReports();
   const el = document.getElementById('reports-list');
   if (allReports.length === 0) {
@@ -1497,6 +1507,7 @@ async function sendContact(id) {
     await api(`/api/reports/${id}/messages`, { method: 'POST', body });
     toast('Mensaje enviado. Lo verás en "Chats".');
     ta.value = '';
+    card.querySelector('.contact-loc').checked = false;
     document.getElementById('contact-' + id).classList.add('hidden');
     actualizarBadgeChats();
   } catch (ex) {
@@ -1533,25 +1544,36 @@ async function flagReport(id) {
 
 document.getElementById('reports-list').addEventListener('click', e => {
   const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  const id = btn.dataset.id;
-  switch (btn.dataset.action) {
-    case 'matches':
-      toggleMatches(id);
-      break;
-    case 'contact':
-      toggleContact(id);
-      break;
-    case 'send':
-      sendContact(id);
-      break;
-    case 'share':
-      shareReport(id);
-      break;
-    case 'flag':
-      flagReport(id);
-      break;
+  if (btn) {
+    const id = btn.dataset.id;
+    switch (btn.dataset.action) {
+      case 'matches':
+        toggleMatches(id);
+        break;
+      case 'contact':
+        toggleContact(id);
+        break;
+      case 'send':
+        sendContact(id);
+        break;
+      case 'share':
+        shareReport(id);
+        break;
+      case 'flag':
+        flagReport(id);
+        break;
+      case 'heat':
+        toggleHeat(id);
+        break;
+    }
+    return;
   }
+  // En el mapa las tarjetas no muestran botones: tocar una de una mascota
+  // perdida enciende (o apaga) su zona de búsqueda sugerida.
+  if (e.target.closest('button, input, textarea, select, a, .contact-box, .matches-box')) return;
+  const card = e.target.closest('.report-card');
+  const enMapa = !document.getElementById('view-home').classList.contains('home-list-mode');
+  if (card && enMapa) toggleHeat(card.dataset.id);
 });
 
 async function renderListMap() {
@@ -1607,6 +1629,84 @@ function mostrarVistaHome(conMapa) {
 }
 document.getElementById('btn-view-map').addEventListener('click', () => mostrarVistaHome(true));
 document.getElementById('btn-view-list').addEventListener('click', () => mostrarVistaHome(false));
+
+/* ============ Zona de búsqueda sugerida (mapa) ============ */
+// Al tocar un aviso de mascota perdida se dibuja en el mapa la zona donde los
+// estudios sugieren buscarla (ver docs/RADIO_DE_BUSQUEDA.md y backend/busqueda.js).
+// Es opcional: el mismo toque la muestra y la esconde. La primera vez de cada
+// sesión (token de ingreso) se avisa de que es una referencia, no una regla.
+const ZONA_INTRO_KEY = 'rastro_zona_intro';
+
+function limpiarZonaCalor() {
+  if (listMap) zonaCalor.capas.forEach(capa => listMap.removeLayer(capa));
+  zonaCalor = { id: null, capas: [] };
+}
+
+// Tres anillos concéntricos: el degradado hace de "mapa de calor" sin librerías.
+function dibujarZonaCalor(r) {
+  const km = r.radio_km || radioBusquedaKm(r.tipo, r.perdido_hace_horas || 0);
+  const centro = [r.lat, r.lng];
+  const anillos = [
+    { f: 1, color: '#f2a03d', op: 0.1 },
+    { f: 0.66, color: '#e8763a', op: 0.13 },
+    { f: 0.33, color: '#d84a2f', op: 0.16 }
+  ];
+  return anillos.map(a =>
+    L.circle(centro, {
+      radius: km * 1000 * a.f,
+      color: '#c8452c',
+      weight: 1,
+      opacity: 0.5,
+      fillColor: a.color,
+      fillOpacity: a.op,
+      interactive: false
+    }).addTo(listMap)
+  );
+}
+
+function toggleHeat(id) {
+  const r = allReports.find(x => x.id === id);
+  if (!r || r.estado !== 'perdido' || !listMap) return;
+  if (zonaCalor.id === id) {
+    limpiarZonaCalor();
+    return;
+  }
+  limpiarZonaCalor();
+  mostrarVistaHome(true);
+  zonaCalor.id = id;
+  zonaCalor.capas = dibujarZonaCalor(r);
+  const borde = zonaCalor.capas[0];
+  setTimeout(() => {
+    if (listMap && borde) listMap.fitBounds(borde.getBounds(), { padding: [40, 40], maxZoom: 15 });
+  }, 120);
+  if (zonaIntroPendiente()) {
+    abrirZonaIntro();
+    marcarZonaIntro();
+  }
+}
+
+// El aviso informativo se muestra una sola vez por token de ingreso: se guarda
+// el token actual y no vuelve a salir hasta que se inicie sesión de nuevo.
+function zonaIntroPendiente() {
+  try {
+    return Boolean(token) && localStorage.getItem(ZONA_INTRO_KEY) !== token;
+  } catch (e) {
+    return false;
+  }
+}
+function marcarZonaIntro() {
+  try {
+    localStorage.setItem(ZONA_INTRO_KEY, token || '');
+  } catch (e) {
+    /* modo privado: se volverá a mostrar, no es crítico */
+  }
+}
+function abrirZonaIntro() {
+  document.getElementById('zona-intro').classList.remove('hidden');
+}
+document.getElementById('btn-zona-intro-close').addEventListener('click', () => {
+  document.getElementById('zona-intro').classList.add('hidden');
+});
 
 /* ============ Chats ============ */
 function actualizarBadgeChats() {
@@ -1743,7 +1843,7 @@ function avisosHTML(reports, vacio, previos = false) {
     .map(
       r => `
       <div class="inbox-item${previos ? ' previous-item' : ''}" data-id="${esc(r.id)}">
-        <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}
+        <h4>${TIPO_ICON[r.tipo] || '🐾'} ${r.nombre_mascota ? esc(r.nombre_mascota) + ' · ' : ''}${esc(r.color)}
           ${r.resolved ? '<span class="tag resolved">Resuelto</span>' : ''}
           ${previos ? '<span class="tag previous">Previo</span>' : ''}
           ${r.unread ? `<span class="unread-dot">${r.unread}</span>` : ''}
@@ -2540,7 +2640,15 @@ document.getElementById('btn-resend-verify').addEventListener('click', async () 
   try {
     const r = await api('/api/auth/resend-verification', { method: 'POST' });
     toast(r.message);
-    if (me) me.email_verified = true;
+    // No damos por confirmado el correo solo porque se reenvió el enlace: con un
+    // proveedor de correo real el servidor solo lo manda, no lo verifica. Se
+    // consulta el estado real y así el aviso no desaparece antes de tiempo.
+    try {
+      const { user } = await api('/api/auth/me');
+      if (user) me = user;
+    } catch (e) {
+      /* si no se puede comprobar, dejamos el aviso como estaba */
+    }
     actualizarBannerVerificacion();
   } catch (ex) {
     toast(ex.message);
@@ -2716,11 +2824,12 @@ async function abrirDeepLink() {
   if (!enLista) {
     try {
       const { report } = await api(`/api/reports/${encodeURIComponent(rid)}`);
-      allReports.unshift(report);
+      const normalizado = conNombre(report);
+      allReports.unshift(normalizado);
       const el = document.getElementById('reports-list');
       const vacio = el.querySelector('.empty-state');
-      if (vacio) el.innerHTML = reportCard(report);
-      else el.insertAdjacentHTML('afterbegin', reportCard(report));
+      if (vacio) el.innerHTML = reportCard(normalizado);
+      else el.insertAdjacentHTML('afterbegin', reportCard(normalizado));
     } catch (e) {
       toast('Ese aviso ya no está disponible.');
       return;
