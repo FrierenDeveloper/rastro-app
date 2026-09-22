@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 // Clave de rate limiting.
 //
 // Hallazgo de auditoría: con la configuración anterior, todos los límites se
@@ -72,6 +74,24 @@ function normalizarCuenta(email) {
   return `${sinAlias}@${dominio}`;
 }
 
+// Longitud a partir de la cual una credencial se resume con un hash en vez de
+// usarse tal cual. Se eligió corta a propósito: las claves de express-rate-limit
+// acaban en memoria y no aporta nada guardar un JWT entero.
+const LARGO_MAXIMO = 64;
+
+// Resume una credencial larga en un hash estable.
+//
+// Hallazgo de auditoría: antes se hacía `valor.slice(0, 120)`, y eso hacía que
+// dos credenciales distintas con los mismos 120 primeros caracteres cayeran en
+// el MISMO cupo. Con los JWT de Google pasa siempre: todos comparten cabecera
+// (`eyJhbGciOiJSUzI1NiIs...`), así que varias cuentas quedaban mezcladas en un
+// cupo común y se agotaban entre ellas. Un hash evita la colisión sin alargar
+// la clave.
+function resumir(valor) {
+  if (valor.length <= LARGO_MAXIMO) return valor;
+  return crypto.createHash('sha256').update(valor).digest('hex');
+}
+
 // Clave del cupo por cuenta (login / registro / recuperar contraseña / reset /
 // Google). A propósito NO lleva la IP: el cupo es el mismo venga de donde venga
 // la petición, para que la fuerza bruta distribuida contra una cuenta choque
@@ -82,7 +102,7 @@ function normalizarCuenta(email) {
 function keyPorCuenta(req) {
   const cuerpo = req.body || {};
   if (typeof cuerpo.email === 'string' && cuerpo.email.trim()) {
-    return 'cuenta:' + normalizarCuenta(cuerpo.email).slice(0, 120);
+    return 'cuenta:' + resumir(normalizarCuenta(cuerpo.email));
   }
   const valor =
     typeof cuerpo.token === 'string'
@@ -90,7 +110,7 @@ function keyPorCuenta(req) {
       : typeof cuerpo.credential === 'string'
         ? cuerpo.credential
         : '';
-  if (valor.trim()) return 'valor:' + valor.trim().slice(0, 120);
+  if (valor.trim()) return 'valor:' + resumir(valor.trim());
   return 'ip:' + ipReal(req);
 }
 

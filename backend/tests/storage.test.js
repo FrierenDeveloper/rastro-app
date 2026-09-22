@@ -312,15 +312,34 @@ describe('modo Supabase Storage', () => {
     expect(bajasFalsas.remove).toHaveBeenCalledWith(['carpeta/foto.jpg']);
   });
 
-  it('no toca el bucket si la URL es de otro bucket o de otro sitio', async () => {
+  // Hallazgo: antes se comparaba contra el BUCKET actual, así que una foto subida
+  // cuando el operador usaba otro bucket nunca se borraba (se quedaba huérfana y
+  // seguía ocupando cuota para siempre).
+  it('borra también las URLs de OTRO bucket, sacando el bucket de la propia URL', async () => {
+    const recargado = cargarStorage({ supabase: true });
+
+    await recargado.deletePhoto('https://proyecto.supabase.co/storage/v1/object/public/otros/foto.jpg');
+
+    expect(clienteSupabaseFalso.storage.from).toHaveBeenCalledWith('otros');
+    expect(bajasFalsas.remove).toHaveBeenCalledWith(['foto.jpg']);
+  });
+
+  it('no toca el bucket si la URL es de otro sitio (no de Storage)', async () => {
     const recargado = cargarStorage({ supabase: true });
     const borrarDisco = vi.spyOn(fs, 'unlinkSync');
 
-    await recargado.deletePhoto('https://proyecto.supabase.co/storage/v1/object/public/otros/foto.jpg');
     await recargado.deletePhoto('https://cdn.test/foto.jpg');
 
     expect(bajasFalsas.remove).not.toHaveBeenCalled();
     expect(borrarDisco).not.toHaveBeenCalled();
+  });
+
+  it('una URL sin ruta de archivo tras el bucket no borra nada', async () => {
+    const recargado = cargarStorage({ supabase: true });
+
+    await recargado.deletePhoto('https://proyecto.supabase.co/storage/v1/object/public/otros/');
+
+    expect(bajasFalsas.remove).not.toHaveBeenCalled();
   });
 
   it('no borra cuando la URL termina justo en la carpeta (sin nombre de archivo)', async () => {
@@ -329,6 +348,29 @@ describe('modo Supabase Storage', () => {
     await recargado.deletePhoto('https://proyecto.supabase.co/storage/v1/object/public/fotos/');
 
     expect(bajasFalsas.remove).not.toHaveBeenCalled();
+  });
+
+  // La ruta tiene que llegar hasta el FINAL de la URL: sin el ancla `$`, algo
+  // como ".../fotos/foto.jpg/algo" se leería como ruta "foto.jpg/algo" y se
+  // intentaría borrar una ruta que el operador nunca guardó así.
+  it('la ruta termina en el fin de la URL, sin recortes intermedios', async () => {
+    const recargado = cargarStorage({ supabase: true });
+
+    await recargado.deletePhoto(
+      'https://proyecto.supabase.co/storage/v1/object/public/fotos/carpeta/foto.jpg'
+    );
+
+    expect(bajasFalsas.remove).toHaveBeenCalledWith(['carpeta/foto.jpg']);
+  });
+
+  it('una URL con texto detrás del nombre usa la ruta completa, no un recorte', async () => {
+    const recargado = cargarStorage({ supabase: true });
+
+    await recargado.deletePhoto(
+      'https://proyecto.supabase.co/storage/v1/object/public/fotos/carpeta/foto.jpg/extra'
+    );
+
+    expect(bajasFalsas.remove).toHaveBeenCalledWith(['carpeta/foto.jpg/extra']);
   });
 
   it('un error de Supabase al borrar no se propaga', async () => {

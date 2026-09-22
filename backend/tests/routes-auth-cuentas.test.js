@@ -323,7 +323,11 @@ describe('POST /google · cuenta nueva', () => {
     expect(busquedas).toBe(2);
   });
 
-  it('si el INSERT choca y la cuenta tampoco aparece, responde 500', async () => {
+  // Hallazgo: aquí `user` quedaba indefinido y el `user.id` de la respuesta
+  // lanzaba un TypeError (un 500 por accidente, fuera de todo control). Ahora
+  // se lanza un error explícito, así que el 500 lo produce el manejador global
+  // y la petición nunca queda a medias.
+  it('si el INSERT choca y la cuenta tampoco aparece, responde 500 y no un TypeError', async () => {
     prepararBase(async sql => {
       if (sql === SQL_INSERT_GOOGLE) {
         const error = new Error('llave duplicada');
@@ -335,6 +339,31 @@ describe('POST /google · cuenta nueva', () => {
 
     const res = await conIp(pedir(app).post('/api/auth/google')).send({ credential: credencial() });
 
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual(MENSAJE_500);
+    expect(res.body.token).toBeUndefined();
+  });
+
+  // La rebúsqueda también puede correr con el `google_sub` aún sin enlazar: el
+  // 23505 no puede dejar la petición a medias en ningún caso.
+  it('un 23505 cuya rebúsqueda devuelve filas vacías no revienta con TypeError', async () => {
+    let busquedas = 0;
+    prepararBase(async sql => {
+      if (sql.includes(SQL_BUSCAR_GOOGLE)) {
+        busquedas += 1;
+        return { rows: [] };
+      }
+      if (sql === SQL_INSERT_GOOGLE) {
+        const error = new Error('llave duplicada');
+        error.code = '23505';
+        throw error;
+      }
+      return { rows: [] };
+    });
+
+    const res = await conIp(pedir(app).post('/api/auth/google')).send({ credential: credencial() });
+
+    expect(busquedas).toBe(2);
     expect(res.status).toBe(500);
     expect(res.body).toStrictEqual(MENSAJE_500);
   });

@@ -208,6 +208,19 @@ describe('requireVerified', () => {
     expect(db.query).toHaveBeenCalledWith('SELECT email_verified FROM users WHERE id = $1', ['u']);
   });
 
+  // La comprobación exige exactamente `true`. Antes se comparaba contra `false`,
+  // así que cualquier otro falsy (0, null, cadena vacía) colaba sin bloquear, y
+  // un `1` tampoco debe valer: la columna es `boolean` en Postgres.
+  it.each([0, 1, null, undefined, '', 'false'])('un %s no confirma la cuenta: 403', async valor => {
+    db.query.mockResolvedValue({ rows: [{ email_verified: valor }] });
+    const res = resFalsa();
+    const next = vi.fn();
+    await requireVerified({ userId: 'u' }, res, next);
+
+    expect(res.codigo).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('un fallo de la base se propaga a next', async () => {
     const fallo = new Error('caída');
     db.query.mockRejectedValue(fallo);

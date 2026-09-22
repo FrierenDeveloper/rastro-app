@@ -424,6 +424,11 @@ router.post(
         user = inserted.rows.length
           ? { id, email, phone: null, token_version: 0 }
           : (await buscarUsuario()).rows[0];
+        // El 23505 dice que el correo ya existe, pero la rebúsqueda puede volver
+        // vacía. Antes eso dejaba `user` indefinido y el `user.id` de la
+        // respuesta lanzaba un TypeError fuera de todo control; ahora se corta
+        // aquí con un error explícito que el manejador global convierte en 500.
+        if (!user) throw new Error('[auth/google] el correo ya existia pero no se pudo recuperar la cuenta');
       } else if (!user.google_sub && info.sub) {
         await db.query('UPDATE users SET google_sub = $1 WHERE id = $2', [info.sub, user.id]);
       }

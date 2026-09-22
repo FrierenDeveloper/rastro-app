@@ -44,12 +44,26 @@ async function savePhoto(buffer, mimetype) {
   return `/uploads/${filename}`;
 }
 
+// Saca bucket y ruta de una URL pública de Supabase Storage:
+//
+//   https://<proyecto>.supabase.co/storage/v1/object/public/<bucket>/<ruta>
+//
+// El bucket se lee de la PROPIA URL, no de la constante BUCKET: si el operador
+// cambia SUPABASE_BUCKET, las fotos subidas con el bucket anterior se quedaban
+// sin borrar nunca (huérfanas ocupando cuota para siempre).
+function partesDeUrlSupabase(fotoUrl) {
+  const re = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;
+  const m = re.exec(fotoUrl);
+  if (!m) return null;
+  return { bucket: decodeURIComponent(m[1]), ruta: decodeURIComponent(m[2]) };
+}
+
 async function deletePhoto(fotoUrl) {
   if (!fotoUrl) return;
   try {
-    if (useSupabase && fotoUrl.includes(`/storage/v1/object/public/${BUCKET}/`)) {
-      const filename = fotoUrl.split(`/storage/v1/object/public/${BUCKET}/`)[1];
-      if (filename) await supabase.storage.from(BUCKET).remove([filename]);
+    const partes = partesDeUrlSupabase(fotoUrl);
+    if (useSupabase && partes) {
+      await supabase.storage.from(partes.bucket).remove([partes.ruta]);
     } else if (fotoUrl.startsWith('/uploads/')) {
       const p = path.join(localDir, path.basename(fotoUrl));
       if (fs.existsSync(p)) fs.unlinkSync(p);

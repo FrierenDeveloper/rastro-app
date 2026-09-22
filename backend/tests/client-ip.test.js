@@ -307,11 +307,25 @@ describe('keyPorCuenta: prioridad correo > token/credential > IP', () => {
     );
   });
 
-  it('recorta la cuenta a 120 caracteres', () => {
+  // Hallazgo de auditoría: antes la cuenta se recortaba con slice(0, 120), así que
+  // dos correos largos con los mismos 120 primeros caracteres compartían cupo.
+  // Ahora se resume con un hash: la clave es corta pero no colisiona.
+  it('un correo larguísimo se resume en un hash corto y estable', () => {
     const correo = 'a'.repeat(200) + '@x.com';
     const clave = keyPorCuenta(reqFalsa({ body: { email: correo } }));
-    expect(clave).toBe('cuenta:' + 'a'.repeat(120));
-    expect(clave).toHaveLength('cuenta:'.length + 120);
+
+    expect(clave.startsWith('cuenta:')).toBe(true);
+    expect(clave.length).toBeLessThanOrEqual('cuenta:'.length + 64);
+    // Estable: el mismo correo produce siempre la misma clave.
+    expect(keyPorCuenta(reqFalsa({ body: { email: correo } }))).toBe(clave);
+  });
+
+  it('dos correos que comparten los primeros 120 caracteres NO comparten cupo', () => {
+    const prefijo = 'a'.repeat(200);
+    const claveUna = keyPorCuenta(reqFalsa({ body: { email: prefijo + 'uno@x.com' } }));
+    const claveOtra = keyPorCuenta(reqFalsa({ body: { email: prefijo + 'dos@x.com' } }));
+
+    expect(claveUna).not.toBe(claveOtra);
   });
 
   it('un correo de solo espacios no cuenta: se usa el respaldo', () => {
@@ -339,11 +353,49 @@ describe('keyPorCuenta: prioridad correo > token/credential > IP', () => {
     expect(keyPorCuenta(reqFalsa({ body: { token: '  tok-1  ' } }))).toBe('valor:tok-1');
   });
 
-  it('recorta el token a 120 caracteres', () => {
+  // Los JWT de Google comparten cabecera (los primeros caracteres son idénticos),
+  // así que recortar por prefijo metía a todas las cuentas en el mismo cupo.
+  it('dos tokens largos con la misma cabecera NO comparten cupo', () => {
+    const cabecera = 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYyJ9.' + 'A'.repeat(200);
+    const claveUna = keyPorCuenta(reqFalsa({ body: { credential: cabecera + 'uno' } }));
+    const claveOtra = keyPorCuenta(reqFalsa({ body: { credential: cabecera + 'dos' } }));
+
+    expect(claveUna.startsWith('valor:')).toBe(true);
+    expect(claveUna.length).toBeLessThanOrEqual('valor:'.length + 64);
+    expect(claveUna).not.toBe(claveOtra);
+  });
+
+  it('un token largo se resume en un hash corto y estable', () => {
     const token = 't'.repeat(200);
     const clave = keyPorCuenta(reqFalsa({ body: { token } }));
-    expect(clave).toBe('valor:' + 't'.repeat(120));
-    expect(clave).toHaveLength('valor:'.length + 120);
+
+    expect(clave.startsWith('valor:')).toBe(true);
+    expect(clave.length).toBeLessThanOrEqual('valor:'.length + 64);
+    expect(keyPorCuenta(reqFalsa({ body: { token } }))).toBe(clave);
+  });
+
+  // Las claves cortas se dejan tal cual: hashear todo haría ilegible el cupo de
+  // los casos normales sin ganar nada, porque no hay colisión que evitar.
+  it('un token corto se usa tal cual, sin hashear', () => {
+    expect(keyPorCuenta(reqFalsa({ body: { token: 'tok-1' } }))).toBe('valor:tok-1');
+  });
+
+  // Frontera exacta del umbral: con 64 caracteres todavía NO se hashea (se
+  // devuelve tal cual) y con 65 sí. Sin los dos casos, un `<` en vez de `<=`
+  // pasaría desapercibido.
+  it('con exactamente 64 caracteres el token se deja tal cual', () => {
+    const token = 't'.repeat(64);
+
+    expect(keyPorCuenta(reqFalsa({ body: { token } }))).toBe('valor:' + token);
+  });
+
+  it('con 65 caracteres el token ya se resume con un hash', () => {
+    const token = 't'.repeat(65);
+    const clave = keyPorCuenta(reqFalsa({ body: { token } }));
+
+    expect(clave).not.toBe('valor:' + token);
+    expect(clave.startsWith('valor:')).toBe(true);
+    expect(clave).toHaveLength('valor:'.length + 64);
   });
 
   it('un token de solo espacios no cuenta: se usa el respaldo', () => {

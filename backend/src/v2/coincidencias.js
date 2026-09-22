@@ -9,10 +9,7 @@
 
 const { buscarCoincidencias, RADIO_TOPE_KM } = require('./matching');
 const { esDuplicado } = require('./phash');
-
-const KM_POR_GRADO = 111.32;
-// En latitudes polares el coseno tiende a 0 y la caja se dispararía; se acota.
-const COS_MINIMO = 0.1;
+const { KM_POR_GRADO, COS_MINIMO } = require('./geo');
 
 // Caja geográfica (bounding box) que cubre el radio máximo de emparejamiento.
 // Sirve para no recorrer toda la tabla: primero se filtra por el cuadro y luego

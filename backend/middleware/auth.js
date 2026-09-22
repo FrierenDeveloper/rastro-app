@@ -48,11 +48,15 @@ function optionalAuth(req, res, next) {
 
 // Exige que la cuenta tenga el correo confirmado. Se usa en las acciones que
 // más abusa el spam (publicar avisos, mandar mensajes, reportar).
+//
+// La comprobación es `!== true` a propósito: con `=== false` cualquier otro
+// valor falsy (0, null, cadena vacía) colaba sin bloquear la petición. Ante la
+// duda, se bloquea.
 async function requireVerified(req, res, next) {
   try {
     const r = await db.query('SELECT email_verified FROM users WHERE id = $1', [req.userId]);
     if (!r.rows[0]) return res.status(401).json({ error: 'Sesión inválida o expirada.' });
-    if (r.rows[0].email_verified === false) {
+    if (r.rows[0].email_verified !== true) {
       return res
         .status(403)
         .json({ error: 'Confirma tu correo para poder publicar. Revisa tu bandeja de entrada.' });
