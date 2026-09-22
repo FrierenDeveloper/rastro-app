@@ -197,6 +197,9 @@ describe('init', () => {
       'CREATE TABLE IF NOT EXISTS push_subscriptions',
       'CREATE TABLE IF NOT EXISTS report_flags',
       'CREATE TABLE IF NOT EXISTS zone_alerts',
+      'CREATE TABLE IF NOT EXISTS chip_registrations',
+      'CREATE TABLE IF NOT EXISTS chip_scan_events',
+      'CREATE TABLE IF NOT EXISTS data_access_log',
       'email TEXT UNIQUE NOT NULL',
       'password_hash TEXT NOT NULL',
       'google_sub TEXT',
@@ -266,20 +269,28 @@ describe('init', () => {
       'CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id)',
       'CREATE INDEX IF NOT EXISTS idx_emailverif_user ON email_verifications(user_id)',
       'CREATE INDEX IF NOT EXISTS idx_zone_alertas ON zone_alerts(lat, lng)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_chip_registros_activo',
+      'CREATE INDEX IF NOT EXISTS idx_chip_registros_dueno ON chip_registrations(owner_user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_chip_escaneos_hash ON chip_scan_events(chip_hash)',
+      'CREATE INDEX IF NOT EXISTS idx_chip_escaneos_fecha ON chip_scan_events(scanned_at)',
+      'CREATE INDEX IF NOT EXISTS idx_accesos_registro ON data_access_log(record_id)',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_correo_normalizado ON users(normalizar_correo(email))'
     ];
     for (const fragmento of fragmentos) expect(sql).toContain(fragmento);
   });
 
-  it('el índice único se crea con una sola consulta sin parámetros', async () => {
+  it('el índice único del correo se crea con una sola consulta sin parámetros', async () => {
     configurarConsultas();
     await db.init();
 
     const llamada = poolFalso.query.mock.calls.find(([texto]) =>
-      String(texto).includes('CREATE UNIQUE INDEX')
+      String(texto).includes('idx_users_correo_normalizado')
     );
     expect(llamada).toHaveLength(1);
-    expect(String(llamada[0])).toContain('idx_users_correo_normalizado');
+    expect(String(llamada[0])).toContain('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_correo_normalizado');
+    // Va sola en su consulta (con try/catch): si hubiera duplicados, este índice
+    // es el único que puede fallar sin impedir el arranque.
+    expect(String(llamada[0]).match(/CREATE UNIQUE INDEX/g)).toHaveLength(1);
   });
 
   it('rellena el destinatario de los mensajes antiguos desde el aviso', async () => {
@@ -300,7 +311,7 @@ describe('init', () => {
     const consultas = poolFalso.query.mock.calls.map(([texto]) => String(texto));
     const posMigraciones = consultas.findIndex(t => t.includes('ADD COLUMN IF NOT EXISTS radio_km'));
     const posIndices = consultas.findIndex(t => t.includes('idx_zone_alertas'));
-    const posUnico = consultas.findIndex(t => t.includes('CREATE UNIQUE INDEX'));
+    const posUnico = consultas.findIndex(t => t.includes('idx_users_correo_normalizado'));
     const posRelleno = consultas.findIndex(t => t.includes('UPDATE messages m'));
 
     expect(posMigraciones).toBeGreaterThan(-1);
@@ -364,7 +375,7 @@ describe('init', () => {
   });
 
   it('si falla el índice único avisa dos veces y sigue con el relleno', async () => {
-    configurarConsultas({ fallas: { 'CREATE UNIQUE INDEX': 'hay cuentas duplicadas' } });
+    configurarConsultas({ fallas: { idx_users_correo_normalizado: 'hay cuentas duplicadas' } });
 
     await expect(db.init()).resolves.toBeUndefined();
 

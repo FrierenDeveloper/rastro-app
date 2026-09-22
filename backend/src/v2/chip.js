@@ -71,11 +71,33 @@ function clave(secreto) {
   return Buffer.from(crypto.hkdfSync('sha256', Buffer.from(secreto, 'utf8'), sal, Buffer.from(CONTEXTO), 32));
 }
 
+// ¿Es un chip ISO completo? El registro voluntario exige los 15 dígitos de la
+// cartilla del veterinario. Un aviso admite de 9 a 15 (el dueño puede dictar el
+// número incompleto); como la huella se calcula siempre sobre la forma canónica
+// de 15, las dos vías hablan del mismo animal.
+function esIso(valor) {
+  return esValido(valor) && normalizar(valor).length === LARGO_ISO;
+}
+
 // Huella con la que se compara. Nunca se devuelve al cliente.
 function huella(valor, secreto) {
   const c = canonico(valor);
   if (!c || !haySecreto(secreto)) return '';
   return crypto.createHmac('sha256', secreto).update(c).digest('hex');
+}
+
+// Contexto propio de las IPs. Un hash con sal fija se puede revertir probando las
+// 2^32 direcciones IPv4 posibles, así que la IP se guarda como HMAC con el mismo
+// secreto del servidor, pero con un contexto distinto al del chip.
+const CONTEXTO_IP = 'rastro-ip-v1';
+
+function huellaIp(ip, secreto) {
+  const texto = ip == null ? '' : String(ip).trim();
+  if (!texto || !haySecreto(secreto)) return '';
+  return crypto
+    .createHmac('sha256', secreto)
+    .update(CONTEXTO_IP + ':' + texto)
+    .digest('hex');
 }
 
 // Cifra el chip para poder mostrárselo después a su dueño.
@@ -109,10 +131,12 @@ function descifrar(texto, secreto) {
 module.exports = {
   normalizar,
   esValido,
+  esIso,
   canonico,
   enmascarar,
   haySecreto,
   huella,
+  huellaIp,
   cifrar,
   descifrar,
   LARGO_MINIMO,

@@ -116,6 +116,54 @@ async function init() {
       updated_at BIGINT,
       origen TEXT NOT NULL DEFAULT 'manual'
     );
+
+    -- Registro voluntario de microchips. Igual que en los avisos, el número NO se
+    -- guarda en claro: chip_hash es el HMAC con el que se busca y chip_cifrado es
+    -- el AES-GCM del que sale, solo para su dueño, el número completo.
+    --   verification_status: 'self_registered' o 'vet_verified' (aún sin uso).
+    --   deleted_at: borrado lógico (derecho de cancelación), deja de ser buscable.
+    -- El índice único es PARCIAL (solo sobre los activos): así un chip borrado se
+    -- puede volver a registrar.
+    CREATE TABLE IF NOT EXISTS chip_registrations (
+      id UUID PRIMARY KEY,
+      chip_hash TEXT NOT NULL,
+      chip_cifrado TEXT NOT NULL,
+      owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      pet_name TEXT NOT NULL,
+      species TEXT,
+      verification_status TEXT NOT NULL DEFAULT 'self_registered',
+      -- Preparado para el flujo con veterinarias. Sin clave foránea a propósito:
+      -- la tabla "vets" no existe todavía y una FK rompería la creación.
+      verified_by_vet_id UUID,
+      consent_given_at BIGINT NOT NULL,
+      consent_text_version TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL,
+      deleted_at BIGINT
+    );
+
+    -- Cada escaneo, con o sin coincidencia. Se guarda la HUELLA del chip (no el
+    -- número) y la de la IP, para poder auditar sin acumular números de chips
+    -- ajenos ni direcciones en claro.
+    CREATE TABLE IF NOT EXISTS chip_scan_events (
+      id UUID PRIMARY KEY,
+      chip_hash TEXT NOT NULL,
+      scanned_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+      ip_hash TEXT NOT NULL,
+      matched BOOLEAN NOT NULL,
+      scanned_at BIGINT NOT NULL
+    );
+
+    -- Trazabilidad de accesos a datos personales (Ley 21.719): quién accedió a
+    -- qué registro y cuándo.
+    CREATE TABLE IF NOT EXISTS data_access_log (
+      id UUID PRIMARY KEY,
+      table_name TEXT NOT NULL,
+      record_id UUID NOT NULL,
+      action TEXT NOT NULL,
+      actor_user_id UUID,
+      occurred_at BIGINT NOT NULL
+    );
   `);
 
   // Migraciones para bases de datos creadas con la versión anterior del esquema.
@@ -189,6 +237,13 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id);
     CREATE INDEX IF NOT EXISTS idx_emailverif_user ON email_verifications(user_id);
     CREATE INDEX IF NOT EXISTS idx_zone_alertas ON zone_alerts(lat, lng);
+    -- Un chip activo solo puede tener un registro; los borrados no estorban.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_chip_registros_activo
+      ON chip_registrations(chip_hash) WHERE deleted_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_chip_registros_dueno ON chip_registrations(owner_user_id);
+    CREATE INDEX IF NOT EXISTS idx_chip_escaneos_hash ON chip_scan_events(chip_hash);
+    CREATE INDEX IF NOT EXISTS idx_chip_escaneos_fecha ON chip_scan_events(scanned_at);
+    CREATE INDEX IF NOT EXISTS idx_accesos_registro ON data_access_log(record_id);
   `);
 
   // Índice único sobre el correo normalizado. Si ya existen duplicados de antes,

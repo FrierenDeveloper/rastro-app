@@ -16,9 +16,11 @@ const chip = require('../src/v2/chip.js');
 const {
   normalizar,
   esValido,
+  esIso,
   canonico,
   enmascarar,
   huella,
+  huellaIp,
   cifrar,
   descifrar,
   haySecreto,
@@ -172,6 +174,57 @@ describe('huella', () => {
   it('con un chip inválido devuelve vacío', () => {
     expect(huella('123', SECRETO)).toBe('');
     expect(huella(null, SECRETO)).toBe('');
+  });
+});
+
+describe('esIso', () => {
+  it('acepta exactamente 15 dígitos', () => {
+    expect(esIso(CHIP_VALIDO)).toBe(true);
+    expect(esIso('981 020 304 050 607')).toBe(true);
+    expect(LARGO_ISO).toBe(15);
+  });
+
+  it('rechaza un chip corto aunque valga para un aviso', () => {
+    expect(esValido('123456789')).toBe(true);
+    expect(esIso('123456789')).toBe(false);
+  });
+
+  it('rechaza 16 dígitos, letras y vacío', () => {
+    expect(esIso('1'.repeat(16))).toBe(false);
+    expect(esIso('98102030405060A')).toBe(false);
+    expect(esIso('')).toBe(false);
+    expect(esIso(null)).toBe(false);
+  });
+});
+
+describe('huellaIp', () => {
+  it('es determinista, de 64 hexadecimales y no contiene la IP', () => {
+    const h = huellaIp('190.160.1.2', SECRETO);
+
+    expect(h).toBe(huellaIp('190.160.1.2', SECRETO));
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    expect(h).not.toContain('190.160.1.2');
+  });
+
+  it('dos IPs distintas dan huellas distintas', () => {
+    expect(huellaIp('1.1.1.1', SECRETO)).not.toBe(huellaIp('2.2.2.2', SECRETO));
+  });
+
+  it('el secreto cambia el resultado', () => {
+    expect(huellaIp('1.1.1.1', SECRETO)).not.toBe(huellaIp('1.1.1.1', 'otro-secreto'));
+  });
+
+  it('no se puede confundir con la huella de un chip del mismo texto', () => {
+    // El contexto es distinto: aunque el valor coincida, las huellas no.
+    expect(huellaIp(CHIP_VALIDO, SECRETO)).not.toBe(huella(CHIP_VALIDO, SECRETO));
+  });
+
+  it('sin IP o sin secreto devuelve vacío', () => {
+    expect(huellaIp('', SECRETO)).toBe('');
+    expect(huellaIp(null, SECRETO)).toBe('');
+    expect(huellaIp(undefined, SECRETO)).toBe('');
+    expect(huellaIp('1.1.1.1', '')).toBe('');
+    expect(huellaIp('1.1.1.1', null)).toBe('');
   });
 });
 
