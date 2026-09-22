@@ -821,6 +821,19 @@ input[type='file'] {
   background: var(--green-soft);
   color: var(--green-ink);
 }
+/* Microchip enmascarado en «Mis microchips»: monoespaciado para que los dígitos
+   no se confundan entre sí. */
+.chip-mascara {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 1px;
+}
+/* El texto del consentimiento se lee entero: no va en letra chica ni escondido. */
+.chip-consentimiento {
+  align-items: flex-start;
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .matches-box {
   margin-top: 8px;
   font-size: 12.5px;

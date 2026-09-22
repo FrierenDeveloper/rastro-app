@@ -605,6 +605,9 @@ function mostrarVista(tab) {
   if (tab === 'admin') {
     renderAdmin();
   }
+  if (tab === 'chips') {
+    renderMisChips();
+  }
 }
 document.querySelectorAll('.bottom-nav button, .drawer-item[data-vista]').forEach(btn => {
   btn.addEventListener('click', () => mostrarVista(btn.dataset.tab || btn.dataset.vista));
@@ -624,9 +627,11 @@ document.querySelectorAll('.bottom-nav button, .drawer-item[data-vista]').forEac
 //   * La última ubicación se guarda en localStorage para no volver a pedirla al
 //     recargar, y se borra al cerrar sesión.
 //
-// Nada de esto se manda al servidor por el simple hecho de abrir la app: la
-// ubicación solo viaja si publicas un aviso, guardas tu zona de alertas o
-// adjuntas "lo vi aquí" a un mensaje.
+// Lo único que sale del dispositivo sin que el usuario haga nada es la ubicación
+// DIFUMINADA (~300 m) para las alertas de zona, y solo con la app abierta, con
+// umbral de 6 h o 500 m de movimiento y respetando si desactivó esas alertas
+// (ver guardarUbicacionDeZona). Todo lo demás viaja solo si él lo pide: publicar
+// un aviso, guardar su barrio o adjuntar "lo vi aquí" a un mensaje.
 const UBICACION_CLAVE = 'rastro_ubicacion';
 const UBICACION_MAX_MS = 5 * 60 * 1000; // a partir de 5 min se considera vieja
 const ubicacion = {
@@ -1972,6 +1977,152 @@ async function guardarUbicacionDeZona() {
     /* es un extra silencioso: la app funciona igual sin esto */
   }
 }
+
+/* ============ Microchips ============ */
+// Registro voluntario. El número completo solo se pide al servidor cuando su
+// dueño lo pide a propósito, y la lista ya trae la máscara para mostrarla por
+// defecto. Nada de esto se muestra a otras cuentas en ninguna parte de la app.
+let misChips = [];
+
+function chipsHTML(registros) {
+  if (!registros.length) {
+    return `<div class="empty-state"><div class="big">🔒</div>Todavía no registraste ningún microchip.</div>`;
+  }
+  return registros
+    .map(
+      r => `
+      <div class="inbox-item" data-id="${esc(r.id)}">
+        <h4>🐾 ${esc(r.pet_name)}${r.species ? ' · ' + esc(r.species) : ''}</h4>
+        <div class="report-meta">
+          Registrado ${timeAgo(r.created_at)} ·
+          <span class="chip-mascara" data-visible="0" data-mascara="${esc(r.chip_enmascarado || '')}">${esc(r.chip_enmascarado || 'sin datos')}</span>
+        </div>
+        <div class="report-actions">
+          <button data-action="chip-ver" data-id="${esc(r.id)}">Ver número</button>
+          <button data-action="chip-editar" data-id="${esc(r.id)}">Editar</button>
+          <button data-action="chip-borrar" data-id="${esc(r.id)}">Dar de baja</button>
+        </div>
+      </div>`
+    )
+    .join('');
+}
+
+async function renderMisChips() {
+  const caja = document.getElementById('chips-lista');
+  try {
+    const { registros } = await api('/api/chips/mine');
+    misChips = registros;
+    caja.innerHTML = chipsHTML(registros);
+  } catch (ex) {
+    caja.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
+}
+
+// Alterna entre la máscara y el número completo. El número ya vino en la lista
+// (es el dato de su dueño), así que no hace falta otra llamada.
+function alternarChipVisible(btn, registro) {
+  const caja = btn.closest('.inbox-item').querySelector('.chip-mascara');
+  const visible = caja.dataset.visible === '1';
+  caja.dataset.visible = visible ? '0' : '1';
+  caja.textContent = visible ? caja.dataset.mascara : registro.chip || caja.dataset.mascara;
+  btn.textContent = visible ? 'Ver número' : 'Ocultar número';
+}
+
+async function editarChip(registro) {
+  const nombre = window.prompt('Nombre de la mascota:', registro.pet_name);
+  if (nombre === null) return;
+  const especie = window.prompt('Especie (déjalo vacío para no especificarla):', registro.species || '');
+  if (especie === null) return;
+  try {
+    await api(`/api/chips/${registro.id}`, {
+      method: 'PATCH',
+      body: { pet_name: nombre.trim(), species: especie.trim() }
+    });
+    toast('Registro actualizado.');
+    renderMisChips();
+  } catch (ex) {
+    toast(ex.message);
+  }
+}
+
+async function borrarChip(registro) {
+  if (
+    !confirm(`¿Dar de baja el microchip de ${registro.pet_name}? Dejará de aparecer si alguien lo escanea.`)
+  )
+    return;
+  try {
+    await api(`/api/chips/${registro.id}`, { method: 'DELETE' });
+    toast('Microchip dado de baja.');
+    renderMisChips();
+  } catch (ex) {
+    toast(ex.message);
+  }
+}
+
+async function manejarAccionChip(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const registro = misChips.find(r => r.id === btn.dataset.id);
+  if (!registro) return;
+  if (btn.dataset.action === 'chip-ver') return alternarChipVisible(btn, registro);
+  if (btn.dataset.action === 'chip-editar') return editarChip(registro);
+  if (btn.dataset.action === 'chip-borrar') return borrarChip(registro);
+}
+document.getElementById('chips-lista').addEventListener('click', manejarAccionChip);
+
+// Mismo criterio que el servidor: fuera separadores y el prefijo ISO. El registro
+// pide los 15 dígitos de la cartilla (el aviso admite menos porque se dicta).
+function digitosDelChip(valor) {
+  return valor.replace(/^iso/i, '').replace(/[\s\-._/]/g, '');
+}
+
+document.getElementById('form-chip').addEventListener('submit', async e => {
+  e.preventDefault();
+  const codigo = document.getElementById('chip-reg-codigo').value.trim();
+  const nombre = document.getElementById('chip-reg-nombre').value.trim();
+  if (!/^[0-9]{15}$/.test(digitosDelChip(codigo))) return toast('El microchip debe tener 15 dígitos.');
+  if (!nombre) return toast('Escribe el nombre de tu mascota.');
+  // Sin consentimiento no se registra: la casilla nunca viene marcada sola.
+  if (!document.getElementById('chip-reg-consent').checked)
+    return toast('Necesitamos tu consentimiento para registrar el microchip.');
+  try {
+    await api('/api/chips/register', {
+      method: 'POST',
+      body: {
+        chip_id: codigo,
+        pet_name: nombre,
+        species: document.getElementById('chip-reg-especie').value,
+        consent_accepted: true
+      }
+    });
+    toast('Microchip registrado. Si alguien lo escanea, te avisamos.');
+    document.getElementById('form-chip').reset();
+    renderMisChips();
+  } catch (ex) {
+    toast(ex.message);
+  }
+});
+
+document.getElementById('btn-chip-scan').addEventListener('click', async () => {
+  const caja = document.getElementById('chip-scan-resultado');
+  const codigo = document.getElementById('chip-scan-codigo').value.trim();
+  if (!/^[0-9]{15}$/.test(digitosDelChip(codigo))) {
+    caja.innerHTML = `<p class="loc-note">Escribe los 15 dígitos del microchip.</p>`;
+    return;
+  }
+  caja.innerHTML = `<p class="loc-note">Buscando…</p>`;
+  try {
+    const r = await api('/api/chips/scan', { method: 'POST', body: { chip_id: codigo } });
+    caja.innerHTML = r.matched
+      ? `<div class="match-banner">
+          <h3>✅ Microchip registrado</h3>
+          <p>Está a nombre de <b>${esc(r.pet_name)}</b>. Ya avisamos a su familia. Por su privacidad, no te damos sus datos: si lo encontraste, publica un aviso en «Encontré» para que puedan contactarte.</p>
+        </div>`
+      : `<p class="loc-note">Ese microchip no está registrado en Rastro. Publica un aviso en «Encontré»: es la vía para que su familia lo vea.</p>`;
+  } catch (ex) {
+    caja.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
+});
 
 /* ============ Alertas por zona ============ */
 async function actualizarBotonZona() {

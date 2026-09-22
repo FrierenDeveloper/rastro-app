@@ -707,6 +707,84 @@
           </div>
         </section>
 
+        <!-- MICROCHIPS -->
+        <!-- Registro voluntario. El consentimiento es explícito (casilla sin
+             marcar y con el texto a la vista) y su versión se guarda con cada
+             registro, como pide la Ley 21.719. El número del chip no se muestra
+             a nadie: solo su dueño puede verlo desde aquí. -->
+        <section class="view" id="view-chips">
+          <div class="card">
+            <h2>Registrar el microchip de tu mascota</h2>
+            <p class="sub">
+              Si algún día se pierde y alguien lee su chip, te avisamos a ti. Nunca compartimos tus datos con
+              quien lo escanea.
+            </p>
+            <form id="form-chip">
+              <label class="required">Código del microchip</label>
+              <input
+                type="text"
+                id="chip-reg-codigo"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="15 dígitos, como salen en la cartilla"
+              />
+
+              <label class="required">Nombre de tu mascota</label>
+              <input type="text" id="chip-reg-nombre" placeholder="Ej: Firulais" />
+
+              <label>Especie</label>
+              <select id="chip-reg-especie">
+                <option value="">Sin especificar</option>
+                <option value="perro">Perro</option>
+                <option value="gato">Gato</option>
+                <option value="ave">Ave</option>
+                <option value="conejo">Conejo</option>
+                <option value="otro">Otro</option>
+              </select>
+
+              <label class="check chip-consentimiento">
+                <input type="checkbox" id="chip-reg-consent" />
+                <span>
+                  Doy mi consentimiento para que Rastro guarde el código de microchip de mi mascota, su nombre
+                  y su especie con la única finalidad de avisarme si alguien lo escanea. Entiendo que mi
+                  teléfono y mi correo no se muestran nunca a quien escanea, y que puedo ver, corregir o dar
+                  de baja este registro cuando quiera desde «Mis microchips».
+                </span>
+              </label>
+              <p class="loc-note">
+                Texto de consentimiento versión v1. El código se guarda protegido: no queda legible en la base
+                de datos y nadie más puede consultarlo.
+              </p>
+
+              <button type="submit" class="submit-btn auth">Registrar microchip</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2>Mis microchips</h2>
+            <p class="sub">Aquí puedes ver el número, corregir los datos o dar de baja el registro.</p>
+            <div id="chips-lista"></div>
+          </div>
+
+          <div class="card">
+            <h2>Leer un microchip</h2>
+            <p class="sub">
+              Si encontraste un animal y un lector te dio su número, escríbelo aquí: avisamos a su familia sin
+              darte sus datos.
+            </p>
+            <label>Código del microchip</label>
+            <input
+              type="text"
+              id="chip-scan-codigo"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="15 dígitos"
+            />
+            <button type="button" class="submit-btn found" id="btn-chip-scan">Buscar el microchip</button>
+            <div id="chip-scan-resultado"></div>
+          </div>
+        </section>
+
         <!-- ADMIN -->
         <section class="view" id="view-admin">
           <h2 class="admin-title">
@@ -764,6 +842,10 @@
         <button class="drawer-item" id="btn-zone">
           <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>
           <span id="zone-label">Activar alertas de mi zona</span>
+        </button>
+        <button class="drawer-item" id="menu-chips" data-vista="chips">
+          <svg class="ic" aria-hidden="true"><use href="#i-lock" /></svg>
+          <span>Microchips</span>
         </button>
         <button class="drawer-item" id="btn-tips">
           <svg class="ic" aria-hidden="true"><use href="#i-bulb" /></svg>
