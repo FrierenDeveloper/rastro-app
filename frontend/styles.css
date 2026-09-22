@@ -293,6 +293,13 @@ button:disabled {
   justify-content: center;
   min-height: 100vh;
   padding: 28px 22px 34px;
+  background:
+    radial-gradient(
+      circle at 15% 12%,
+      color-mix(in srgb, var(--green-soft) 75%, transparent),
+      transparent 34%
+    ),
+    var(--paper);
 }
 #auth-screen .brand,
 #reset-screen .brand {
@@ -324,8 +331,8 @@ button:disabled {
 .auth-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--r-xl);
-  padding: 22px;
+  border-radius: 10px;
+  padding: 24px;
   box-shadow: var(--shadow);
 }
 .auth-tabs {
@@ -334,12 +341,13 @@ button:disabled {
   padding: 4px;
   margin-bottom: 18px;
   background: var(--paper-2);
-  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
 .auth-tabs button {
   flex: 1;
   padding: 9px 8px;
-  border-radius: var(--r-pill);
+  border-radius: 8px;
   border: none;
   background: none;
   color: var(--ink-soft);
@@ -348,8 +356,9 @@ button:disabled {
   cursor: pointer;
 }
 .auth-tabs button.active {
-  background: var(--card);
-  color: var(--ink);
+  background: var(--green-soft);
+  color: var(--green-ink);
+  border: 1px solid var(--green);
   box-shadow: var(--shadow-xs);
 }
 .auth-form {
@@ -1169,7 +1178,7 @@ input[type='file'] {
   margin: 12px 0 0;
 }
 .link-note a {
-  color: var(--ink-soft);
+  color: var(--green-ink);
   text-underline-offset: 3px;
 }
 .auth-ok {
@@ -2021,6 +2030,16 @@ body.theme-dark .leaflet-popup-content-wrapper,
 body.theme-dark .leaflet-popup-tip {
   background: var(--card);
   color: var(--ink);
+}
+body.theme-dark #auth-screen,
+body.theme-dark #reset-screen {
+  background:
+    radial-gradient(
+      circle at 15% 12%,
+      color-mix(in srgb, var(--green-soft) 75%, transparent),
+      transparent 34%
+    ),
+    var(--paper);
 }
 body.theme-dark .leaflet-layer,
 body.theme-dark .leaflet-control-zoom-in,

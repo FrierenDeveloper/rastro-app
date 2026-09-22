@@ -183,9 +183,20 @@ function actualizarRadioHint() {
 // Algunas redes, bloqueadores o países bloquean un proveedor de tiles concreto
 // y el mapa queda gris. Si el proveedor principal falla varias veces seguidas,
 // saltamos automáticamente al siguiente para que el mapa siempre se vea.
-// Nota: CARTO y Stadia ya exigen API key (devuelven tiles con marca de agua),
-// por eso no se usan aquí.
+// MapTiler se activa al definir window.RASTRO_MAPTILER_KEY en la configuración
+// de despliegue. Sin clave, conservamos los respaldos públicos actuales.
+const MAPTILER_KEY = window.RASTRO_MAPTILER_KEY || '';
 const TILE_PROVIDERS = [
+  ...(MAPTILER_KEY
+    ? [
+        {
+          url: `https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=${encodeURIComponent(MAPTILER_KEY)}`,
+          attribution:
+            '<a href="https://www.maptiler.com/copyright/" target="_blank">© MapTiler</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>',
+          maxZoom: 20
+        }
+      ]
+    : []),
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
     attribution: '© Esri',
