@@ -384,6 +384,37 @@ function fotoSrc(u) {
 }
 
 /* ============ Arranque ============ */
+// Render (plan gratis) "duerme" el servicio tras 15 min sin uso: la primera
+// petición tras eso puede tardar 30-50 s. La pantalla de arranque se queda
+// visible hasta que el servidor responde; si tarda, avisamos y reintentamos
+// hasta ~45 s en vez de dejar al usuario mirando un login que no carga.
+const ESPERA_SERVIDOR_MS = 45000;
+
+function pingSalud(msTimeout) {
+  const ctrl = new window.AbortController();
+  const timer = setTimeout(() => ctrl.abort(), msTimeout);
+  return fetch(API_BASE + '/api/health', { signal: ctrl.signal })
+    .then(res => res.ok)
+    .catch(() => false)
+    .finally(() => clearTimeout(timer));
+}
+
+async function despertarServidor() {
+  const inicio = Date.now();
+  let avisado = false;
+  while (Date.now() - inicio < ESPERA_SERVIDOR_MS) {
+    if (await pingSalud(6000)) return;
+    if (!avisado && Date.now() - inicio > 1200) {
+      avisado = true;
+      const nota = document.getElementById('boot-status');
+      if (nota) {
+        nota.textContent = 'Estamos despertando el servidor… la primera vez puede tardar hasta 45 segundos.';
+      }
+    }
+    await new Promise(r => setTimeout(r, 900));
+  }
+}
+
 async function loadConfig() {
   try {
     config = await api('/api/config', { auth: false });
@@ -585,6 +616,19 @@ function activarMedidorPassword(inputId, meterId, noteId) {
 }
 activarMedidorPassword('register-password', 'register-pw-meter', 'register-pw-note');
 activarMedidorPassword('reset-password', 'reset-pw-meter', 'reset-pw-note');
+
+// Botón "ojo": alterna entre ocultar y mostrar lo escrito en los campos de
+// contraseña (Entrar, Crear cuenta y Resetear). No toca el valor del campo.
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.pw);
+    if (!input) return;
+    const mostrar = input.type === 'password';
+    input.type = mostrar ? 'text' : 'password';
+    btn.classList.toggle('ver', mostrar);
+    btn.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  });
+});
 
 function initGoogle() {
   const area = document.getElementById('google-area');
@@ -2723,6 +2767,7 @@ async function validarSesion(intentos = 2) {
 
 (async function bootstrap() {
   initTema();
+  await despertarServidor();
   await loadConfig();
 
   const params = new URLSearchParams(location.search);

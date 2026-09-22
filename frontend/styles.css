@@ -172,6 +172,17 @@ button:disabled {
   font-weight: 600;
   letter-spacing: -0.02em;
 }
+#boot-screen .boot-status {
+  max-width: 280px;
+  padding: 0 24px;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.45;
+  text-align: center;
+}
 .boot-brand {
   display: grid;
   place-items: center;
@@ -691,6 +702,41 @@ input[type='tel']:hover,
 select:hover,
 textarea:hover {
   border-color: var(--ink-faint);
+}
+
+/* Campo de contraseña con botón "ojo" a la derecha. */
+.pw-field {
+  position: relative;
+}
+.pw-field input {
+  padding-right: 48px;
+}
+.pw-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.pw-toggle:hover {
+  color: var(--ink);
+}
+.pw-toggle .ic {
+  width: 20px;
+  height: 20px;
+}
+.pw-toggle .pw-slash {
+  opacity: 0;
+}
+.pw-toggle.ver .pw-slash {
+  opacity: 1;
 }
 textarea {
   resize: vertical;
@@ -2448,6 +2494,11 @@ body.theme-dark .mode-toggle {
 #view-home:not(.home-list-mode) #reports-list::-webkit-scrollbar {
   display: none;
 }
+/* El mensaje de "no hay avisos" solo tiene sentido en la vista de lista. En el
+   mapa se pintaba como una tarjeta suelta sobre el mapa: lo ocultamos ahí. */
+#view-home:not(.home-list-mode) #reports-list .empty-state {
+  display: none;
+}
 #view-home:not(.home-list-mode) .report-card {
   flex: 0 0 100%;
   min-width: 0;
@@ -2559,7 +2610,7 @@ nav.bottom-nav button {
   gap: 4px;
   min-height: 64px;
   border-radius: 17px;
-  color: #173f43;
+  color: var(--ink);
   font-size: 12px;
 }
 nav.bottom-nav button .ic {
