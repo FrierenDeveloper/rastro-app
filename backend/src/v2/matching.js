@@ -25,6 +25,10 @@ const PESO_SEXO = 10;
 const PESO_RAZA = 8;
 const PESO_COLLAR = 4;
 const PESO_TIEMPO = 3;
+// El mismo microchip es la prueba más fuerte que existe: dos avisos que lo
+// declaran son el mismo animal. Puntúa como una coincidencia perfecta, pero
+// además lleva `por_chip` para ordenarse siempre por delante.
+const PUNTAJE_CHIP = 100;
 const PUNTAJE_MINIMO = 50;
 const RADIO_MINIMO_KM = 1;
 const RADIO_TOPE_KM = 5;
@@ -134,8 +138,20 @@ function puntosDistancia(dist, radio) {
 function esPar(base, candidato) {
   if (!base || !candidato) return false;
   if (normalizar(base.estado) === normalizar(candidato.estado)) return false;
+  // El chip manda sobre el tipo declarado: si es el mismo animal, da igual que
+  // alguien haya puesto "gato" donde iba "perro".
+  if (mismoChip(base, candidato)) return true;
   const tipo = normalizar(base.tipo);
   return Boolean(tipo) && tipo === normalizar(candidato.tipo);
+}
+
+// ¿Los dos avisos declaran el MISMO microchip? Solo se compara la huella: el
+// número del chip no llega nunca a este módulo ni sale de la base de datos.
+// Un lado sin chip no puede coincidir "por vacío".
+function mismoChip(a, b) {
+  const ha = normalizar(a.chip_hash);
+  const hb = normalizar(b.chip_hash);
+  return Boolean(ha) && ha === hb;
 }
 
 // El aviso de referencia puede ser el "perdido" o el "encontrado"; aquí se
@@ -160,6 +176,19 @@ function motivos(d) {
   return lista;
 }
 
+// Coincidencia por microchip: inmediata. No se mira radio, ni fecha, ni puntaje
+// mínimo; solo se calcula la distancia para poder mostrarla. Nunca incluye el
+// número del chip, solo el motivo.
+function coincidenciaPorChip(candidato, dist) {
+  return {
+    id: candidato.id,
+    puntaje: PUNTAJE_CHIP,
+    distancia_km: Math.round(dist * 10) / 10,
+    por_chip: true,
+    motivos: ['Coincidencia por microchip', textoDistancia(dist)]
+  };
+}
+
 /**
  * Compara dos avisos y devuelve la coincidencia puntuada, o null si no aplica.
  * @param {object} base aviso de referencia
@@ -172,11 +201,15 @@ function emparejar(base, candidato, opciones) {
 
   const { perdido, encontrado } = orientar(base, candidato);
   const ahora = Number.isFinite(op.ahora) ? op.ahora : Date.now();
+  const dist = distanciaKm(perdido.lat, perdido.lng, encontrado.lat, encontrado.lng);
+
+  // Va antes que todo lo demás a propósito: el chip no se filtra ni por fecha ni
+  // por distancia ni por puntaje mínimo.
+  if (mismoChip(base, candidato)) return coincidenciaPorChip(candidato, dist);
 
   const pTiempo = puntosTiempo(perdido, encontrado, ahora);
   if (pTiempo === null) return null;
 
-  const dist = distanciaKm(perdido.lat, perdido.lng, encontrado.lat, encontrado.lng);
   const radio = radioKm(perdido, ahora);
   if (dist > radio) return null;
 
@@ -198,6 +231,12 @@ function emparejar(base, candidato, opciones) {
   };
 }
 
+// 1 si la coincidencia es por microchip. Sirve para que el chip gane el
+// desempate contra una coincidencia perfecta (las dos puntúan 100).
+function prioridad(m) {
+  return m.por_chip ? 1 : 0;
+}
+
 /**
  * Ordena por puntaje (mayor primero) y, a igualdad, por cercanía.
  * @param {object} base aviso de referencia
@@ -211,7 +250,7 @@ function buscarCoincidencias(base, candidatos, opciones) {
   return lista
     .map(c => emparejar(base, c, op))
     .filter(Boolean)
-    .sort((a, b) => b.puntaje - a.puntaje || a.distancia_km - b.distancia_km)
+    .sort((a, b) => prioridad(b) - prioridad(a) || b.puntaje - a.puntaje || a.distancia_km - b.distancia_km)
     .slice(0, limite);
 }
 
@@ -229,6 +268,7 @@ module.exports = {
   PESO_RAZA,
   PESO_COLLAR,
   PESO_TIEMPO,
+  PUNTAJE_CHIP,
   RADIO_MINIMO_KM,
   RADIO_TOPE_KM
 };

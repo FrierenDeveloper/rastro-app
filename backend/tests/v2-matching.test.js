@@ -22,12 +22,17 @@ const {
   PESO_RAZA,
   PESO_COLLAR,
   PESO_TIEMPO,
+  PUNTAJE_CHIP,
   RADIO_MINIMO_KM,
   RADIO_TOPE_KM
 } = matching;
 
 const T0 = 1_000_000_000_000;
 const H = 60 * 60 * 1000;
+// Huellas de microchip de ejemplo (en producción son HMAC-SHA256 en hex). El
+// motor NUNCA ve el número del chip, solo esta huella.
+const HUELLA_A = 'a'.repeat(64);
+const HUELLA_B = 'b'.repeat(64);
 
 function perdido(over = {}) {
   return {
@@ -233,6 +238,80 @@ describe('emparejar', () => {
     expect(RADIO_TOPE_KM).toBe(5);
     expect(emparejar(a, dentro, { puntajeMinimo: 0 })).not.toBeNull();
     expect(emparejar(a, fuera, { puntajeMinimo: 0 })).toBeNull();
+  });
+});
+
+describe('regla dura del microchip', () => {
+  it('el mismo chip empareja aunque el aviso esté a 500 km', () => {
+    const m = emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ chip_hash: HUELLA_A, lat: 45 }));
+    expect(m).not.toBeNull();
+    expect(m.puntaje).toBe(PUNTAJE_CHIP);
+    expect(m.distancia_km).toBeGreaterThan(500);
+    expect(m.motivos[0]).toBe('Coincidencia por microchip');
+  });
+
+  it('el chip manda sobre el tipo declarado', () => {
+    const m = emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ chip_hash: HUELLA_A, tipo: 'gato' }));
+    expect(m).not.toBeNull();
+    expect(m.motivos).not.toContain('Mismo tipo de mascota');
+  });
+
+  it('el chip manda sobre las fechas: un "encontrado" muy anterior sigue valiendo', () => {
+    const m = emparejar(
+      perdido({ chip_hash: HUELLA_A }),
+      encontrado({ chip_hash: HUELLA_A, created_at: T0 - 900 * H })
+    );
+    expect(m).not.toBeNull();
+    expect(m.motivos).not.toContain('Fechas compatibles');
+  });
+
+  it('el chip no se puede filtrar subiendo el puntaje mínimo', () => {
+    const m = emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ chip_hash: HUELLA_A, lat: 45 }), {
+      puntajeMinimo: 1000
+    });
+    expect(m.puntaje).toBe(PUNTAJE_CHIP);
+  });
+
+  it('explica también la distancia cuando es finita', () => {
+    const m = emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ chip_hash: HUELLA_A }));
+    expect(m.motivos).toEqual(['Coincidencia por microchip', 'A menos de 500 m']);
+  });
+
+  it('chips distintos no emparejan: vuelve a mandar la distancia', () => {
+    expect(
+      emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ chip_hash: HUELLA_B, lat: 45 }))
+    ).toBeNull();
+  });
+
+  it('con un solo lado declarando chip manda la regla normal', () => {
+    expect(emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ lat: 45 }))).toBeNull();
+    expect(emparejar(perdido({}), encontrado({ chip_hash: HUELLA_A, lat: 45 }))).toBeNull();
+  });
+
+  it('un chip vacío o nulo no empareja con otro vacío', () => {
+    expect(emparejar(perdido({ chip_hash: '' }), encontrado({ chip_hash: '' }))).not.toBeNull();
+    expect(emparejar(perdido({ chip_hash: null }), encontrado({ chip_hash: null, tipo: 'ave' }))).toBeNull();
+    expect(emparejar(perdido({ chip_hash: undefined }), encontrado({ chip_hash: '' }))).not.toBeNull();
+  });
+
+  it('el mismo chip no salta la regla del estado opuesto', () => {
+    expect(emparejar(perdido({ chip_hash: HUELLA_A }), perdido({ chip_hash: HUELLA_A }))).toBeNull();
+  });
+
+  it('la huella se compara sin distinguir mayúsculas', () => {
+    const m = emparejar(
+      perdido({ chip_hash: HUELLA_A }),
+      encontrado({ chip_hash: HUELLA_A.toUpperCase(), lat: 45 })
+    );
+    expect(m.puntaje).toBe(PUNTAJE_CHIP);
+  });
+
+  it('buscarCoincidencias pone primero la del chip aunque esté lejísimos', () => {
+    const porChip = encontrado({ id: 'chip', chip_hash: HUELLA_A, lat: 45 });
+    const perfecto = encontrado({ id: 'perfecto' });
+    const r = buscarCoincidencias(perdido({ chip_hash: HUELLA_A }), [perfecto, porChip]);
+    expect(r.map(m => m.id)).toEqual(['chip', 'perfecto']);
+    expect(PUNTAJE_CHIP).toBe(100);
   });
 });
 

@@ -8,14 +8,14 @@
 // se sustituyen con los dobles de ./helpers/aislar.js, que va PRIMERO.
 //
 // HALLAZGOS (no se arreglan desde aquí):
-//   1) requireVerified compara `email_verified === false`: un valor falsy que no
-//      sea el booleano `false` (por ejemplo 0) NO bloquea la petición. Hoy no se
-//      dispara con Postgres (la columna es boolean), pero queda documentado con
-//      una prueba que afirma el comportamiento actual.
-//   2) PATCH /:id devuelve 404 (no 403) cuando el aviso es de otro usuario, y
-//      DELETE /:id también: el mensaje no distingue "no existe" de "no es tuyo".
+//   (ninguno pendiente en esta parte)
 //
 // ARREGLADO (eran hallazgos de este archivo; ahora se prueba el contrato nuevo):
+//   * PATCH /:id y DELETE /:id responden 403 (no 404) cuando el aviso es de otro
+//     usuario: antes el mensaje no distinguía "no existe" de "no es tuyo".
+//   * requireVerified exige que `email_verified` sea exactamente `true`: antes
+//     comparaba `=== false`, así que un falsy que no fuera el booleano `false`
+//     (por ejemplo 0) NO bloqueaba la petición.
 //   * POST /:id/reunion guarda la foto NUEVA antes de borrar la anterior, y solo
 //     borra la anterior cuando la base ya aceptó el cambio.
 //   * DELETE /:id usa el id de la fila devuelta (report.id), no el texto de la URL.
@@ -52,14 +52,16 @@ const SQL_REUNION =
 const SQL_RESOLVER = 'UPDATE reports SET resolved = $1, resolved_at = $2 WHERE id = $3';
 const SQL_EDITAR =
   'UPDATE reports SET tipo=$1, sexo=$2, color=$3, raza=$4, collar=$5, descripcion=$6, ' +
-  'nombre_mascota=$7, lat=$8, lng=$9, lat_public=$10, lng_public=$11 WHERE id=$12';
+  'nombre_mascota=$7, lat=$8, lng=$9, lat_public=$10, lng_public=$11, ' +
+  'chip_hash=$12, chip_cifrado=$13 WHERE id=$14';
 
 const NO_AUTENTICADO = { error: 'No autenticado.' };
 const SESION_INVALIDA = { error: 'Sesión inválida o expirada.' };
 const NO_ENCONTRADO = { error: 'Aviso no encontrado.' };
+const AJENO = { error: 'Este aviso no es tuyo.' };
 const INVALIDO = { error: 'Invalid value' };
 const ID_INVALIDO = { error: 'Identificador inválido.' };
-const DATO_INVALIDO = { error: 'Dato inválido.' };
+const RESOLVED_INVALIDO = { error: 'El campo resolved debe ser true o false.' };
 const SIN_VERIFICAR = { error: 'Confirma tu correo para poder publicar. Revisa tu bandeja de entrada.' };
 const PROPIO = { error: 'No puedes reportar tu propio aviso.' };
 const CUENTA_NUEVA = { error: 'Tu cuenta es demasiado nueva para reportar avisos.' };
@@ -123,6 +125,8 @@ const AVISO_PUBLICO = {
   foto_url: '/uploads/foto.jpg',
   resolved: false,
   es_mio: true,
+  tiene_chip: false,
+  chip_enmascarado: null,
   radio_km: 3,
   perdido_hace_horas: 5,
   lat: -33.4527,
@@ -273,13 +277,13 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
     expect(db.query).toHaveBeenCalledTimes(2);
   });
 
-  it('un aviso de otro usuario responde 404 y no se actualiza nada', async () => {
+  it('un aviso de otro usuario responde 403 (no 404) y no se actualiza nada', async () => {
     montarBase({ fila: aviso({ user_id: OTRO }) });
 
     const res = await editar({ color: 'blanco' });
 
-    expect(res.status).toBe(404);
-    expect(res.body).toStrictEqual(NO_ENCONTRADO);
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(AJENO);
     expect(sqls()).toStrictEqual([SQL_TOKEN, SQL_AVISO]);
   });
 
@@ -306,6 +310,8 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
       -70.66,
       -33.4527,
       -70.6627,
+      null,
+      null,
       UUID
     ]);
     expect(db.query.mock.calls[3]).toStrictEqual([SQL_AVISO, [UUID]]);
@@ -337,6 +343,8 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
       -70.66,
       -33.4527,
       -70.6627,
+      null,
+      null,
       UUID
     ]);
   });
@@ -356,6 +364,8 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
       -70.66,
       -33.4527,
       -70.6627,
+      null,
+      null,
       UUID
     ]);
   });
@@ -368,7 +378,7 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
     expect(res.status).toBe(200);
     const params = db.query.mock.calls[2][1];
     // Math.random = 0.5 => jitter no desplaza nada: la pública coincide con la real.
-    expect(params.slice(7)).toStrictEqual([10.5, 20.25, 10.5, 20.25, UUID]);
+    expect(params.slice(7)).toStrictEqual([10.5, 20.25, 10.5, 20.25, null, null, UUID]);
   });
 
   it('si solo llega lat se conservan lat, lng y la posición pública anteriores', async () => {
@@ -377,7 +387,15 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
     const res = await editar({ lat: '10.5' });
 
     expect(res.status).toBe(200);
-    expect(db.query.mock.calls[2][1].slice(7)).toStrictEqual([-33.45, -70.66, -33.4527, -70.6627, UUID]);
+    expect(db.query.mock.calls[2][1].slice(7)).toStrictEqual([
+      -33.45,
+      -70.66,
+      -33.4527,
+      -70.6627,
+      null,
+      null,
+      UUID
+    ]);
   });
 
   it('si solo llega lng también se conserva todo', async () => {
@@ -386,7 +404,15 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
     const res = await editar({ lng: '20.25' });
 
     expect(res.status).toBe(200);
-    expect(db.query.mock.calls[2][1].slice(7)).toStrictEqual([-33.45, -70.66, -33.4527, -70.6627, UUID]);
+    expect(db.query.mock.calls[2][1].slice(7)).toStrictEqual([
+      -33.45,
+      -70.66,
+      -33.4527,
+      -70.6627,
+      null,
+      null,
+      UUID
+    ]);
   });
 
   it('trabaja con el id de la fila devuelta, no con el texto de la URL', async () => {
@@ -398,7 +424,7 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
 
     expect(res.status).toBe(200);
     expect(db.query.mock.calls[1]).toStrictEqual([SQL_AVISO, [UUID_MAYUS]]);
-    expect(db.query.mock.calls[2][1][11]).toBe(UUID);
+    expect(db.query.mock.calls[2][1][13]).toBe(UUID);
     expect(db.query.mock.calls[3]).toStrictEqual([SQL_AVISO, [UUID]]);
   });
 
@@ -571,7 +597,7 @@ describe('PATCH /api/reports/:id — editar un aviso propio', () => {
     const res = await editar({ lat: '-90', lng: '180' });
 
     expect(res.status).toBe(200);
-    expect(db.query.mock.calls[2][1].slice(7)).toStrictEqual([-90, 180, -90, 180, UUID]);
+    expect(db.query.mock.calls[2][1].slice(7)).toStrictEqual([-90, 180, -90, 180, null, null, UUID]);
   });
 
   it('si la base falla al actualizar responde 500', async () => {
@@ -825,9 +851,9 @@ describe('POST /api/reports/:id/resolve — resolver o reabrir', () => {
     const res = await resolver({ resolved: true }, 'xyz');
 
     expect(res.status).toBe(400);
-    // Ojo: esta ruta usa un mensaje fijo para cualquier error de validación,
-    // así que un id mal formado no se distingue de un `resolved` inválido.
-    expect(res.body).toStrictEqual(DATO_INVALIDO);
+    // El id mal formado y el `resolved` inválido ya se distinguen: cada validador
+    // lleva su propio mensaje en vez de compartir un "Dato inválido." genérico.
+    expect(res.body).toStrictEqual(ID_INVALIDO);
     expect(sqls()).toStrictEqual([SQL_TOKEN]);
   });
 
@@ -839,7 +865,7 @@ describe('POST /api/reports/:id/resolve — resolver o reabrir', () => {
       const res = await resolver(cuerpo);
 
       expect(res.status).toBe(400);
-      expect(res.body).toStrictEqual(DATO_INVALIDO);
+      expect(res.body).toStrictEqual(RESOLVED_INVALIDO);
       expect(sqls()).toStrictEqual([SQL_TOKEN]);
     }
   );
@@ -853,13 +879,13 @@ describe('POST /api/reports/:id/resolve — resolver o reabrir', () => {
     expect(res.body).toStrictEqual(NO_ENCONTRADO);
   });
 
-  it('un aviso de otro usuario responde 404', async () => {
+  it('un aviso de otro usuario responde 403 (no 404)', async () => {
     montarBase({ fila: aviso({ user_id: OTRO }) });
 
     const res = await resolver({ resolved: true });
 
-    expect(res.status).toBe(404);
-    expect(res.body).toStrictEqual(NO_ENCONTRADO);
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(AJENO);
     expect(sqls()).toStrictEqual([SQL_TOKEN, SQL_AVISO]);
   });
 
@@ -884,24 +910,36 @@ describe('POST /api/reports/:id/resolve — resolver o reabrir', () => {
     expect(db.query.mock.calls[2][1]).toStrictEqual([false, null, UUID]);
   });
 
-  it('el texto "true" no cuenta como resuelto: exige el booleano de verdad', async () => {
+  it('el texto "true" se rechaza con 400: exige el booleano de verdad', async () => {
     montarBase();
 
     const res = await resolver({ resolved: 'true' });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ ok: true, resolved: false });
-    expect(db.query.mock.calls[2][1]).toStrictEqual([false, null, UUID]);
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(RESOLVED_INVALIDO);
+    expect(sqls()).toStrictEqual([SQL_TOKEN]);
   });
 
-  it('un 1 también pasa el validador pero NO se guarda como resuelto', async () => {
+  // Hallazgo: `isBoolean()` de express-validator acepta 1, y después
+  // `req.body.resolved === true` lo guardaba como `false`. La API decía 200 y
+  // "resolved: false" ante un 1 que el cliente mandó como "sí".
+  it('un 1 ahora se rechaza con 400 en vez de guardarse como false', async () => {
     montarBase();
 
     const res = await resolver({ resolved: 1 });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ ok: true, resolved: false });
-    expect(db.query.mock.calls[2][1]).toStrictEqual([false, null, UUID]);
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(RESOLVED_INVALIDO);
+    expect(sqls()).toStrictEqual([SQL_TOKEN]);
+  });
+
+  it('un 0 también se rechaza con 400', async () => {
+    montarBase();
+
+    const res = await resolver({ resolved: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(RESOLVED_INVALIDO);
   });
 
   it('si la base falla responde 500', async () => {
@@ -1017,13 +1055,13 @@ describe('POST /api/reports/:id/flag — reportar un aviso', () => {
     expect(res.body).toStrictEqual(GRACIAS);
   });
 
-  it('HALLAZGO: la comprobación es estricta (=== false): un 0 no bloquea la petición', async () => {
+  it('un valor falsy que no sea `false` (0) tampoco deja reportar: responde 403', async () => {
     montarBase({ fila: aviso({ user_id: OTRO }), verificada: 0, resto: restoFlag() });
 
     const res = await flag();
 
-    expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual(GRACIAS);
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(SIN_VERIFICAR);
   });
 
   it('con 10 reportes en 24 h responde 429 y no inserta nada', async () => {
@@ -1153,13 +1191,13 @@ describe('DELETE /api/reports/:id — dar de baja un aviso propio', () => {
     expect(storage.deletePhoto).not.toHaveBeenCalled();
   });
 
-  it('un aviso de otro usuario responde 404 y no se da de baja', async () => {
+  it('un aviso de otro usuario responde 403 (no 404) y no se da de baja', async () => {
     montarBase({ fila: aviso({ user_id: OTRO }) });
 
     const res = await borrar();
 
-    expect(res.status).toBe(404);
-    expect(res.body).toStrictEqual(NO_ENCONTRADO);
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(AJENO);
     expect(sqls()).toStrictEqual([SQL_TOKEN, SQL_AVISO]);
     expect(storage.deletePhoto).not.toHaveBeenCalled();
   });

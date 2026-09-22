@@ -9,7 +9,11 @@ const storage = require('../storage');
 const push = require('../push');
 const { radioBusquedaKm, curvaRadio, sugerenciaBusqueda } = require('../busqueda');
 const { hashPerceptual } = require('../src/v2/phash');
+const chip = require('../src/v2/chip');
 const { cajaBusqueda, coincidenciasDeOtros, duplicadosDeFoto } = require('../src/v2/coincidencias');
+// Misma constante que usa el cuadro de búsqueda de src/v2: antes aquí estaba
+// escrito 111.32 a mano y el cuadro quedaba más estrecho que el radio.
+const { KM_POR_GRADO, COS_MINIMO } = require('../src/v2/geo');
 const { requireAuth, optionalAuth, requireVerified } = require('../middleware/auth');
 const { keyPorIp } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
@@ -48,6 +52,13 @@ const flagLimiter = rateLimit({
 const infoLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: numEnv('LIMITE_CONSULTAS_15MIN', 200),
+  keyGenerator: keyPorIp
+});
+// El microchip es el dato más sensible de un aviso: verlo se limita aparte, más
+// estrecho que el resto de consultas, para que no se pueda cosechar en serie.
+const chipLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: numEnv('LIMITE_CHIP_HORA', 30),
   keyGenerator: keyPorIp
 });
 
@@ -89,6 +100,7 @@ function jitter(lat, lng, meters = 300) {
 }
 
 function publicReport(r, me) {
+  const esMio = !!me && r.user_id === me;
   return {
     id: r.id,
     estado: r.estado,
@@ -101,7 +113,12 @@ function publicReport(r, me) {
     nombre_mascota: r.estado === 'perdido' ? r.nombre_mascota : null,
     foto_url: r.foto_url || null,
     resolved: !!r.resolved,
-    es_mio: !!me && r.user_id === me,
+    es_mio: esMio,
+    // Del microchip solo sale esto: si existe (para poder decir "tiene chip
+    // declarado") y, SOLO para su dueño, los últimos 4 dígitos. El número
+    // completo no se devuelve en ningún listado.
+    tiene_chip: Boolean(r.chip_hash),
+    chip_enmascarado: esMio ? enmascararChip(r) : null,
     radio_km: r.radio_km === null || r.radio_km === undefined ? null : Number(r.radio_km),
     perdido_hace_horas:
       r.perdido_hace_horas === null || r.perdido_hace_horas === undefined
@@ -111,6 +128,15 @@ function publicReport(r, me) {
     lng: r.lng_public,
     created_at: Number(r.created_at)
   };
+}
+
+// Solo para el dueño del aviso: los últimos 4 dígitos del chip que declaró. Se
+// descifra al vuelo (el número no está en claro en ninguna parte) y si el secreto
+// cambió se devuelve null en vez de romper el listado entero.
+function enmascararChip(r) {
+  if (!r.chip_cifrado) return null;
+  const claro = chip.descifrar(r.chip_cifrado, secretoChip());
+  return claro ? chip.enmascarar(claro) : null;
 }
 
 async function findReport(id) {
@@ -128,11 +154,59 @@ async function contarUltimas24h(sql, userId) {
   return r.rows[0].n;
 }
 
+/* ---------- Microchip (dato privado) ---------- */
+// El número del chip no se guarda en claro ni se devuelve nunca en un listado.
+// Se guarda su huella HMAC (lo único que se compara) y su forma cifrada (para
+// que el dueño pueda verlo con el botón "visualizar").
+//
+// CHIP_SECRET es propio y no JWT_SECRET para poder rotar el secreto de sesión sin
+// perder los chips ya guardados; si no está definido se usa JWT_SECRET para que
+// la app funcione sin configuración extra.
+function secretoChip() {
+  return process.env.CHIP_SECRET || process.env.JWT_SECRET || '';
+}
+
+// Traduce el chip que llega del formulario a lo que se guarda.
+// `undefined` significa "no lo toques"; la cadena vacía significa "bórralo".
+//
+// No se comprueba aquí que exista secreto: server.js aborta el arranque sin
+// JWT_SECRET, así que la app no puede estar viva sin uno. Si aun así faltara,
+// huella() y cifrar() devuelven vacío (fail-closed) y el aviso queda "sin chip"
+// en vez de guardar algo comparable.
+function prepararChip(valor) {
+  if (valor === undefined) return { ok: true, definido: false };
+  const texto = String(valor == null ? '' : valor).trim();
+  if (texto === '') return { ok: true, definido: true, chipHash: null, chipCifrado: null };
+  if (!chip.esValido(texto)) return { ok: false, error: 'El microchip debe tener entre 9 y 15 dígitos.' };
+  const secreto = secretoChip();
+  return {
+    ok: true,
+    definido: true,
+    chipHash: chip.huella(texto, secreto),
+    chipCifrado: chip.cifrar(texto, secreto)
+  };
+}
+
+// ¿Dos avisos declaran el mismo chip? Compara huellas, nunca el número. El
+// primer aviso siempre existe (la ruta ya lo comprobó), así que solo hay que
+// mirar su huella: un aviso sin chip nunca coincide "por vacío".
+function coincidePorChip(a, b) {
+  return Boolean(a.chip_hash) && a.chip_hash === b.chip_hash;
+}
+
+// Comparación de color del listado de coincidencias: basta con que compartan la
+// primera palabra ("negro con blanco" coincide con "negro").
+function coincideColor(mio, otro) {
+  const a = String(mio).toLowerCase();
+  const b = String(otro).toLowerCase();
+  return b.includes(a.split(' ')[0]) || a.includes(b.split(' ')[0]);
+}
+
 // Avisa a quienes pidieron alertas de su zona cuando se pierde una mascota
 // cerca. El radio sale de busqueda.js (cuánto se aleja según el tiempo).
 async function notificarZona(reportId, tipo, color, lat, lng, radioKm, excluirUserId) {
-  const dLat = radioKm / 111.32;
-  const dLng = radioKm / (111.32 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)));
+  const dLat = radioKm / KM_POR_GRADO;
+  const dLng = radioKm / (KM_POR_GRADO * Math.max(COS_MINIMO, Math.cos((lat * Math.PI) / 180)));
   const rows = (
     await db.query(
       `SELECT user_id, lat, lng FROM zone_alerts
@@ -176,20 +250,35 @@ function payloadCoincidencia(nuevo, coincidencia) {
   };
 }
 
+// Aviso al dueño de un aviso cuando el otro declara el MISMO microchip. Nunca
+// lleva el número: solo "coincide", que ya lo saben las dos partes.
+function payloadChip(nuevo) {
+  return {
+    title: '✅ El microchip coincide',
+    body: `Publicaron un aviso de ${nuevo.tipo} que declara el mismo microchip que el tuyo. Toca para verlo.`,
+    report_id: nuevo.id,
+    tag: 'chip-' + nuevo.id
+  };
+}
+
+// Aviso para el autor que acaba de publicar: cuántas coincidencias hay. Si la hay
+// por microchip se dice abiertamente, porque es la única que no puede deducir.
+function avisoCoincidenciasAlAutor(nuevo, coincidencias) {
+  if (coincidencias.some(c => c.por_chip)) return payloadChip(nuevo);
+  return {
+    title: '🔎 Encontramos posibles coincidencias',
+    body: `Hay ${coincidencias.length} aviso(s) que podrían ser tu mascota. Toca para verlos.`,
+    report_id: nuevo.id,
+    tag: 'coincidencia-' + nuevo.id
+  };
+}
+
 // Avisos para el autor del aviso recién creado: cuántas coincidencias hay y si
 // la foto ya se había publicado.
 function avisosAlAutor(nuevo, coincidencias, duplicados) {
   const tareas = [];
-  if (coincidencias.length) {
-    tareas.push(
-      avisarPush(nuevo.user_id, {
-        title: '🔎 Encontramos posibles coincidencias',
-        body: `Hay ${coincidencias.length} aviso(s) que podrían ser tu mascota. Toca para verlos.`,
-        report_id: nuevo.id,
-        tag: 'coincidencia-' + nuevo.id
-      })
-    );
-  }
+  if (coincidencias.length)
+    tareas.push(avisarPush(nuevo.user_id, avisoCoincidenciasAlAutor(nuevo, coincidencias)));
   if (duplicados.length) {
     tareas.push(
       avisarPush(nuevo.user_id, {
@@ -205,19 +294,27 @@ function avisosAlAutor(nuevo, coincidencias, duplicados) {
 
 async function revisarCoincidencias(nuevo) {
   const caja = cajaBusqueda(nuevo.lat, nuevo.lng);
+  // Además de la caja geográfica se traen los avisos con el MISMO chip, que
+  // pueden estar a cualquier distancia y con el tipo mal declarado. Si el aviso
+  // no declara chip, $7 va NULL y esa condición no aporta nada (NULL nunca es
+  // verdadero en SQL), así que no hace falta una consulta distinta.
   const candidatos = (
     await db.query(
       `SELECT * FROM reports
-        WHERE tipo = $1 AND active = TRUE AND resolved = FALSE AND id <> $2
-          AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6
+        WHERE active = TRUE AND resolved = FALSE AND id <> $2
+          AND ((tipo = $1 AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6) OR chip_hash = $7)
         LIMIT 100`,
-      [nuevo.tipo, nuevo.id, caja.latMin, caja.latMax, caja.lngMin, caja.lngMax]
+      [nuevo.tipo, nuevo.id, caja.latMin, caja.latMax, caja.lngMin, caja.lngMax, nuevo.chip_hash || null]
     )
   ).rows;
 
   const coincidencias = coincidenciasDeOtros(nuevo, candidatos);
   const duplicados = duplicadosDeFoto(nuevo, candidatos);
-  const tareas = coincidencias.map(c => avisarPush(c.user_id, payloadCoincidencia(nuevo, c)));
+  // El aviso por chip no puede decir "a 300 km" con el texto de siempre: se
+  // distingue para que el destinatario entienda por qué le llega.
+  const tareas = coincidencias.map(c =>
+    avisarPush(c.user_id, c.por_chip ? payloadChip(nuevo) : payloadCoincidencia(nuevo, c))
+  );
   await Promise.all(tareas.concat(avisosAlAutor(nuevo, coincidencias, duplicados)));
 }
 
@@ -239,6 +336,12 @@ router.post(
   body('lat').isFloat({ min: -90, max: 90 }),
   body('lng').isFloat({ min: -180, max: 180 }),
   body('perdido_hace_horas').optional({ values: 'falsy' }).isInt({ min: 0, max: 8760 }),
+  body('codigo_chip')
+    .optional({ values: 'falsy' })
+    .isString()
+    .trim()
+    .isLength({ max: 32 })
+    .withMessage('El microchip no es válido.'),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
@@ -252,6 +355,8 @@ router.post(
         return res.status(429).json({ error: 'Alcanzaste el límite de avisos por hoy. Intenta mañana.' });
 
       const { estado, tipo, sexo, color, raza, collar, descripcion, nombre_mascota } = req.body;
+      const ch = prepararChip(req.body.codigo_chip);
+      if (!ch.ok) return res.status(400).json({ error: ch.error });
       const lat = parseFloat(req.body.lat),
         lng = parseFloat(req.body.lng);
       const pub = jitter(lat, lng);
@@ -274,8 +379,8 @@ router.post(
 
       await db.query(
         `INSERT INTO reports
-          (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km,foto_hash)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18,$19)`,
+          (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km,foto_hash,chip_hash,chip_cifrado)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18,$19,$20,$21)`,
         [
           id,
           req.userId,
@@ -295,7 +400,9 @@ router.post(
           Date.now(),
           horasPerdido,
           radioKm,
-          fotoHash
+          fotoHash,
+          ch.chipHash || null,
+          ch.chipCifrado || null
         ]
       );
 
@@ -614,28 +721,65 @@ router.get('/:id/matches', requireAuth, infoLimiter, param('id').isUUID(), async
       return res.status(403).json({ error: 'Solo puedes ver coincidencias de tus propios avisos.' });
 
     const opuesto = report.estado === 'perdido' ? 'encontrado' : 'perdido';
-    const dLat = 5 / 111.32; // ~5 km
-    const dLng = 5 / (111.32 * Math.max(0.1, Math.cos((report.lat * Math.PI) / 180)));
+    const dLat = 5 / KM_POR_GRADO; // ~5 km
+    const dLng = 5 / (KM_POR_GRADO * Math.max(COS_MINIMO, Math.cos((report.lat * Math.PI) / 180)));
+    // Igual que en revisarCoincidencias: la caja trae los avisos de la zona y,
+    // aparte, cualquiera que declare el MISMO microchip aunque esté lejísimos.
     const candidatos = await db.query(
       `SELECT * FROM reports
-        WHERE estado = $1 AND tipo = $2 AND active = TRUE AND resolved = FALSE
-          AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6
+        WHERE estado = $1 AND active = TRUE AND resolved = FALSE
+          AND ((tipo = $2 AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6) OR chip_hash = $7)
         LIMIT 100`,
-      [opuesto, report.tipo, report.lat - dLat, report.lat + dLat, report.lng - dLng, report.lng + dLng]
+      [
+        opuesto,
+        report.tipo,
+        report.lat - dLat,
+        report.lat + dLat,
+        report.lng - dLng,
+        report.lng + dLng,
+        report.chip_hash || null
+      ]
     );
 
     const matches = candidatos.rows
-      .map(c => ({ ...c, dist: haversine(report.lat, report.lng, c.lat, c.lng) }))
-      .filter(
-        c =>
-          c.dist <= 5 &&
-          (c.color.toLowerCase().includes(report.color.toLowerCase().split(' ')[0]) ||
-            report.color.toLowerCase().includes(c.color.toLowerCase().split(' ')[0]))
-      )
-      .sort((a, b) => a.dist - b.dist)
-      .map(c => ({ ...publicReport(c, req.userId), distancia_km: Math.round(c.dist * 10) / 10 }));
+      .map(c => ({
+        ...c,
+        dist: haversine(report.lat, report.lng, c.lat, c.lng),
+        porChip: coincidePorChip(report, c)
+      }))
+      // El mismo microchip no necesita ni estar cerca ni tener el color parecido:
+      // es el mismo animal.
+      .filter(c => c.porChip || (c.dist <= 5 && coincideColor(report.color, c.color)))
+      .sort((a, b) => Number(b.porChip) - Number(a.porChip) || a.dist - b.dist)
+      .map(c => ({
+        ...publicReport(c, req.userId),
+        distancia_km: Math.round(c.dist * 10) / 10,
+        por_chip: c.porChip
+      }));
 
     res.json({ matches });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------- Ver el microchip de un aviso propio ---------- */
+// El número completo solo sale por aquí, solo para el dueño y solo cuando lo pide
+// a propósito (el botón "visualizar" del frontend). No va en listados, ni en
+// push, ni en el aviso público: así una consulta casual no puede cosechar chips.
+router.get('/:id/chip', requireAuth, chipLimiter, param('id').isUUID(), async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
+
+    const report = await findReport(req.params.id);
+    if (!report) return res.status(404).json({ error: 'Aviso no encontrado.' });
+    // 403 y no 404, igual que en PATCH: el aviso existe, no es suyo.
+    if (report.user_id !== req.userId) return res.status(403).json({ error: 'Este aviso no es tuyo.' });
+
+    const claro = report.chip_cifrado ? chip.descifrar(report.chip_cifrado, secretoChip()) : null;
+    if (!claro) return res.json({ chip: null, enmascarado: null, tiene_chip: false });
+    res.json({ chip: claro, enmascarado: chip.enmascarar(claro), tiene_chip: true });
   } catch (err) {
     next(err);
   }
@@ -784,7 +928,14 @@ const editValidators = [
   body('descripcion').optional().trim().isLength({ max: 1000 }),
   body('nombre_mascota').optional().trim().isLength({ max: 60 }),
   body('lat').optional().isFloat({ min: -90, max: 90 }),
-  body('lng').optional().isFloat({ min: -180, max: 180 })
+  body('lng').optional().isFloat({ min: -180, max: 180 }),
+  // Aquí la cadena vacía SÍ es significativa: significa "bórrame el microchip".
+  body('codigo_chip')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 32 })
+    .withMessage('El microchip no es válido.')
 ];
 
 router.patch('/:id', requireAuth, param('id').isUUID(), ...editValidators, async (req, res, next) => {
@@ -793,10 +944,15 @@ router.patch('/:id', requireAuth, param('id').isUUID(), ...editValidators, async
     if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
     const report = await findReport(req.params.id);
-    if (!report || report.user_id !== req.userId)
-      return res.status(404).json({ error: 'Aviso no encontrado.' });
+    if (!report) return res.status(404).json({ error: 'Aviso no encontrado.' });
+    // 403 y no 404: el aviso existe, solo que no es suyo. Con 404 el dueño que se
+    // equivoca de dispositivo (o el que mira el aviso de otro) no puede
+    // distinguir "no existe" de "no es tuyo".
+    if (report.user_id !== req.userId) return res.status(403).json({ error: 'Este aviso no es tuyo.' });
 
     const b = req.body;
+    const ch = prepararChip(b.codigo_chip);
+    if (!ch.ok) return res.status(400).json({ error: ch.error });
     const val = (campo, actual) =>
       b[campo] === undefined ? actual : b[campo].trim() === '' ? null : b[campo].trim();
     let lat = report.lat,
@@ -813,8 +969,9 @@ router.patch('/:id', requireAuth, param('id').isUUID(), ...editValidators, async
 
     await db.query(
       `UPDATE reports SET tipo=$1, sexo=$2, color=$3, raza=$4, collar=$5, descripcion=$6,
-              nombre_mascota=$7, lat=$8, lng=$9, lat_public=$10, lng_public=$11
-        WHERE id=$12`,
+              nombre_mascota=$7, lat=$8, lng=$9, lat_public=$10, lng_public=$11,
+              chip_hash=$12, chip_cifrado=$13
+        WHERE id=$14`,
       [
         val('tipo', report.tipo),
         val('sexo', report.sexo),
@@ -827,6 +984,8 @@ router.patch('/:id', requireAuth, param('id').isUUID(), ...editValidators, async
         lng,
         latPub,
         lngPub,
+        ch.definido ? ch.chipHash : report.chip_hash || null,
+        ch.definido ? ch.chipCifrado : report.chip_cifrado || null,
         report.id
       ]
     );
@@ -889,16 +1048,21 @@ router.post(
 router.post(
   '/:id/resolve',
   requireAuth,
-  param('id').isUUID(),
-  body('resolved').isBoolean(),
+  param('id').isUUID().withMessage('Identificador inválido.'),
+  // `isBoolean()` de express-validator acepta 1 y 0, y luego
+  // `req.body.resolved === true` los guardaba como `false`: la API respondía 200
+  // y "resolved: false" ante un 1 que el cliente mandó como "sí". Se exige el
+  // booleano de verdad.
+  body('resolved').isBoolean({ strict: true }).withMessage('El campo resolved debe ser true o false.'),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ error: 'Dato inválido.' });
+      if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
 
       const report = await findReport(req.params.id);
-      if (!report || report.user_id !== req.userId)
-        return res.status(404).json({ error: 'Aviso no encontrado.' });
+      if (!report) return res.status(404).json({ error: 'Aviso no encontrado.' });
+      // Igual que en PATCH y DELETE: existe pero no es suyo -> 403, no 404.
+      if (report.user_id !== req.userId) return res.status(403).json({ error: 'Este aviso no es tuyo.' });
 
       const resolved = req.body.resolved === true;
       await db.query('UPDATE reports SET resolved = $1, resolved_at = $2 WHERE id = $3', [
@@ -972,8 +1136,9 @@ router.delete('/:id', requireAuth, param('id').isUUID(), async (req, res, next) 
     if (!errors.isEmpty()) return res.status(400).json({ error: 'Identificador inválido.' });
 
     const report = await findReport(req.params.id);
-    if (!report || report.user_id !== req.userId)
-      return res.status(404).json({ error: 'Aviso no encontrado.' });
+    if (!report) return res.status(404).json({ error: 'Aviso no encontrado.' });
+    // Igual que en PATCH /:id: existe pero no es suyo -> 403, no 404.
+    if (report.user_id !== req.userId) return res.status(403).json({ error: 'Este aviso no es tuyo.' });
     // Con el id de la fila, igual que PATCH /:id: el texto de la URL puede venir
     // con otro formato (mayúsculas) y findReport ya devolvió el id real.
     await db.query('UPDATE reports SET active = FALSE WHERE id = $1', [report.id]);

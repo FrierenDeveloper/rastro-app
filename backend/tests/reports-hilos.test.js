@@ -27,6 +27,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { db, push, crearApp, pedir, tokenPara } from './helpers/aislar.js';
 import reportsRouter from '../routes/reports.js';
+// La misma constante que usa la ruta (antes esta prueba replicaba 111.32 a mano).
+import { KM_POR_GRADO, COS_MINIMO } from '../src/v2/geo.js';
 import QRCode from 'qrcode';
 
 const app = crearApp({ '/api/reports': reportsRouter });
@@ -416,6 +418,8 @@ describe('GET /api/reports/:id', () => {
         foto_url: '/uploads/firulais.jpg',
         resolved: false,
         es_mio: false,
+        tiene_chip: false,
+        chip_enmascarado: null,
         radio_km: 3.5,
         perdido_hace_horas: 48,
         lat: -33.4489,
@@ -583,12 +587,12 @@ describe('GET /api/reports/:id/matches', () => {
     expect(res.status).toBe(200);
     expect(res.body).toStrictEqual({ matches: [] });
 
-    const dLat = 5 / 111.32;
-    const dLng = 5 / (111.32 * Math.max(0.1, Math.cos((-33.4489 * Math.PI) / 180)));
+    const dLat = 5 / KM_POR_GRADO;
+    const dLng = 5 / (KM_POR_GRADO * Math.max(COS_MINIMO, Math.cos((-33.4489 * Math.PI) / 180)));
     const consulta = consultaCon('LIMIT 100');
-    expect(consulta[0]).toContain('WHERE estado = $1 AND tipo = $2 AND active = TRUE AND resolved = FALSE');
-    expect(consulta[0]).toContain('lat BETWEEN $3 AND $4');
-    expect(consulta[0]).toContain('lng BETWEEN $5 AND $6');
+    expect(consulta[0]).toContain('WHERE estado = $1 AND active = TRUE AND resolved = FALSE');
+    expect(consulta[0]).toContain('tipo = $2 AND lat BETWEEN $3 AND $4 AND lng BETWEEN $5 AND $6');
+    expect(consulta[0]).toContain('OR chip_hash = $7');
     expect(consulta[0]).toContain('LIMIT 100');
     expect(consulta[1][0]).toBe('encontrado');
     expect(consulta[1][1]).toBe('perro');
@@ -596,6 +600,8 @@ describe('GET /api/reports/:id/matches', () => {
     expect(consulta[1][3]).toBeCloseTo(-33.4489 + dLat, 10);
     expect(consulta[1][4]).toBeCloseTo(-70.6693 - dLng, 10);
     expect(consulta[1][5]).toBeCloseTo(-70.6693 + dLng, 10);
+    // Sin microchip declarado el parámetro va NULL y la condición no aporta nada.
+    expect(consulta[1][6]).toBeNull();
   });
 
   it('si el aviso es un encontrado busca perdidos', async () => {
@@ -612,7 +618,7 @@ describe('GET /api/reports/:id/matches', () => {
 
     const res = await conToken(pedir(app).get(`/api/reports/${UUID}/matches`), DUENO);
 
-    const dLng = 5 / (111.32 * 0.1);
+    const dLng = 5 / (KM_POR_GRADO * COS_MINIMO);
     expect(res.status).toBe(200);
     expect(consultaCon('LIMIT 100')[1][4]).toBeCloseTo(-dLng, 10);
     expect(consultaCon('LIMIT 100')[1][5]).toBeCloseTo(dLng, 10);
@@ -744,12 +750,15 @@ describe('GET /api/reports/:id/matches', () => {
       foto_url: null,
       resolved: false,
       es_mio: true,
+      tiene_chip: false,
+      chip_enmascarado: null,
       radio_km: null,
       perdido_hace_horas: null,
       lat: 0.02,
       lng: 0.03,
       created_at: 1700000000000,
-      distancia_km: 1.1
+      distancia_km: 1.1,
+      por_chip: false
     });
     expect(res.body.matches[1].distancia_km).toBe(3.3);
     expect(res.body.matches[1].es_mio).toBe(false);

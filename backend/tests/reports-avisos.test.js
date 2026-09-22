@@ -31,6 +31,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db, storage, push, crearApp, pedir, tokenPara } from './helpers/aislar.js';
 import reportsRouter from '../routes/reports.js';
+// La misma constante que usa la ruta: si aquí se volviera a escribir 111.32 a
+// mano, la prueba dejaría de detectar que el cuadro es más estrecho que el radio.
+import { KM_POR_GRADO, COS_MINIMO } from '../src/v2/geo.js';
 import { PNG as PNGjs } from 'pngjs';
 
 const app = crearApp({ '/api/reports': reportsRouter });
@@ -63,7 +66,7 @@ const CUPO_HORARIO = { error: 'Publicaste demasiados avisos en poco tiempo. Inte
 const IMAGEN_INVALIDA = { error: 'El archivo no es una imagen válida.' };
 const VALOR_INVALIDO = { error: 'Invalid value' };
 
-const SQL_INSERT = `INSERT INTO reports (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km,foto_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18,$19)`;
+const SQL_INSERT = `INSERT INTO reports (id,user_id,estado,tipo,sexo,color,raza,collar,descripcion,nombre_mascota,foto_url,lat,lng,lat_public,lng_public,active,resolved,created_at,perdido_hace_horas,radio_km,foto_hash,chip_hash,chip_cifrado) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,TRUE,FALSE,$16,$17,$18,$19,$20,$21)`;
 const SQL_AVISOS_24H = 'SELECT COUNT(*)::int AS n FROM reports WHERE user_id = $1 AND created_at > $2';
 
 const TIPOS = ['perro', 'gato', 'ave', 'conejo', 'otro'];
@@ -167,7 +170,9 @@ const COLUMNAS = [
   'created_at',
   'perdido_hace_horas',
   'radio_km',
-  'foto_hash'
+  'foto_hash',
+  'chip_hash',
+  'chip_cifrado'
 ];
 
 const creados = [];
@@ -217,6 +222,10 @@ const AVISO_PUBLICO = {
   foto_url: null,
   resolved: false,
   es_mio: true,
+  // El microchip solo deja ver si existe; los últimos 4 dígitos van solo en el
+  // endpoint dedicado. Aquí no hay chip declarado.
+  tiene_chip: false,
+  chip_enmascarado: null,
   radio_km: null,
   perdido_hace_horas: null,
   lat: expect.any(Number),
@@ -441,6 +450,9 @@ describe('POST /api/reports/ · guardado del aviso', () => {
       expect.any(Number),
       null,
       null,
+      null,
+      // Sin microchip declarado: huella y forma cifrada van a NULL.
+      null,
       null
     ]);
     expect(typeof creados[0][0]).toBe('string');
@@ -578,10 +590,10 @@ describe('POST /api/reports/ · radio sugerido y aviso a la zona', () => {
 
     expect(res.status).toBe(201);
     expect(paramsDe('FROM zone_alerts')).toStrictEqual([
-      -33.45 - 0.5 / 111.32,
-      -33.45 + 0.5 / 111.32,
-      -70.66 - 0.5 / (111.32 * Math.cos((-33.45 * Math.PI) / 180)),
-      -70.66 + 0.5 / (111.32 * Math.cos((-33.45 * Math.PI) / 180))
+      -33.45 - 0.5 / KM_POR_GRADO,
+      -33.45 + 0.5 / KM_POR_GRADO,
+      -70.66 - 0.5 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180)),
+      -70.66 + 0.5 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180))
     ]);
     expect(push.sendToUser.mock.calls.map(call => call[0])).toStrictEqual([OTRO, 'cerca-4']);
     expect(push.sendToUser).toHaveBeenCalledWith(OTRO, {
@@ -617,10 +629,10 @@ describe('POST /api/reports/ · radio sugerido y aviso a la zona', () => {
     await reposar();
 
     const [latMin, latMax, lngMin, lngMax] = paramsDe('FROM zone_alerts');
-    expect(latMin).toBeCloseTo(89.9 - 0.5 / 111.32, 10);
-    expect(latMax).toBeCloseTo(89.9 + 0.5 / 111.32, 10);
-    expect(lngMin).toBeCloseTo(-0.5 / (111.32 * 0.1), 10);
-    expect(lngMax).toBeCloseTo(0.5 / (111.32 * 0.1), 10);
+    expect(latMin).toBeCloseTo(89.9 - 0.5 / KM_POR_GRADO, 10);
+    expect(latMax).toBeCloseTo(89.9 + 0.5 / KM_POR_GRADO, 10);
+    expect(lngMin).toBeCloseTo(-0.5 / (KM_POR_GRADO * COS_MINIMO), 10);
+    expect(lngMax).toBeCloseTo(0.5 / (KM_POR_GRADO * COS_MINIMO), 10);
   });
 
   it('con un radio de aviso grande el cuadro usa ese radio, no el mínimo de 500 m', async () => {
@@ -630,9 +642,9 @@ describe('POST /api/reports/ · radio sugerido y aviso a la zona', () => {
 
     expect(creados[0][17]).toBe(15);
     const [latMin, latMax, lngMin, lngMax] = paramsDe('FROM zone_alerts');
-    const dLng = 15 / (111.32 * Math.cos((-33.45 * Math.PI) / 180));
-    expect(latMin).toBeCloseTo(-33.45 - 15 / 111.32, 10);
-    expect(latMax).toBeCloseTo(-33.45 + 15 / 111.32, 10);
+    const dLng = 15 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180));
+    expect(latMin).toBeCloseTo(-33.45 - 15 / KM_POR_GRADO, 10);
+    expect(latMax).toBeCloseTo(-33.45 + 15 / KM_POR_GRADO, 10);
     expect(lngMin).toBeCloseTo(-70.66 - dLng, 10);
     expect(lngMax).toBeCloseTo(-70.66 + dLng, 10);
   });
@@ -691,7 +703,7 @@ function baseConCandidatos(candidatos, extra = {}) {
     ...extra,
     resto: (sql, params) => {
       void params;
-      return sql.includes('tipo = $1 AND active = TRUE') ? { rows: candidatos } : { rows: [] };
+      return sql.includes('id <> $2') ? { rows: candidatos } : { rows: [] };
     }
   });
 }
@@ -703,11 +715,11 @@ describe('POST /api/reports/ · coincidencias entre avisos', () => {
     await reposar();
 
     expect(res.status).toBe(201);
-    const params = paramsDe('tipo = $1 AND active = TRUE');
+    const params = paramsDe('id <> $2');
     expect(params[0]).toBe('perro');
     expect(params[1]).toBe(creados[0][0]);
-    const dLat = 5 / 111.32;
-    const dLng = 5 / (111.32 * Math.cos((-33.45 * Math.PI) / 180));
+    const dLat = 5 / KM_POR_GRADO;
+    const dLng = 5 / (KM_POR_GRADO * Math.cos((-33.45 * Math.PI) / 180));
     expect(params[2]).toBeCloseTo(-33.45 - dLat, 10);
     expect(params[3]).toBeCloseTo(-33.45 + dLat, 10);
     expect(params[4]).toBeCloseTo(-70.66 - dLng, 10);
@@ -764,7 +776,7 @@ describe('POST /api/reports/ · coincidencias entre avisos', () => {
   it('si falla la consulta de candidatos, el aviso igual se crea (201)', async () => {
     base({
       resto: sql => {
-        if (sql.includes('tipo = $1 AND active = TRUE')) throw new Error('caída al buscar');
+        if (sql.includes('id <> $2')) throw new Error('caída al buscar');
         return { rows: [] };
       }
     });
@@ -1112,6 +1124,8 @@ describe('GET /api/reports/ · listado público', () => {
           foto_url: '/uploads/luna.jpg',
           resolved: false,
           es_mio: true,
+          tiene_chip: false,
+          chip_enmascarado: null,
           radio_km: 0.3,
           perdido_hace_horas: 4,
           lat: -33.401,
@@ -1160,6 +1174,8 @@ describe('GET /api/reports/ · listado público', () => {
       foto_url: null,
       resolved: true,
       es_mio: false,
+      tiene_chip: false,
+      chip_enmascarado: null,
       radio_km: null,
       perdido_hace_horas: null,
       created_at: null
@@ -1269,6 +1285,8 @@ describe('GET /api/reports/mine/all · mis avisos', () => {
           foto_url: null,
           resolved: false,
           es_mio: true,
+          tiene_chip: false,
+          chip_enmascarado: null,
           radio_km: null,
           perdido_hace_horas: null,
           lat: -33.401,
