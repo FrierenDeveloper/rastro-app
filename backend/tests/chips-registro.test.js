@@ -262,17 +262,18 @@ describe('POST /api/chips/register', () => {
   });
 
   it.each([
-    ['catorce dígitos', '98102030405060'],
-    ['dieciséis dígitos', '9810203040506078'],
-    ['letras', '98102030405060A'],
-    ['un número, no texto', 981020304050607]
-  ])('rechaza un chip con %s y no registra', async (_caso, valor) => {
+    ['catorce dígitos', '98102030405060', CHIP_INVALIDO],
+    ['dieciséis dígitos', '9810203040506078', CHIP_INVALIDO],
+    ['letras', '98102030405060A', CHIP_INVALIDO],
+    ['demasiado largo', '1'.repeat(33), CHIP_INVALIDO],
+    ['un número, no texto', 981020304050607, VALOR_INVALIDO]
+  ])('rechaza un chip con %s y no registra', async (_caso, valor, esperado) => {
     base();
 
     const res = await registrar({ ...REGISTRO, chip_id: valor });
 
     expect(res.status).toBe(400);
-    expect([CHIP_INVALIDO, VALOR_INVALIDO]).toContainEqual(res.body);
+    expect(res.body).toStrictEqual(esperado);
     expect(creados).toHaveLength(0);
   });
 
@@ -518,5 +519,145 @@ describe('DELETE /api/chips/:id', () => {
     const res = await borrar(UUID, { sub: null });
 
     expect(res.status).toBe(401);
+  });
+});
+
+/* ======================================================================== */
+/* Contrato fino: lo que fijan los mutantes que sobrevivían                 */
+/* ======================================================================== */
+describe('POST /api/chips/register · parámetros y traza exactos', () => {
+  it('el cupo diario se cuenta con la cuenta del token y una ventana de 24 h', async () => {
+    const antes = Date.now();
+    base();
+
+    await registrar(REGISTRO);
+
+    const consulta = db.query.mock.calls.find(call => String(call[0]).includes('COUNT(*)::int AS n'));
+    expect(consulta[1][0]).toBe(SUB);
+    // Hacia atrás 24 h, no hacia delante.
+    expect(consulta[1][1]).toBeLessThanOrEqual(antes);
+    expect(consulta[1][1]).toBeGreaterThanOrEqual(antes - 24 * 60 * 60 * 1000 - 5000);
+    expect(consulta[1][1]).toBeLessThan(antes - 24 * 60 * 60 * 1000 + 5000);
+  });
+
+  it('busca el duplicado por la huella y relee la fila por su id', async () => {
+    base();
+
+    await registrar(REGISTRO);
+
+    const duplicado = db.query.mock.calls.find(call =>
+      String(call[0]).includes('SELECT id FROM chip_registrations')
+    );
+    expect(duplicado[1]).toStrictEqual([chip.huella(CHIP, SECRETO_CHIP)]);
+    const relectura = db.query.mock.calls.find(call =>
+      String(call[0]).startsWith('SELECT * FROM chip_registrations')
+    );
+    expect(relectura[1]).toStrictEqual([creados[0][0]]);
+  });
+
+  it('la traza de acceso guarda la tabla, la acción y quién la hizo', async () => {
+    base();
+
+    await registrar(REGISTRO);
+
+    expect(accesos[0][1]).toBe('chip_registrations');
+    expect(accesos[0][3]).toBe('create');
+    expect(accesos[0][4]).toBe(SUB);
+    expect(accesos[0][5]).toEqual(expect.any(Number));
+  });
+
+  it('devuelve la especie declarada tal cual', async () => {
+    base();
+
+    const res = await registrar({ ...REGISTRO, species: 'perro' });
+
+    expect(res.body.registro.species).toBe('perro');
+  });
+
+  it('sin CHIP_SECRET el alta falla con 500 en vez de guardar algo sin proteger', async () => {
+    base();
+    delete process.env.CHIP_SECRET;
+
+    const res = await registrar(REGISTRO);
+
+    expect(res.status).toBe(500);
+    expect(creados).toHaveLength(0);
+  });
+});
+
+describe('PATCH y DELETE · detalles del contrato', () => {
+  it('un nombre vacío en la edición responde 400', async () => {
+    base();
+
+    const res = await editar(UUID, { pet_name: '   ' });
+
+    expect(res.status).toBe(400);
+    expect(actualizados).toHaveLength(0);
+  });
+
+  it('recorta los espacios del nombre antes de guardarlo', async () => {
+    base();
+
+    await editar(UUID, { pet_name: '  Luna  ' });
+
+    expect(actualizados[0][0]).toBe('Luna');
+  });
+
+  it('una especie con espacios se recorta', async () => {
+    base();
+
+    await editar(UUID, { species: '  quiltro  ' });
+
+    expect(actualizados[0][1]).toBe('quiltro');
+  });
+
+  it('la traza de la edición guarda quién y qué acción', async () => {
+    base();
+
+    await editar(UUID, { pet_name: 'Luna' });
+
+    expect(accesos[0][1]).toBe('chip_registrations');
+    expect(accesos[0][3]).toBe('update');
+    expect(accesos[0][4]).toBe(SUB);
+  });
+
+  it('si la base falla al editar responde 500', async () => {
+    base();
+    db.query.mockImplementation(async sql => {
+      if (String(sql).includes('token_version')) return { rows: [{ token_version: 0 }] };
+      if (String(sql).includes('SELECT * FROM chip_registrations WHERE id = $1 AND deleted_at IS NULL')) {
+        return { rows: [registroFila()] };
+      }
+      throw new Error('base caída');
+    });
+
+    const res = await editar(UUID, { pet_name: 'Luna' });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('si la base falla al dar de baja responde 500', async () => {
+    base();
+    db.query.mockImplementation(async sql => {
+      if (String(sql).includes('token_version')) return { rows: [{ token_version: 0 }] };
+      if (String(sql).includes('SELECT * FROM chip_registrations WHERE id = $1 AND deleted_at IS NULL')) {
+        return { rows: [registroFila()] };
+      }
+      throw new Error('base caída');
+    });
+
+    const res = await borrar(UUID);
+
+    expect(res.status).toBe(500);
+  });
+
+  it('la traza de la baja guarda quién y qué acción', async () => {
+    base();
+
+    await borrar(UUID);
+
+    expect(accesos[0][1]).toBe('chip_registrations');
+    expect(accesos[0][3]).toBe('delete');
+    expect(accesos[0][4]).toBe(SUB);
   });
 });

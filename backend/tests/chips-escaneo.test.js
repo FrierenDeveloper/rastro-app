@@ -255,17 +255,18 @@ describe('POST /api/chips/scan · sin coincidencia', () => {
 
 describe('POST /api/chips/scan · validación y cupo', () => {
   it.each([
-    ['catorce dígitos', '98102030405060'],
-    ['letras', '98102030405060A'],
-    ['vacío', ''],
-    ['un número, no texto', 981020304050607]
-  ])('rechaza %s y no registra el intento', async (_caso, valor) => {
+    ['catorce dígitos', '98102030405060', CHIP_INVALIDO],
+    ['letras', '98102030405060A', CHIP_INVALIDO],
+    ['demasiado largo', '1'.repeat(33), CHIP_INVALIDO],
+    ['vacío', '', CHIP_INVALIDO],
+    ['un número, no texto', 981020304050607, VALOR_INVALIDO]
+  ])('rechaza %s y no registra el intento', async (_caso, valor, esperado) => {
     base();
 
     const res = await escanear({ chip_id: valor });
 
     expect(res.status).toBe(400);
-    expect([CHIP_INVALIDO, VALOR_INVALIDO]).toContainEqual(res.body);
+    expect(res.body).toStrictEqual(esperado);
     expect(eventos).toHaveLength(0);
   });
 
@@ -299,5 +300,77 @@ describe('POST /api/chips/scan · validación y cupo', () => {
     const res = await escanear({ chip_id: CHIP });
 
     expect(res.status).toBe(500);
+  });
+});
+
+/* ======================================================================== */
+/* Contrato fino: lo que fijan los mutantes que sobrevivían                 */
+/* ======================================================================== */
+describe('POST /api/chips/scan · parámetros y avisos exactos', () => {
+  it('el evento guarda todos sus campos: huella, quién, huella de IP, coincidencia y fecha', async () => {
+    base();
+    const antes = Date.now();
+
+    await escanear({ chip_id: CHIP }, { sub: OTRO, ip: IP });
+
+    expect(eventos[0][0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(eventos[0][1]).toBe(chip.huella(CHIP, SECRETO_CHIP));
+    expect(eventos[0][2]).toBe(OTRO);
+    expect(eventos[0][3]).toBe(chip.huellaIp(IP, SECRETO_CHIP));
+    expect(eventos[0][4]).toBe(true);
+    expect(eventos[0][5]).toBeGreaterThanOrEqual(antes);
+    expect(eventos[0][5]).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('la traza de la lectura guarda la tabla, la acción y quién escaneó', async () => {
+    base();
+
+    await escanear({ chip_id: CHIP }, { sub: OTRO });
+
+    expect(accesos[0][1]).toBe('chip_registrations');
+    expect(accesos[0][2]).toBe(UUID);
+    expect(accesos[0][3]).toBe('read');
+    expect(accesos[0][4]).toBe(OTRO);
+  });
+
+  it('en un escaneo anónimo la traza queda sin actor', async () => {
+    base();
+
+    await escanear({ chip_id: CHIP });
+
+    expect(accesos[0][4]).toBeNull();
+  });
+
+  it('el correo al dueño lleva el nombre, el aviso y la firma', async () => {
+    base();
+
+    await escanear({ chip_id: CHIP });
+    await reposar();
+
+    const correo = mailer.sendMail.mock.calls[0][0];
+    expect(correo.subject).toContain('Firulais');
+    expect(correo.text).toContain('Alguien acaba de escanear el microchip');
+    expect(correo.text).toContain('Firulais');
+    expect(correo.text).toContain('no compartimos tus datos de contacto');
+    expect(correo.text).toContain('Rastro');
+  });
+
+  it('el push lleva una etiqueta propia del registro, para no repetir avisos', async () => {
+    base();
+
+    await escanear({ chip_id: CHIP });
+    await reposar();
+
+    expect(push.sendToUser).toHaveBeenCalledWith(SUB, expect.objectContaining({ tag: 'chip-scan-' + UUID }));
+  });
+
+  it('sin CHIP_SECRET el escaneo falla con 500 en vez de comparar con la huella vacía', async () => {
+    base();
+    delete process.env.CHIP_SECRET;
+
+    const res = await escanear({ chip_id: CHIP });
+
+    expect(res.status).toBe(500);
+    expect(eventos).toHaveLength(0);
   });
 });
