@@ -645,9 +645,11 @@ function mostrarVista(tab) {
   // Al salir de la vista, cualquier número revelado vuelve a enmascararse.
   if (tab !== 'chips') ocultarChipVisible();
 }
-document.querySelectorAll('.bottom-nav button, .drawer-item[data-vista]').forEach(btn => {
-  btn.addEventListener('click', () => mostrarVista(btn.dataset.tab || btn.dataset.vista));
-});
+document
+  .querySelectorAll('.bottom-nav button, .drawer-item[data-vista], .home-action[data-tab]')
+  .forEach(btn => {
+    btn.addEventListener('click', () => mostrarVista(btn.dataset.tab || btn.dataset.vista));
+  });
 
 /* ============ Geolocalización ============ */
 // Política de ubicación (a propósito, poco invasiva):

@@ -519,6 +519,58 @@ main {
   padding: 16px;
   flex: 1;
 }
+.home-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 2px 0 14px;
+}
+.home-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--ease),
+    border-color var(--ease),
+    box-shadow var(--ease);
+}
+.home-action:hover {
+  transform: translateY(-1px);
+  border-color: var(--ink-faint);
+  box-shadow: var(--shadow-xs);
+}
+.home-action .ic {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  stroke-width: 1.7;
+}
+.home-action span {
+  display: grid;
+  gap: 2px;
+}
+.home-action strong {
+  font-size: 17px;
+}
+.home-action small {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+.home-action.lost {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+.home-action.found {
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
 .view {
   display: none;
 }
@@ -813,8 +865,8 @@ input[type='file'] {
 }
 
 #list-map {
-  height: 280px;
-  border-radius: var(--r-lg);
+  height: 330px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
   margin-bottom: 14px;
