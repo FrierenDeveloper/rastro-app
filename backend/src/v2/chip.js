@@ -128,6 +128,17 @@ function descifrar(texto, secreto) {
   }
 }
 
+// Días que se conserva un registro dado de baja antes de borrarlo del todo. La
+// baja (deleted_at) lo saca de las búsquedas al instante; este plazo existe para
+// poder auditar una baja reciente antes de que el dato desaparezca.
+const DIAS_PURGA = 90;
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+// Instante (ms) a partir del cual un registro borrado ya se puede purgar.
+function fechaLimitePurga(ahora) {
+  return Number(ahora) - DIAS_PURGA * MS_DIA;
+}
+
 module.exports = {
   normalizar,
   esValido,
@@ -137,6 +148,8 @@ module.exports = {
   haySecreto,
   huella,
   huellaIp,
+  fechaLimitePurga,
+  DIAS_PURGA,
   cifrar,
   descifrar,
   LARGO_MINIMO,

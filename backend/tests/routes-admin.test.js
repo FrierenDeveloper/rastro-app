@@ -611,3 +611,72 @@ describe('carga del módulo sin ADMIN_EMAILS', () => {
     aviso.mockRestore();
   });
 });
+
+describe('POST /api/admin/chips/purgar', () => {
+  it('sin token responde 401 y no purga nada', async () => {
+    prepararBase();
+
+    const res = await pedir(app).post('/api/admin/chips/purgar');
+
+    expect(res.status).toBe(401);
+    expect(res.body).toStrictEqual(NO_AUTENTICADO);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('una cuenta que no es administradora responde 403 y no purga', async () => {
+    prepararBase({ email: 'curiosa@test.local' });
+
+    const res = await conToken(pedir(app).post('/api/admin/chips/purgar'), OTRO);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(SIN_PERMISOS);
+    expect(db.query.mock.calls.some(([sql]) => String(sql).includes('DELETE FROM chip_registrations'))).toBe(
+      false
+    );
+  });
+
+  it('una administradora purga los registros con baja anterior al plazo', async () => {
+    const purgas = [];
+    prepararBase({
+      resto: (sql, params) => {
+        if (String(sql).startsWith('DELETE FROM chip_registrations')) {
+          purgas.push(params);
+          return { rows: [], rowCount: 4 };
+        }
+        return { rows: [] };
+      }
+    });
+
+    const res = await conToken(pedir(app).post('/api/admin/chips/purgar'));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ borrados: 4 });
+    expect(purgas).toHaveLength(1);
+    expect(purgas[0][0]).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('sin nada que purgar responde 0', async () => {
+    prepararBase({
+      resto: sql =>
+        String(sql).startsWith('DELETE FROM chip_registrations') ? { rows: [], rowCount: 0 } : { rows: [] }
+    });
+
+    const res = await conToken(pedir(app).post('/api/admin/chips/purgar'));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ borrados: 0 });
+  });
+
+  it('si la base falla responde 500', async () => {
+    prepararBase({
+      resto: sql => {
+        if (String(sql).startsWith('DELETE FROM chip_registrations')) throw new Error('base caída');
+        return { rows: [] };
+      }
+    });
+
+    const res = await conToken(pedir(app).post('/api/admin/chips/purgar'));
+
+    expect(res.status).toBe(500);
+  });
+});

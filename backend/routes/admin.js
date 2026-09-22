@@ -7,6 +7,7 @@ const express = require('express');
 const { param, validationResult } = require('express-validator');
 const db = require('../db');
 const storage = require('../storage');
+const { purgarChipsBorrados } = require('../mantenimiento');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -141,6 +142,20 @@ router.get('/users', requireAuth, requireAdmin, async (req, res, next) => {
         reports: u.reports
       }))
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------- Mantenimiento: purga de microchips dados de baja ---------- */
+// El borrado lógico saca el registro de las búsquedas al instante, pero la fila
+// se conserva 90 días para poder auditar una baja reciente. Esto la borra del
+// todo. Va como endpoint para poder programarlo desde fuera (el hosting no
+// siempre deja ejecutar un script): es idempotente y no toca nada más.
+router.post('/chips/purgar', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const borrados = await purgarChipsBorrados(Date.now());
+    res.json({ borrados });
   } catch (err) {
     next(err);
   }

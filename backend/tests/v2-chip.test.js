@@ -21,6 +21,8 @@ const {
   enmascarar,
   huella,
   huellaIp,
+  fechaLimitePurga,
+  DIAS_PURGA,
   cifrar,
   descifrar,
   haySecreto,
@@ -225,6 +227,21 @@ describe('huellaIp', () => {
     expect(huellaIp(undefined, SECRETO)).toBe('');
     expect(huellaIp('1.1.1.1', '')).toBe('');
     expect(huellaIp('1.1.1.1', null)).toBe('');
+  });
+});
+
+describe('fechaLimitePurga', () => {
+  it('un registro dado de baja se conserva 90 días', () => {
+    expect(DIAS_PURGA).toBe(90);
+  });
+
+  it('devuelve el instante a partir del cual un registro borrado se purga', () => {
+    const ahora = 1_800_000_000_000;
+    expect(fechaLimitePurga(ahora)).toBe(ahora - 90 * 24 * 60 * 60 * 1000);
+  });
+
+  it('acepta el momento como texto numérico', () => {
+    expect(fechaLimitePurga('1800000000000')).toBe(1_800_000_000_000 - 90 * 86_400_000);
   });
 });
 
