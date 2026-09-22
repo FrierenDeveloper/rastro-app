@@ -1650,14 +1650,15 @@ input[type='file'] {
 
 /* ---------- Publicar un aviso por pasos ---------- */
 /* Mismo carril que el onboarding, pero con formularios dentro: el alto lo marca
-   el paso más alto, así el carril no salta al deslizar, y los botones de
-   navegación viven fuera del carril (no se desplazan con él). */
+   el paso visible (se recalcula al cambiar de paso desde app.js), así el carril
+   no salta al deslizar ni deja un hueco enorme en los pasos cortos. */
 .wizard-viewport {
   overflow: hidden;
+  transition: height 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .wizard-track {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
   /* Deja el gesto vertical (scroll) al navegador y se queda el horizontal. */
   touch-action: pan-y;
@@ -1669,6 +1670,24 @@ input[type='file'] {
 /* El primer campo de cada paso no arrastra el margen de los campos anteriores. */
 .wizard-step > label:first-child {
   margin-top: 0;
+}
+/* «Paso 2 de 4 · Cómo es»: en móvil se lee mejor que cuatro puntos de 7 px. */
+.wizard-paso {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+/* Campo que falta por completar: se ve cuál es, no solo que falta algo. */
+.campo-error {
+  border-color: var(--rust-ink) !important;
+  outline: 1px solid var(--rust-ink);
+}
+.error-campo {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--rust-ink);
 }
 .wizard-dots {
   display: flex;

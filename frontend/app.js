@@ -593,10 +593,12 @@ function mostrarVista(tab) {
   if (tab === 'found') {
     asegurarPicker('found');
     renderInbox();
+    ajustarAlto('found');
   }
   if (tab === 'lost') {
     asegurarPicker('lost');
     renderInbox();
+    ajustarAlto('lost');
   }
   if (tab === 'chats') {
     cerrarConversacion();
@@ -608,6 +610,8 @@ function mostrarVista(tab) {
   if (tab === 'chips') {
     renderMisChips();
   }
+  // Al salir de la vista, cualquier número revelado vuelve a enmascararse.
+  if (tab !== 'chips') ocultarChipVisible();
 }
 document.querySelectorAll('.bottom-nav button, .drawer-item[data-vista]').forEach(btn => {
   btn.addEventListener('click', () => mostrarVista(btn.dataset.tab || btn.dataset.vista));
@@ -951,9 +955,11 @@ function limpiarZonaFoto(zone, input) {
 
 /* ============ Publicar por pasos ============ */
 // El formulario de publicar va en cuatro pasos dentro de un carril (el mismo
-// gesto que el onboarding). Cada paso valida lo suyo antes de dejar avanzar: así
-// nadie llega al final con el formulario a medias sin saber qué falta.
+// gesto que el onboarding). Cada paso valida lo suyo antes de dejar avanzar y, si
+// falta algo, señala EL CAMPO: un aviso suelto obliga a adivinar qué falta.
 const PASOS_PUBLICAR = 4;
+const NOMBRES_PASOS = ['Tipo y sexo', 'Cómo es', 'Foto y descripción', 'Ubicación'];
+const BOTONES_PASO = ['Siguiente: ¿cómo es?', 'Siguiente: foto y descripción', 'Siguiente: ubicación', ''];
 const wizardPaso = { found: 0, lost: 0 };
 
 function ultimoPaso(key) {
@@ -968,13 +974,68 @@ function chipMalEscrito(valor) {
   return !/^[0-9]{9,15}$/.test(digitos);
 }
 
-// Qué le falta al paso para poder avanzar. Cadena vacía = se puede pasar.
+// Qué le falta al paso para poder avanzar: null o el campo concreto que falla.
 function problemaDelPaso(key, paso) {
   const valor = id => (document.getElementById(id + '-' + key).value || '').trim();
-  if (paso === 0 && !valor('tipo')) return 'Elige el tipo de animal.';
-  if (paso === 1 && !valor('color')) return 'Escribe el color del animal.';
-  if (paso === 1 && chipMalEscrito(valor('chip'))) return 'El microchip debe tener entre 9 y 15 dígitos.';
-  return '';
+  if (paso === 0 && !valor('tipo')) return { id: 'tipo-' + key, mensaje: 'Elige el tipo de animal.' };
+  if (paso === 1 && !valor('color')) return { id: 'color-' + key, mensaje: 'Escribe el color del animal.' };
+  if (paso === 1 && chipMalEscrito(valor('chip')))
+    return { id: 'chip-' + key, mensaje: 'El microchip debe tener entre 9 y 15 dígitos.' };
+  // En "Perdí" la antigüedad de la pérdida es obligatoria: sin ella no hay radio
+  // de búsqueda. Antes lo cortaba el navegador con su mensaje genérico.
+  if (paso === 3 && key === 'lost' && !document.getElementById('perdido-hace-lost').value)
+    return { id: 'perdido-hace-lost', mensaje: 'Dinos cuándo se perdió.' };
+  return null;
+}
+
+// Señala el campo que falta: borde, mensaje debajo y foco. Se limpia solo en
+// cuanto el usuario corrige el valor.
+function marcarError(id, mensaje) {
+  const campo = document.getElementById(id);
+  if (!campo) return;
+  campo.classList.add('campo-error');
+  campo.setAttribute('aria-invalid', 'true');
+  let aviso = campo.nextElementSibling;
+  if (!aviso || !aviso.classList.contains('error-campo')) {
+    aviso = document.createElement('p');
+    aviso.className = 'error-campo';
+    campo.insertAdjacentElement('afterend', aviso);
+  }
+  aviso.textContent = mensaje;
+  campo.focus();
+}
+
+function limpiarErrorDe(campo) {
+  campo.classList.remove('campo-error');
+  campo.removeAttribute('aria-invalid');
+  const aviso = campo.nextElementSibling;
+  if (aviso && aviso.classList.contains('error-campo')) aviso.remove();
+}
+
+function limpiarErrores(form) {
+  form.querySelectorAll('.campo-error').forEach(limpiarErrorDe);
+}
+
+// Alto del carril = alto del paso que se está viendo. Sin esto el carril mide lo
+// que el paso más alto (el del mapa) y los pasos cortos dejan un hueco enorme.
+function ajustarAlto(key) {
+  const viewport = document.getElementById('wizard-viewport-' + key);
+  const paso = document.querySelector(`#wizard-track-${key} .wizard-step[data-step="${wizardPaso[key]}"]`);
+  if (!viewport || !paso) return;
+  const alto = paso.offsetHeight;
+  // Con la vista oculta la medida es 0: ahí se deja el alto automático.
+  viewport.style.height = alto > 0 ? alto + 'px' : '';
+}
+
+// Dentro de un paso el contenido cambia solo: el gráfico del radio aparece al
+// elegir la antigüedad, la foto sustituye al aviso de "toca para subir", un texto
+// pasa a dos líneas. Si no se vuelve a medir, el carril lo recortaría.
+if (typeof window.ResizeObserver !== 'undefined') {
+  const medirPasos = new window.ResizeObserver(() => {
+    ajustarAlto('found');
+    ajustarAlto('lost');
+  });
+  document.querySelectorAll('.wizard-step').forEach(paso => medirPasos.observe(paso));
 }
 
 function pintarPaso(key) {
@@ -983,9 +1044,19 @@ function pintarPaso(key) {
   document
     .querySelectorAll('#wizard-dots-' + key + ' i')
     .forEach((d, i) => d.classList.toggle('active', i === paso));
+
+  const progreso = document.getElementById('wizard-dots-' + key);
+  progreso.setAttribute('aria-valuenow', String(paso + 1));
+  progreso.setAttribute('aria-label', `Paso ${paso + 1} de ${PASOS_PUBLICAR}`);
+  document.getElementById('wizard-paso-' + key).textContent =
+    `Paso ${paso + 1} de ${PASOS_PUBLICAR} · ${NOMBRES_PASOS[paso]}`;
+
   document.getElementById('wizard-prev-' + key).classList.toggle('hidden', paso === 0);
-  document.getElementById('wizard-next-' + key).classList.toggle('hidden', paso === PASOS_PUBLICAR - 1);
+  const siguiente = document.getElementById('wizard-next-' + key);
+  siguiente.classList.toggle('hidden', ultimoPaso(key));
+  siguiente.textContent = BOTONES_PASO[paso];
   document.getElementById('wizard-submit-' + key).classList.toggle('hidden', !ultimoPaso(key));
+  ajustarAlto(key);
 }
 
 function irAlPaso(key, paso) {
@@ -996,19 +1067,27 @@ function irAlPaso(key, paso) {
 // Avanzar solo si el paso está completo; retroceder nunca bloquea (lo escrito se
 // queda donde estaba: los campos no se vacían al moverse por el carril).
 function avanzarPaso(key) {
+  const form = document.getElementById('form-' + key);
+  limpiarErrores(form);
   const problema = problemaDelPaso(key, wizardPaso[key]);
   if (problema) {
-    toast(problema);
+    marcarError(problema.id, problema.mensaje);
     return;
   }
   irAlPaso(key, wizardPaso[key] + 1);
 }
 
 function initWizard(key) {
+  const form = document.getElementById('form-' + key);
   document
     .getElementById('wizard-prev-' + key)
     .addEventListener('click', () => irAlPaso(key, wizardPaso[key] - 1));
   document.getElementById('wizard-next-' + key).addEventListener('click', () => avanzarPaso(key));
+  // El aviso de error desaparece en cuanto se corrige el campo.
+  form.querySelectorAll('input, select, textarea').forEach(campo => {
+    campo.addEventListener('input', () => limpiarErrorDe(campo));
+    campo.addEventListener('change', () => limpiarErrorDe(campo));
+  });
   activarSwipeOnboarding(
     document.getElementById('wizard-track-' + key),
     paso => irAlPaso(key, paso),
@@ -1016,6 +1095,12 @@ function initWizard(key) {
   );
   pintarPaso(key);
 }
+
+// Al girar el móvil el alto del paso cambia: hay que volver a medirlo.
+window.addEventListener('resize', () => {
+  ajustarAlto('found');
+  ajustarAlto('lost');
+});
 
 /* ============ Publicar aviso ============ */
 function resetForm(key) {
@@ -1983,6 +2068,11 @@ async function guardarUbicacionDeZona() {
 // dueño lo pide a propósito, y la lista ya trae la máscara para mostrarla por
 // defecto. Nada de esto se muestra a otras cuentas en ninguna parte de la app.
 let misChips = [];
+let editandoChipId = null;
+let chipVisibleTimer = null;
+// El número revelado se vuelve a ocultar solo: no conviene que quede a la vista
+// en el móvil si alguien mira por encima del hombro.
+const CHIP_VISIBLE_MS = 30000;
 
 function chipsHTML(registros) {
   if (!registros.length) {
@@ -1995,7 +2085,14 @@ function chipsHTML(registros) {
         <h4>🐾 ${esc(r.pet_name)}${r.species ? ' · ' + esc(r.species) : ''}</h4>
         <div class="report-meta">
           Registrado ${timeAgo(r.created_at)} ·
-          <span class="chip-mascara" data-visible="0" data-mascara="${esc(r.chip_enmascarado || '')}">${esc(r.chip_enmascarado || 'sin datos')}</span>
+          <span
+            class="chip-mascara"
+            role="status"
+            aria-live="polite"
+            data-visible="0"
+            data-mascara="${esc(r.chip_enmascarado || '')}"
+            >${esc(r.chip_enmascarado || 'sin datos')}</span
+          >
         </div>
         <div class="report-actions">
           <button data-action="chip-ver" data-id="${esc(r.id)}">Ver número</button>
@@ -2022,28 +2119,61 @@ async function renderMisChips() {
 // (es el dato de su dueño), así que no hace falta otra llamada.
 function alternarChipVisible(btn, registro) {
   const caja = btn.closest('.inbox-item').querySelector('.chip-mascara');
-  const visible = caja.dataset.visible === '1';
-  caja.dataset.visible = visible ? '0' : '1';
-  caja.textContent = visible ? caja.dataset.mascara : registro.chip || caja.dataset.mascara;
-  btn.textContent = visible ? 'Ver número' : 'Ocultar número';
+  if (caja.dataset.visible === '1') return ocultarChipVisible();
+  caja.dataset.visible = '1';
+  caja.textContent = registro.chip || caja.dataset.mascara || '';
+  btn.textContent = 'Ocultar número';
+  if (chipVisibleTimer) clearTimeout(chipVisibleTimer);
+  chipVisibleTimer = setTimeout(ocultarChipVisible, CHIP_VISIBLE_MS);
 }
 
-async function editarChip(registro) {
-  const nombre = window.prompt('Nombre de la mascota:', registro.pet_name);
-  if (nombre === null) return;
-  const especie = window.prompt('Especie (déjalo vacío para no especificarla):', registro.species || '');
-  if (especie === null) return;
+// Vuelve a enmascarar todos los números (y cancela el temporizador). Se llama al
+// ocultar a mano y al salir de la vista.
+function ocultarChipVisible() {
+  if (chipVisibleTimer) {
+    clearTimeout(chipVisibleTimer);
+    chipVisibleTimer = null;
+  }
+  document.querySelectorAll('.chip-mascara[data-visible="1"]').forEach(caja => {
+    caja.dataset.visible = '0';
+    caja.textContent = caja.dataset.mascara || '';
+    const item = caja.closest('.inbox-item');
+    const btn = item ? item.querySelector('[data-action="chip-ver"]') : null;
+    if (btn) btn.textContent = 'Ver número';
+  });
+}
+
+function editarChip(registro) {
+  editandoChipId = registro.id;
+  document.getElementById('chip-edit-nombre').value = registro.pet_name;
+  document.getElementById('chip-edit-especie').value = registro.species || '';
+  document.getElementById('chip-modal').classList.remove('hidden');
+  document.getElementById('chip-edit-nombre').focus();
+}
+
+document.getElementById('btn-chip-edit-cancel').addEventListener('click', () => {
+  document.getElementById('chip-modal').classList.add('hidden');
+  editandoChipId = null;
+});
+
+document.getElementById('form-chip-edit').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!editandoChipId) return;
+  const nombre = document.getElementById('chip-edit-nombre').value.trim();
+  if (!nombre) return toast('Escribe el nombre de tu mascota.');
   try {
-    await api(`/api/chips/${registro.id}`, {
+    await api(`/api/chips/${editandoChipId}`, {
       method: 'PATCH',
-      body: { pet_name: nombre.trim(), species: especie.trim() }
+      body: { pet_name: nombre, species: document.getElementById('chip-edit-especie').value }
     });
+    document.getElementById('chip-modal').classList.add('hidden');
+    editandoChipId = null;
     toast('Registro actualizado.');
     renderMisChips();
   } catch (ex) {
     toast(ex.message);
   }
-}
+});
 
 async function borrarChip(registro) {
   if (

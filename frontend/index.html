@@ -421,7 +421,8 @@
               <!-- Publicar va por pasos dentro de un carril que se arrastra con el
                    dedo. Cada paso valida lo suyo antes de dejar pasar, así no se
                    publica a medias ni se pierde nada. -->
-              <div class="wizard-viewport">
+              <p class="wizard-paso" id="wizard-paso-found" role="status">Paso 1 de 4 · Tipo y sexo</p>
+              <div class="wizard-viewport" id="wizard-viewport-found">
                 <div class="wizard-track" id="wizard-track-found">
                   <div class="wizard-step" data-step="0">
                     <label class="required">Tipo de animal</label>
@@ -524,7 +525,15 @@
                 </div>
               </div>
 
-              <div class="wizard-dots" id="wizard-dots-found">
+              <div
+                class="wizard-dots"
+                id="wizard-dots-found"
+                role="progressbar"
+                aria-valuemin="1"
+                aria-valuemax="4"
+                aria-valuenow="1"
+                aria-label="Paso 1 de 4"
+              >
                 <i class="active"></i><i></i><i></i><i></i>
               </div>
               <div class="wizard-actions">
@@ -556,7 +565,8 @@
               <!-- Misma lógica de pasos que en "Encontré": lo primero es lo que
                    identifica al animal, y la ubicación se pide al final, cuando
                    ya está todo lo demás. -->
-              <div class="wizard-viewport">
+              <p class="wizard-paso" id="wizard-paso-lost" role="status">Paso 1 de 4 · Tipo y sexo</p>
+              <div class="wizard-viewport" id="wizard-viewport-lost">
                 <div class="wizard-track" id="wizard-track-lost">
                   <div class="wizard-step" data-step="0">
                     <label class="required">Tipo de animal</label>
@@ -669,7 +679,17 @@
                 </div>
               </div>
 
-              <div class="wizard-dots" id="wizard-dots-lost"><i class="active"></i><i></i><i></i><i></i></div>
+              <div
+                class="wizard-dots"
+                id="wizard-dots-lost"
+                role="progressbar"
+                aria-valuemin="1"
+                aria-valuemax="4"
+                aria-valuenow="1"
+                aria-label="Paso 1 de 4"
+              >
+                <i class="active"></i><i></i><i></i><i></i>
+              </div>
               <div class="wizard-actions">
                 <button type="button" class="icon-btn hidden" id="wizard-prev-lost">‹ Atrás</button>
                 <button type="button" class="submit-btn lost" id="wizard-next-lost">Siguiente</button>
@@ -925,6 +945,37 @@
           <p class="loc-note" id="edit-chip-estado"></p>
           <div class="modal-actions">
             <button type="button" class="icon-btn" id="btn-edit-cancel">Cancelar</button>
+            <button type="submit" class="submit-btn auth" style="margin-top: 0">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL EDITAR MICROCHIP =====================
+         Se cambia el nombre o la especie del registro. El número del chip no se
+         toca aquí a propósito: se cambia dando de baja y registrando de nuevo,
+         para que nadie lo modifique por error y pierda el vínculo. -->
+    <div id="chip-modal" class="modal hidden">
+      <div class="modal-box">
+        <h3>Editar el registro del microchip</h3>
+        <form id="form-chip-edit">
+          <label class="required">Nombre de tu mascota</label>
+          <input type="text" id="chip-edit-nombre" />
+          <label>Especie</label>
+          <select id="chip-edit-especie">
+            <option value="">Sin especificar</option>
+            <option value="perro">Perro</option>
+            <option value="gato">Gato</option>
+            <option value="ave">Ave</option>
+            <option value="conejo">Conejo</option>
+            <option value="otro">Otro</option>
+          </select>
+          <p class="loc-note">
+            El código del microchip no se cambia desde aquí: si te equivocaste, da de baja el registro y
+            vuelve a crearlo.
+          </p>
+          <div class="modal-actions">
+            <button type="button" class="icon-btn" id="btn-chip-edit-cancel">Cancelar</button>
             <button type="submit" class="submit-btn auth" style="margin-top: 0">Guardar</button>
           </div>
         </form>
