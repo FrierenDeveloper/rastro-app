@@ -199,6 +199,17 @@
       </symbol>
     </svg>
 
+    <!-- ===================== ARRANQUE ===================== -->
+    <div id="boot-screen" role="status" aria-live="polite" aria-label="Cargando Rastro">
+      <div class="boot-brand" aria-hidden="true">
+        <svg class="boot-paw boot-paw-1"><use href="#i-paw" /></svg>
+        <svg class="boot-paw boot-paw-2"><use href="#i-paw" /></svg>
+        <svg class="boot-paw boot-paw-3"><use href="#i-paw" /></svg>
+        <svg class="boot-paw boot-paw-4"><use href="#i-paw" /></svg>
+      </div>
+      <p>Rastro</p>
+    </div>
+
     <!-- ===================== RESET SCREEN ===================== -->
     <div id="reset-screen" class="hidden">
       <div class="brand">
@@ -221,7 +232,7 @@
     </div>
 
     <!-- ===================== AUTH SCREEN ===================== -->
-    <div id="auth-screen">
+    <div id="auth-screen" class="hidden">
       <div class="brand">
         <svg class="brand-logo lg" aria-hidden="true"><use href="#i-logo" /></svg>
         <h1 class="serif">Rastro</h1>
@@ -554,6 +565,13 @@
             <p class="sub">Edita, comparte o marca como resuelto los avisos de animales que encontraste.</p>
             <div id="inbox-found"></div>
           </div>
+          <div class="card previous-card">
+            <h2>Avisos previos</h2>
+            <p class="sub">
+              Aquí quedan los avisos encontrados que diste de baja. Ya no aparecen en el mapa.
+            </p>
+            <div id="inbox-previous-found"></div>
+          </div>
         </section>
 
         <!-- LOST -->
@@ -705,6 +723,11 @@
             <h2>Mis avisos perdidos</h2>
             <p class="sub">Edita, comparte o marca como resuelto los avisos de tus mascotas perdidas.</p>
             <div id="inbox-lost"></div>
+          </div>
+          <div class="card previous-card">
+            <h2>Avisos previos</h2>
+            <p class="sub">Aquí quedan los avisos perdidos que diste de baja. Ya no aparecen en el mapa.</p>
+            <div id="inbox-previous-lost"></div>
           </div>
         </section>
 

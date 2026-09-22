@@ -152,6 +152,79 @@ button:disabled {
   display: none !important;
 }
 
+/* Pantalla de arranque: mantiene oculto el login mientras se valida la sesión
+   guardada. Si la red tarda o falla, la huella sigue caminando en bucle. */
+#boot-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--paper);
+  color: var(--green-ink);
+}
+#boot-screen p {
+  margin: 0;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.boot-brand {
+  position: relative;
+  width: 154px;
+  height: 112px;
+}
+.boot-paw {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  color: var(--green);
+  opacity: 0;
+  transform: scale(0.55) rotate(-24deg);
+  animation: boot-paw-step 1.8s ease-in-out infinite;
+}
+.boot-paw-1 {
+  left: 112px;
+  top: 66px;
+  animation-delay: 0s;
+}
+.boot-paw-2 {
+  left: 78px;
+  top: 42px;
+  animation-delay: 0.18s;
+}
+.boot-paw-3 {
+  left: 44px;
+  top: 22px;
+  animation-delay: 0.36s;
+}
+.boot-paw-4 {
+  left: 18px;
+  top: 4px;
+  animation-delay: 0.54s;
+}
+@keyframes boot-paw-step {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.55) rotate(-24deg);
+  }
+  18%,
+  64% {
+    opacity: 0.85;
+    transform: scale(1) rotate(-24deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-paw {
+    animation: none;
+    opacity: 0.7;
+    transform: scale(0.9) rotate(-24deg);
+  }
+}
+
 /* --- Iconos de línea (sprite SVG) --- */
 .sprite {
   display: none;
@@ -758,6 +831,16 @@ input[type='file'] {
   padding: 3px 9px;
   border-radius: var(--r-pill);
   white-space: nowrap;
+}
+.tag.previous {
+  background: var(--paper-2);
+  color: var(--ink-soft);
+}
+.previous-card {
+  border-style: dashed;
+}
+.previous-item {
+  opacity: 0.82;
 }
 .tag.found {
   background: var(--green-soft);

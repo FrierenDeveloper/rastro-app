@@ -525,9 +525,10 @@ router.get('/threads', requireAuth, async (req, res, next) => {
 /* ---------- Mis avisos (con ubicación exacta y conteo de no leídos) ---------- */
 router.get('/mine/all', requireAuth, async (req, res, next) => {
   try {
-    const result = await db.query('SELECT * FROM reports WHERE user_id = $1 ORDER BY created_at DESC', [
-      req.userId
-    ]);
+    const result = await db.query(
+      'SELECT * FROM reports WHERE user_id = $1 AND active = TRUE ORDER BY created_at DESC',
+      [req.userId]
+    );
     const counts = await db.query(
       'SELECT report_id, COUNT(*)::int AS n FROM messages WHERE recipient_user_id = $1 AND read = FALSE GROUP BY report_id',
       [req.userId]
@@ -541,6 +542,20 @@ router.get('/mine/all', requireAuth, async (req, res, next) => {
         unread: unreadById[r.id] || 0
       }))
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Historial de avisos dados de baja: se conserva para que el dueño recuerde lo
+// que publicó, pero no vuelve al mapa ni trae acciones para editarlo o compartirlo.
+router.get('/mine/previous', requireAuth, async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM reports WHERE user_id = $1 AND active = FALSE ORDER BY created_at DESC',
+      [req.userId]
+    );
+    res.json({ reports: result.rows.map(r => publicReport(r, req.userId)) });
   } catch (err) {
     next(err);
   }

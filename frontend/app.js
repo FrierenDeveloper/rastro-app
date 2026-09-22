@@ -312,14 +312,20 @@ async function loadConfig() {
 }
 
 function showAuth() {
+  ocultarArranque();
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('reset-screen').classList.add('hidden');
 }
 function showApp() {
+  ocultarArranque();
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('reset-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
+}
+function ocultarArranque() {
+  const boot = document.getElementById('boot-screen');
+  if (boot) boot.classList.add('hidden');
 }
 function logout() {
   token = null;
@@ -1564,20 +1570,24 @@ document.getElementById('btn-conv-send').addEventListener('click', async () => {
 /* ============ Mis avisos (repartidos por estado) ============ */
 // Antes había una pestaña "Avisos" con todo mezclado. Ahora cada sección
 // (Perdí, Encontré) muestra los suyos, así que la lista se filtra por estado.
-function avisosHTML(reports, vacio) {
+function avisosHTML(reports, vacio, previos = false) {
   if (!reports.length) {
     return `<div class="empty-state"><div class="big">${vacio}</div>Todavía no has publicado avisos aquí.</div>`;
   }
   return reports
     .map(
       r => `
-      <div class="inbox-item" data-id="${esc(r.id)}">
+      <div class="inbox-item${previos ? ' previous-item' : ''}" data-id="${esc(r.id)}">
         <h4>${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}
           ${r.resolved ? '<span class="tag resolved">Resuelto</span>' : ''}
+          ${previos ? '<span class="tag previous">Previo</span>' : ''}
           ${r.unread ? `<span class="unread-dot">${r.unread}</span>` : ''}
         </h4>
         <div class="report-meta">Publicado ${timeAgo(r.created_at)}${r.descripcion ? ' · ' + esc(r.descripcion) : ''}</div>
-        <div class="report-actions">
+        ${
+          previos
+            ? ''
+            : `<div class="report-actions">
           <button data-action="open-chat" data-id="${esc(r.id)}">Conversaciones</button>
           <button data-action="resolve" data-id="${esc(r.id)}" data-resolved="${r.resolved ? 'false' : 'true'}">${r.resolved ? 'Reabrir' : 'Marcar resuelto'}</button>
           <button data-action="edit" data-id="${esc(r.id)}">Editar</button>
@@ -1585,14 +1595,18 @@ function avisosHTML(reports, vacio) {
           ${r.tiene_chip ? `<button data-action="chip" data-id="${esc(r.id)}">Ver microchip</button>` : ''}
           <button data-action="share" data-id="${esc(r.id)}">Compartir</button>
           <button data-action="delete" data-id="${esc(r.id)}">Eliminar</button>
-        </div>
+        </div>`
+        }
       </div>`
     )
     .join('');
 }
 async function renderInbox() {
   try {
-    const { reports } = await api('/api/reports/mine/all');
+    const [{ reports }, { reports: previous }] = await Promise.all([
+      api('/api/reports/mine/all'),
+      api('/api/reports/mine/previous')
+    ]);
     myReports = reports;
     document.getElementById('inbox-lost').innerHTML = avisosHTML(
       reports.filter(r => r.estado === 'perdido'),
@@ -1601,6 +1615,16 @@ async function renderInbox() {
     document.getElementById('inbox-found').innerHTML = avisosHTML(
       reports.filter(r => r.estado !== 'perdido'),
       '🐾'
+    );
+    document.getElementById('inbox-previous-lost').innerHTML = avisosHTML(
+      previous.filter(r => r.estado === 'perdido'),
+      '🔎',
+      true
+    );
+    document.getElementById('inbox-previous-found').innerHTML = avisosHTML(
+      previous.filter(r => r.estado !== 'perdido'),
+      '🐾',
+      true
     );
   } catch (ex) {
     const error = `<p class="loc-note">${esc(ex.message)}</p>`;
@@ -2556,6 +2580,7 @@ async function validarSesion(intentos = 2) {
   if (params.get('verified') === '1') toast('¡Correo confirmado! Ya puedes publicar.');
   if (params.get('verified') === '0') toast('El enlace de confirmación venció o ya se usó.');
   if (params.get('reset')) {
+    ocultarArranque();
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app').classList.add('hidden');
     document.getElementById('reset-screen').classList.remove('hidden');

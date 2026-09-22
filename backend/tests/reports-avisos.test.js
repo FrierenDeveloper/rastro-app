@@ -1270,7 +1270,8 @@ describe('GET /api/reports/mine/all · mis avisos', () => {
   it('devuelve mis avisos con la ubicación exacta y los mensajes sin leer', async () => {
     db.query.mockImplementation(async (sql, params) => {
       if (sql.includes('token_version')) return { rows: [{ token_version: 0 }] };
-      if (sql.includes('WHERE user_id = $1 ORDER BY created_at DESC')) return { rows: [FILA_MIA] };
+      if (sql.includes('WHERE user_id = $1 AND active = TRUE ORDER BY created_at DESC'))
+        return { rows: [FILA_MIA] };
       if (sql.includes('FROM messages WHERE recipient_user_id')) {
         return {
           rows: [
@@ -1314,8 +1315,10 @@ describe('GET /api/reports/mine/all · mis avisos', () => {
       ]
     });
 
-    const [sql, params] = sqlDe('WHERE user_id = $1 ORDER BY created_at DESC');
-    expect(limpiar(sql)).toBe('SELECT * FROM reports WHERE user_id = $1 ORDER BY created_at DESC');
+    const [sql, params] = sqlDe('WHERE user_id = $1 AND active = TRUE ORDER BY created_at DESC');
+    expect(limpiar(sql)).toBe(
+      'SELECT * FROM reports WHERE user_id = $1 AND active = TRUE ORDER BY created_at DESC'
+    );
     expect(params).toStrictEqual([SUB]);
     const [sqlLeidos, paramsLeidos] = sqlDe('FROM messages WHERE recipient_user_id');
     expect(limpiar(sqlLeidos)).toBe(
@@ -1355,6 +1358,27 @@ describe('GET /api/reports/mine/all · mis avisos', () => {
     const res = await peticion('get', '/api/reports/mine/all');
 
     expect(res.status).toBe(500);
+  });
+
+  it('los avisos previos solo consulta los que están dados de baja', async () => {
+    db.query.mockImplementation(async (sql, params) => {
+      if (sql.includes('token_version')) return { rows: [{ token_version: 0 }] };
+      if (sql.includes('WHERE user_id = $1 AND active = FALSE ORDER BY created_at DESC')) {
+        return { rows: [{ ...FILA_MIA, active: false, color: 'café' }] };
+      }
+      void params;
+      return { rows: [] };
+    });
+
+    const res = await peticion('get', '/api/reports/mine/previous');
+
+    expect(res.status).toBe(200);
+    expect(res.body.reports[0]).toMatchObject({ id: UUID, color: 'café', es_mio: true });
+    const [sql, params] = sqlDe('WHERE user_id = $1 AND active = FALSE ORDER BY created_at DESC');
+    expect(limpiar(sql)).toBe(
+      'SELECT * FROM reports WHERE user_id = $1 AND active = FALSE ORDER BY created_at DESC'
+    );
+    expect(params).toStrictEqual([SUB]);
   });
 });
 
