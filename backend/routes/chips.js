@@ -18,8 +18,10 @@ const { body, param, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const chip = require('../src/v2/chip');
-const { requireAuth } = require('../middleware/auth');
-const { keyPorIp } = require('../middleware/client-ip');
+const push = require('../push');
+const mailer = require('../mailer');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { ipReal, keyPorIp } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
 
 const router = express.Router();
@@ -34,6 +36,15 @@ const TABLA = 'chip_registrations';
 const registroLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: numEnv('LIMITE_CHIPS_HORA', 15),
+  keyGenerator: keyPorIp
+});
+
+// El escaneo es la puerta más expuesta (puede ser anónimo). Un cupo estrecho por
+// IP es la defensa principal contra quien intente averiguar qué chips están
+// registrados probando códigos seguidos.
+const escaneoLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: numEnv('LIMITE_ESCANEO_HORA', 20),
   keyGenerator: keyPorIp
 });
 
@@ -77,6 +88,40 @@ async function buscarPropio(id, userId) {
   if (!fila) return { error: 404 };
   if (fila.owner_user_id !== userId) return { error: 403 };
   return { fila };
+}
+
+/* ---------- Aviso al dueño cuando alguien escanea su chip ---------- */
+// Quien escanea no recibe NADA del dueño (ni su contacto, ni su id, ni siquiera
+// si tiene cuenta). El aviso va en el sentido contrario y es un extra: si falla,
+// quien escaneó ya tiene su respuesta.
+async function avisarPorCorreo(registro) {
+  try {
+    const dueno = (await db.query('SELECT email FROM users WHERE id = $1', [registro.owner_user_id])).rows[0];
+    if (!dueno) return;
+    await mailer.sendMail({
+      to: dueno.email,
+      subject: `Alguien escaneó el microchip de ${registro.pet_name}`,
+      text:
+        `Hola:\n\n` +
+        `Alguien acaba de escanear el microchip que registraste en Rastro para ${registro.pet_name}.\n\n` +
+        `Entra en la app para verlo. Por tu privacidad, no compartimos tus datos de contacto con quien lo escaneó.\n\n` +
+        `— Rastro`
+    });
+  } catch (e) {
+    /* el correo es un extra del aviso */
+  }
+}
+
+function avisarAlDueno(registro) {
+  // Sin await a propósito: la respuesta a quien escanea no espera a los envíos.
+  push
+    .sendToUser(registro.owner_user_id, {
+      title: '🐾 Alguien escaneó el microchip de tu mascota',
+      body: `Escanearon el chip de ${registro.pet_name}. Si la encontraste, entra a Rastro para avisar a su familia.`,
+      tag: 'chip-scan-' + registro.id
+    })
+    .catch(() => {});
+  return avisarPorCorreo(registro);
 }
 
 /* ---------- Alta del registro ---------- */
@@ -218,6 +263,59 @@ router.delete(
       ]);
       await registrarAcceso(fila.id, 'delete', req.userId);
       res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/* ---------- Escaneo ---------- */
+// Puede ser anónimo (quien encuentra al animal quizá no tenga cuenta) o
+// autenticado. La respuesta NUNCA lleva el contacto del dueño: solo si hay
+// coincidencia y el nombre de la mascota. Todo intento queda registrado, con o
+// sin coincidencia, para poder detectar un sondeo del registro.
+router.post(
+  '/scan',
+  optionalAuth,
+  escaneoLimiter,
+  body('chip_id').isString().trim().isLength({ max: 32 }).withMessage('El microchip debe tener 15 dígitos.'),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+      if (!chip.esIso(req.body.chip_id))
+        return res.status(400).json({ error: 'El microchip debe tener 15 dígitos.' });
+
+      const hash = chip.huella(req.body.chip_id, secreto());
+      if (!hash) throw new Error('[chips] no se pudo calcular la huella (revisa CHIP_SECRET)');
+
+      // Un registro borrado (o en purga) ya no se encuentra: la consulta lo excluye.
+      const registro = (
+        await db.query(
+          `SELECT id, owner_user_id, pet_name FROM chip_registrations
+            WHERE chip_hash = $1 AND deleted_at IS NULL`,
+          [hash]
+        )
+      ).rows[0];
+
+      await db.query(
+        `INSERT INTO chip_scan_events (id, chip_hash, scanned_by_user_id, ip_hash, matched, scanned_at)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [
+          uuidv4(),
+          hash,
+          req.userId || null,
+          chip.huellaIp(ipReal(req), secreto()),
+          Boolean(registro),
+          Date.now()
+        ]
+      );
+
+      if (!registro) return res.json({ matched: false });
+
+      await registrarAcceso(registro.id, 'read', req.userId || null);
+      avisarAlDueno(registro).catch(() => {});
+      res.json({ matched: true, pet_name: registro.pet_name });
     } catch (err) {
       next(err);
     }
