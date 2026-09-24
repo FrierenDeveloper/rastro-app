@@ -83,6 +83,15 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain("localStorage.getItem('rastro_onboard') === '1'");
   });
 
+  it('usa una foto real sin recortar en la tarjeta de publicar un aviso', () => {
+    const paso = html.match(/<div class="onboard-step" data-step="1">[\s\S]*?data-step="2">/)?.[0] || '';
+    expect(paso).toContain('class="onboard-visual onboard-photo"');
+    expect(paso).toContain('src="img/onboard-aviso.jpg"');
+    expect(paso).not.toContain('#i-camera');
+    expect(css).toMatch(/\.onboard-photo img \{[^}]*object-fit: contain/);
+    expect(fs.existsSync(path.join(frontendPath, 'img/onboard-aviso.jpg'))).toBe(true);
+  });
+
   it('resume el consentimiento y separa la lectura de microchip', () => {
     expect(html).toContain('class="chip-consent-details"');
     expect(html).toContain('Leer consentimiento completo…');

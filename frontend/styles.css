@@ -2252,6 +2252,27 @@ body.theme-dark .chip-consent-details summary {
   width: 50px;
   height: 50px;
 }
+/* Paso "Publica un aviso claro": la foto se muestra completa (contain), así no
+   se deforma ni se recorta la mascota. Detrás va la misma foto difuminada para
+   que el recuadro no quede con franjas vacías en los costados. */
+.onboard-photo {
+  position: relative;
+  background: #d5ebe7;
+}
+.onboard-photo::before {
+  content: '';
+  position: absolute;
+  inset: -50px;
+  background: url('img/onboard-aviso.jpg') center / cover no-repeat;
+  filter: blur(18px) saturate(1.05);
+}
+.onboard-photo img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .onboard-map-art {
   display: block;
   width: 100%;
