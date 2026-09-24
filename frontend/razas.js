@@ -887,7 +887,8 @@ function cabezaConPatron(cx, cy, rx, ry, c1, c2, pat, uid) {
     ? `<defs><clipPath id="${clipId}"><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/></clipPath></defs>` +
       `<g clip-path="url(#${clipId})">${capa}</g>`
     : '';
-  return elip(cx, cy, rx, ry, c1) + recorte;
+  const contorno = elip(cx, cy, rx, ry, 'none', ` stroke="${oscurece(c1, 0.2)}" stroke-width="1.25"`);
+  return elip(cx, cy, rx, ry, c1) + recorte + contorno;
 }
 
 /* ---------------------------------------------------------------------------
@@ -939,8 +940,11 @@ function caraPerro(def, c, uid) {
   const cabeza = cabezaConPatron(60, 60, 35, 33, c1, c2, c.patron, uid);
   const ojos = ojosAnimal(60, 55, 13, 4.6, '#2b2a2c');
   const nariz = narizAnimal(60, 78, 6, '#2b2a2c');
-  const boca = `<path d="M60 82 v5 q-7 6 -13 1 M60 87 q7 6 13 1" stroke="${oscurece(c1, 0.24)}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
-  return melena + orejas + cabeza + hocico + ojos + nariz + boca;
+  const mejillas = elip(52, 79, 8, 6.5, aclara(c1, 0.24)) + elip(68, 79, 8, 6.5, aclara(c1, 0.24));
+  const cejas = `<path d="M40 47 q7 -4 13 0 M67 47 q6 -4 13 0" stroke="${oscurece(c1, 0.3)}" stroke-width="1.25" fill="none" stroke-linecap="round"/>`;
+  const boca = `<path d="M60 82 v5 q-7 6 -13 1 M60 87 q7 6 13 1" stroke="${oscurece(c1, 0.34)}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  const pecas = `<circle cx="45" cy="84" r="1" fill="${oscurece(c1, 0.25)}"/><circle cx="48" cy="87" r="1" fill="${oscurece(c1, 0.25)}"/><circle cx="75" cy="84" r="1" fill="${oscurece(c1, 0.25)}"/><circle cx="72" cy="87" r="1" fill="${oscurece(c1, 0.25)}"/>`;
+  return melena + orejas + cabeza + hocico + mejillas + cejas + ojos + nariz + boca + pecas;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1138,7 +1142,7 @@ function renderAnimalSVG(tipo, raza, color, opts) {
   const fondo = opts && opts.fondo ? elip(60, 60, 58, 58, opts.fondo) : '';
   return (
     `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="animal-svg" ` +
-    `aria-hidden="true" focusable="false"><g transform="translate(60 60) scale(${escala}) translate(-60 -60)">` +
+    `aria-hidden="true" focusable="false"><g class="animal-sprite" transform="translate(60 60) scale(${escala}) translate(-60 -60)">` +
     `${fondo}${cara}</g></svg>`
   );
 }

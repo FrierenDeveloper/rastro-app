@@ -106,6 +106,13 @@ describe('arte de animales: render por raza y color', () => {
     expect(total).toBeGreaterThan(150);
   });
 
+  it('da volumen y expresión clara a los sprites de perro', () => {
+    const svg = api.renderAnimalSVG('perro', 'Mestizo', 'café');
+    expect(svg).toContain('class="animal-sprite"');
+    expect(svg).toContain('stroke-width="1.25"');
+    expect(svg).toContain('stroke-linecap="round"');
+  });
+
   it('no pinta con el color de otra especie (un conejo nunca sale verde)', () => {
     const verde = api.PALETA_ANIMAL.verde.hex;
     expect(api.coloresDeRaza('conejo', 'Enano')).not.toContain('verde');

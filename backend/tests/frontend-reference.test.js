@@ -33,6 +33,12 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain("aplicarTema(guardado || 'light')");
   });
 
+  it('mantiene las acciones sobre el mapa y extiende el mapa tras la navegación', () => {
+    expect(css).toMatch(/\.home-actions \{[^}]*z-index: 2/);
+    expect(css).toMatch(/\.home-map-stage \{[^}]*z-index: 0/);
+    expect(css).toMatch(/\.home-map-stage \{[^}]*bottom: calc\(-85px/);
+  });
+
   it('incluye una ficha demo completa sin depender de campos opcionales', () => {
     expect(javascript).toContain("nombre: 'Coco'");
     expect(javascript).toContain("ubicacion: 'Palermo, CABA'");
