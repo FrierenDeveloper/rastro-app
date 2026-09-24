@@ -76,4 +76,17 @@ describe('pantalla principal de referencia', () => {
     expect(manifest.prefer_related_applications).toBe(false);
     expect(manifest.icons.some(icon => icon.sizes === '512x512' && icon.purpose === 'maskable')).toBe(true);
   });
+
+  it('fija el armazón al viewport dinámico para que la vista Mapa no desplace el documento', () => {
+    // body y #app deben usar la MISMA unidad de viewport. Si el armazón es 100dvh
+    // pero el body queda en 100vh (viewport grande), en móvil con la barra visible
+    // el documento supera al viewport y toda la interfaz se desplaza en vertical.
+    expect(css).toMatch(/\bbody\s*\{[^}]*min-height:\s*100dvh/);
+    expect(css).toMatch(/#app\s*\{[^}]*height:\s*100dvh/);
+    expect(css).toMatch(/#app\s*\{[^}]*max-height:\s*100dvh/);
+    // El scroll interno de main no debe encogerse por debajo del contenido ni
+    // encadenarse al documento (rebote de toda la interfaz).
+    expect(css).toMatch(/main\s*\{[^}]*min-height:\s*0/);
+    expect(css).toMatch(/main\s*\{[^}]*overscroll-behavior:\s*contain/);
+  });
 });

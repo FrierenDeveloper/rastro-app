@@ -36,7 +36,6 @@ let editingId = null;
 let zonaCalor = { id: null, capas: [] };
 
 const TIPO_ICON = { perro: '🐕', gato: '🐈', ave: '🐦', conejo: '🐇', otro: '🐾' };
-const TIPO_MARKER = { perro: '🐶', gato: '🐱', ave: '🐦', conejo: '🐰', otro: '🐾' };
 const COLLAR_COLOR = { rojo: '#e05252', azul: '#438bd1', negro: '#263238', verde: '#3da879' };
 const DEMO_REPORTS = [
   {
@@ -94,9 +93,10 @@ const DEMO_REPORTS = [
 ];
 
 function markerIcon(report) {
-  const animal = TIPO_MARKER[report.tipo] || TIPO_MARKER.otro;
   const collar = COLLAR_COLOR[report.collar] || 'transparent';
   const estado = report.estado === 'perdido' ? 'lost' : 'found';
+  // El dibujo cambia con la raza y el color declarados (frontend/razas.js).
+  const animal = window.RAZAS_API.renderAnimalSVG(report.tipo, report.raza, report.color);
   return L.divIcon({
     className: 'animal-marker-wrap',
     html: `<span class="animal-marker ${estado}"><span class="animal-face"><span class="animal-emoji">${animal}</span><span class="animal-collar" style="background:${collar}"></span></span></span>`,
@@ -1379,6 +1379,21 @@ document.getElementById('form-lost').addEventListener('submit', e => {
 document.getElementById('tipo-lost').addEventListener('change', actualizarRadioHint);
 document.getElementById('perdido-hace-lost').addEventListener('change', actualizarRadioHint);
 
+// Vista previa del animal en el formulario: se redibuja al cambiar tipo, raza o
+// color, para que el usuario vea cómo quedará su aviso antes de publicarlo.
+function actualizarPreviewAnimal(key) {
+  const cont = document.getElementById('preview-' + key);
+  if (!cont) return;
+  const valor = campo => (document.getElementById(campo + '-' + key) || {}).value || '';
+  cont.innerHTML = window.RAZAS_API.renderAnimalSVG(valor('tipo') || 'otro', valor('raza'), valor('color'));
+}
+['found', 'lost'].forEach(key => {
+  ['tipo', 'raza', 'color'].forEach(campo => {
+    const input = document.getElementById(campo + '-' + key);
+    if (input) input.addEventListener('input', () => actualizarPreviewAnimal(key));
+  });
+});
+
 /* ============ Home: lista y mapa ============ */
 async function fetchReports() {
   const tipo = document.getElementById('filter-tipo').value;
@@ -1410,7 +1425,7 @@ function conNombre(r) {
 function reportCard(r) {
   const nombre = r.nombre ? esc(r.nombre) : `${TIPO_ICON[r.tipo] || '🐾'} ${esc(r.color)}`;
   const ubicacion = r.ubicacion ? esc(r.ubicacion) : '';
-  const avatar = TIPO_MARKER[r.tipo] || TIPO_MARKER.otro;
+  const avatar = window.RAZAS_API.renderAnimalSVG(r.tipo, r.raza, r.color);
   const colorCollar = COLLAR_COLOR[String(r.collar || '').toLowerCase()] || '';
   const collarAvatar = colorCollar
     ? `<span class="pet-avatar-collar" style="background:${colorCollar}"></span>`

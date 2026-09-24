@@ -91,7 +91,12 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* El armazón (#app) usa 100dvh; el body debe usar la MISMA unidad. Con 100vh
+     (viewport grande) el documento quedaba más alto que el viewport visible en
+     móvil y toda la interfaz se desplazaba verticalmente. Fallback a 100vh para
+     navegadores sin dvh. */
   min-height: 100vh;
+  min-height: 100dvh;
   overscroll-behavior-y: none;
 }
 
@@ -143,7 +148,10 @@ button:disabled {
 #app {
   max-width: 520px;
   margin: 0 auto;
+  /* 100vh como respaldo y 100dvh cuando el navegador lo soporta (móvil/PWA). */
+  height: 100vh;
   height: 100dvh;
+  max-height: 100vh;
   max-height: 100dvh;
   overflow: hidden;
   background: var(--paper);
@@ -560,7 +568,13 @@ nav.bottom-nav button[data-tab='found'].active {
 main {
   padding: 16px;
   flex: 1;
+  /* Sin min-height:0 un hijo flex no puede encogerse por debajo de su contenido
+     y empujaría la barra inferior fuera del armazón. */
+  min-height: 0;
   overflow-y: auto;
+  /* El scroll interno no se encadena al documento (evita el "rebote" de toda la
+     interfaz al llegar al final de una vista). */
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 .home-actions {
@@ -977,6 +991,11 @@ input[type='file'] {
 .animal-emoji {
   display: block;
 }
+.animal-emoji .animal-svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
 .animal-collar {
   position: absolute;
   bottom: -3px;
@@ -1048,6 +1067,11 @@ body.theme-dark #list-map .leaflet-layer {
   display: block;
   line-height: 1;
 }
+.pet-avatar-emoji .animal-svg {
+  display: block;
+  width: 56px;
+  height: 56px;
+}
 .pet-avatar-collar {
   position: absolute;
   bottom: -3px;
@@ -1058,6 +1082,21 @@ body.theme-dark #list-map .leaflet-layer {
   border-radius: 3px;
   transform: translateX(-50%);
   box-shadow: 0 1px 2px rgba(0, 35, 38, 0.18);
+}
+.animal-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  margin: 4px 0 2px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.animal-preview .animal-svg {
+  display: block;
+  width: 104px;
+  height: 104px;
 }
 .report-body {
   flex: 1;
@@ -2474,12 +2513,15 @@ body.theme-dark .mode-toggle {
 }
 .home-map-stage {
   position: relative;
+  /* 100vh de respaldo; 100dvh en móvil/PWA para no dejar hueco bajo el mapa. */
+  min-height: max(440px, calc(100vh - 330px));
   min-height: max(440px, calc(100dvh - 330px));
   margin-top: -1px;
   overflow: hidden;
   background: var(--paper-2);
 }
 #view-home #list-map {
+  height: max(440px, calc(100vh - 330px));
   height: max(440px, calc(100dvh - 330px));
   margin: 0;
   border: 0;
