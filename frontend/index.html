@@ -333,10 +333,6 @@
           ></div>
         </div>
 
-        <p class="loc-note" style="margin-top: 14px">
-          Tu correo y teléfono nunca se muestran públicamente. Solo se usan para que otros usuarios puedan
-          escribirte dentro de la app.
-        </p>
         <p class="link-note">
           <a href="#" id="link-privacy">Privacidad: qué se ve y qué no</a>
         </p>
@@ -345,11 +341,17 @@
         </p>
       </div>
       <div class="auth-install" id="auth-install">
-        <button type="button" class="auth-install-btn" id="btn-install-auth">
-          <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
-          <span>Instalar PetSeñal</span>
-        </button>
-        <p>Instálala desde el navegador, rápido y sin avisos.</p>
+        <div class="auth-install-actions">
+          <button type="button" class="auth-install-btn" id="btn-install-ios">
+            <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
+            <span>Instalar en iPhone</span>
+          </button>
+          <a class="auth-install-btn" id="btn-install-android" href="/descargar/petsenal.apk" download>
+            <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
+            <span>Descargar para Android</span>
+          </a>
+        </div>
+        <p>iPhone usa Safari y Android descarga el APK.</p>
       </div>
     </div>
 
@@ -460,7 +462,8 @@
               <span>Ir a mí</span>
             </button>
             <div id="reports-list"></div>
-            <div class="map-carousel-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="map-carousel-dots" id="map-carousel-dots" aria-label="Avisos del mapa"></div>
+            <p class="map-carousel-status" id="map-carousel-status" aria-live="polite"></p>
           </div>
 
           <!-- Éxitos / reencuentros: viven al final del mapa como leyenda

@@ -11,6 +11,7 @@ const mailer = require('../mailer');
 const { requireAuth } = require('../middleware/auth');
 const { keyPorIp, keyPorCuenta, normalizarCuenta } = require('../middleware/client-ip');
 const { numEnv } = require('../middleware/limits');
+const { esCorreoTemporal } = require('../src/v2/disposable-email');
 
 const router = express.Router();
 
@@ -155,6 +156,9 @@ router.post(
   cuentaLimiter,
   verificarHumano,
   body('email').isEmail().normalizeEmail().withMessage('Correo inválido.'),
+  body('email')
+    .custom(email => !esCorreoTemporal(email))
+    .withMessage('Usa un correo permanente; no aceptamos correos temporales.'),
   body('password').isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres.'),
   body('phone').optional().trim().isLength({ max: 40 }),
   async (req, res, next) => {

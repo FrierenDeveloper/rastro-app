@@ -39,10 +39,27 @@ describe('pantalla principal de referencia', () => {
     expect(css).toMatch(/\.home-map-stage \{[^}]*bottom: calc\(-68px/);
     expect(css).toMatch(/\.home-action \{[^}]*min-height: 84px/);
     expect(css).toMatch(/nav\.bottom-nav button \{[^}]*min-height: 48px/);
-    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*bottom: calc\(82px/);
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*bottom: calc\(104px/);
     expect(css).toMatch(/#view-home:not\(\.home-list-mode\) \.home-actions \{[^}]*backdrop-filter: none/);
     expect(css).toMatch(/#view-home:not\(\.home-list-mode\) \.report-card \{[^}]*backdrop-filter: none/);
     expect(css).toMatch(/body:not\(\.theme-dark\) #list-map \.leaflet-layer \{[^}]*filter: none/);
+  });
+
+  it('convierte los puntos del mapa en navegación accesible entre avisos', () => {
+    expect(html).toContain('id="map-carousel-status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(javascript).toContain('actualizarCarruselMapa');
+    expect(javascript).toContain("addEventListener('scroll'");
+    expect(javascript).toContain('scrollTo({ left:');
+    expect(css).not.toContain('.report-card:not(:first-child)');
+  });
+
+  it('oculta el zoom del mapa principal y funde el mapa con la barra inferior', () => {
+    expect(javascript).toContain("L.map('list-map', { zoomControl: false })");
+    expect(css).toMatch(
+      /nav\.bottom-nav::before \{[^}]*linear-gradient\(to bottom, transparent, var\(--card\)\)/
+    );
+    expect(css).toMatch(/nav\.bottom-nav \{[^}]*background: var\(--card\)/);
   });
 
   it('muestra marcadores de mascotas visibles en el mapa', () => {
@@ -84,6 +101,10 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain('detenerRespiracion');
     expect(javascript).toContain('navigator.share');
     expect(javascript).toContain('navigator.clipboard');
+    expect(css).toContain(".breathing-orb[data-phase='inhale']");
+    expect(css).toContain(".breathing-orb[data-phase='hold']");
+    expect(css).toContain('animation: respiracion-mantener');
+    expect(css).toContain(".breathing-orb[data-phase='exhale']");
   });
 
   it('incluye una ficha demo completa sin depender de campos opcionales', () => {
@@ -106,14 +127,25 @@ describe('pantalla principal de referencia', () => {
     expect(pin).not.toContain('href="#i-paw"');
   });
 
-  it('ofrece instalar PetSeñal directamente desde la pantalla de acceso', () => {
-    expect(html).toContain('id="btn-install-auth"');
-    expect(html).toContain('Instalar PetSeñal');
-    expect(html).not.toContain('/descargar/petsenal.apk');
-    expect(html).not.toContain('Descargar app Android (APK)');
-    expect(javascript).toContain("['btn-install', 'btn-install-auth']");
+  it('distingue las instalaciones para iPhone y Android con el mismo estilo', () => {
+    expect(html).toContain('id="btn-install-ios"');
+    expect(html).toContain('Instalar en iPhone');
+    expect(html).toContain('id="btn-install-android"');
+    expect(html).toContain('Descargar para Android');
+    expect(html).toContain('href="/descargar/petsenal.apk"');
+    expect(html.match(/class="auth-install-btn"/g)).toHaveLength(2);
+    expect(javascript).toContain("getElementById('btn-install-ios')");
+    expect(javascript).toContain('En iPhone o iPad');
     expect(javascript).toContain("'(display-mode: standalone)'");
     expect(javascript).toContain('Añadir a pantalla de inicio');
+  });
+
+  it('muestra la explicación del contacto dentro de Privacidad y no en el acceso', () => {
+    const acceso = html.match(/id="auth-screen"[\s\S]*?id="app"/)?.[0] || '';
+    const privacidad = html.match(/id="privacy-modal"[\s\S]*?id="zona-intro"/)?.[0] || '';
+    const mensaje = 'Tu correo y teléfono nunca se muestran públicamente.';
+    expect(acceso).not.toContain(mensaje);
+    expect(privacidad).toContain(mensaje);
   });
 
   it('usa el pin de GPS con huella como logo en acceso y recuperación', () => {

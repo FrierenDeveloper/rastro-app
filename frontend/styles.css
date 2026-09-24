@@ -380,6 +380,11 @@ button:disabled {
   margin: 14px auto 0;
   text-align: center;
 }
+.auth-install-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
 .auth-install-btn {
   display: inline-flex;
   align-items: center;
@@ -387,13 +392,17 @@ button:disabled {
   gap: 9px;
   width: 100%;
   min-height: 48px;
+  padding: 9px 8px;
   border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line));
   border-radius: 14px;
   background: var(--green-soft);
   color: var(--green-ink);
   box-shadow: var(--shadow-xs);
   font: inherit;
+  font-size: 13px;
   font-weight: 750;
+  line-height: 1.2;
+  text-decoration: none;
   cursor: pointer;
 }
 .auth-install-btn .ic {
@@ -406,27 +415,6 @@ button:disabled {
   font-size: 12px;
   line-height: 1.45;
 }
-/* Descarga directa del APK (alternativa a instalar la PWA desde el navegador). */
-.auth-apk {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 10px 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--card);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-}
-.auth-apk .ic {
-  width: 17px;
-  height: 17px;
-}
-
 /* ---------- Header ---------- */
 header {
   position: sticky;
@@ -1354,10 +1342,20 @@ body.theme-dark .chip-consent-details summary {
 .breathing-orb[data-phase='hold'] {
   transform: scale(1.18);
   transition: transform 0.2s linear;
+  animation: respiracion-mantener 0.22s ease-in-out infinite;
 }
 .breathing-orb[data-phase='exhale'] {
   transform: scale(0.82);
   transition: transform 6s ease-in-out;
+}
+@keyframes respiracion-mantener {
+  0%,
+  100% {
+    transform: scale(1.18) translateX(-1px);
+  }
+  50% {
+    transform: scale(1.18) translateX(1px);
+  }
 }
 .breathing-guide strong {
   color: var(--ink);
@@ -2807,7 +2805,7 @@ body.theme-dark .mode-toggle {
 #view-home:not(.home-list-mode) #reports-list {
   position: absolute;
   right: 16px;
-  bottom: calc(82px + env(safe-area-inset-bottom));
+  bottom: calc(104px + env(safe-area-inset-bottom));
   left: 16px;
   z-index: 550;
   display: flex;
@@ -2840,9 +2838,6 @@ body.theme-dark .mode-toggle {
   scroll-snap-align: center;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-}
-#view-home:not(.home-list-mode) .report-card:not(:first-child) {
-  display: none;
 }
 #view-home:not(.home-list-mode) .report-card .ph-placeholder,
 #view-home:not(.home-list-mode) .report-card img {
@@ -2969,21 +2964,41 @@ body.theme-dark #view-home:not(.home-list-mode) .home-actions {
 }
 .map-carousel-dots {
   position: absolute;
-  bottom: calc(73px + env(safe-area-inset-bottom));
+  bottom: calc(75px + env(safe-area-inset-bottom));
   left: 50%;
   z-index: 560;
   display: flex;
-  gap: 9px;
+  gap: 7px;
   transform: translateX(-50%);
 }
-.map-carousel-dots i {
+.map-carousel-dots button {
   width: 9px;
   height: 9px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: #b9d2d4;
+  cursor: pointer;
 }
-.map-carousel-dots i:first-child {
+.map-carousel-dots button.active {
   background: #0b6268;
+  transform: scale(1.2);
+}
+.map-carousel-status {
+  position: absolute;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 560;
+  max-width: calc(100% - 40px);
+  margin: 0;
+  overflow: hidden;
+  color: #f7ffff;
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 32, 34, 0.8);
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 #view-home:not(.home-list-mode) .reunion-legend {
   display: none;
@@ -3033,7 +3048,8 @@ main:has(#view-home:not(.home-list-mode)) {
   position: static;
 }
 #view-home.home-list-mode .map-my-location,
-#view-home.home-list-mode .map-carousel-dots {
+#view-home.home-list-mode .map-carousel-dots,
+#view-home.home-list-mode .map-carousel-status {
   display: none;
 }
 #view-home.home-list-mode .reunion-legend {
@@ -3044,9 +3060,19 @@ nav.bottom-nav {
   padding: 5px 10px calc(5px + env(safe-area-inset-bottom));
   border-top: 0;
   border-radius: 22px 22px 0 0;
-  background: color-mix(in srgb, var(--card) 94%, transparent);
+  background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+nav.bottom-nav::before {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--card));
+  content: '';
+  pointer-events: none;
 }
 nav.bottom-nav button {
   gap: 2px;

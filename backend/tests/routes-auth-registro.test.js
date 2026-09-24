@@ -35,6 +35,7 @@ app.use((err, req, res, _next) =>
 const MENSAJE_CAPTCHA = { error: 'La verificación anti-spam falló. Recarga la página e inténtalo de nuevo.' };
 const MENSAJE_HONEYPOT = { error: 'No se pudo validar el formulario.' };
 const MENSAJE_CORREO = { error: 'Correo inválido.' };
+const MENSAJE_TEMPORAL = { error: 'Usa un correo permanente; no aceptamos correos temporales.' };
 const MENSAJE_PASSWORD = { error: 'La contraseña debe tener al menos 10 caracteres.' };
 const MENSAJE_DUPLICADO = { error: 'Ya existe una cuenta con ese correo.' };
 const MENSAJE_500 = { error: 'Ocurrió un error en el servidor.' };
@@ -340,6 +341,18 @@ describe('POST /register · validaciones del cuerpo', () => {
       expect(res.status).toBe(400);
       expect(res.body).toStrictEqual(MENSAJE_CORREO);
     }
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('un correo temporal conocido no crea una cuenta', async () => {
+    const res = await conIp(pedir(app).post('/api/auth/register')).send({
+      email: 'persona@mailinator.com',
+      password: PASSWORD,
+      captcha: retoVigente()
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(MENSAJE_TEMPORAL);
     expect(db.query).not.toHaveBeenCalled();
   });
 

@@ -1471,9 +1471,41 @@ async function renderList() {
   const el = document.getElementById('reports-list');
   if (allReports.length === 0) {
     el.innerHTML = `<div class="empty-state"><div class="big">🐾</div>Todavía no hay avisos.<br>Publica el primero desde Perdí o Encontré.</div>`;
+    actualizarCarruselMapa();
     return;
   }
   el.innerHTML = allReports.map(reportCard).join('');
+  actualizarCarruselMapa(0);
+}
+
+function actualizarCarruselMapa(indice = 0) {
+  const puntos = document.getElementById('map-carousel-dots');
+  const estado = document.getElementById('map-carousel-status');
+  const cantidad = allReports.length;
+  puntos.hidden = cantidad < 2;
+  estado.hidden = cantidad === 0;
+  if (!cantidad) {
+    puntos.replaceChildren();
+    estado.textContent = '';
+    return;
+  }
+  const actual = Math.min(Math.max(indice, 0), cantidad - 1);
+  puntos.innerHTML = allReports
+    .map(
+      (_, posicion) =>
+        `<button type="button" data-carousel-index="${posicion}" aria-label="Ver aviso ${posicion + 1} de ${cantidad}"${posicion === actual ? ' class="active" aria-current="true"' : ''}></button>`
+    )
+    .join('');
+  const reporte = allReports[actual];
+  const tipo = reporte.estado === 'perdido' ? 'Perdido' : 'Encontrado';
+  const mascota = reporte.nombre || reporte.color || reporte.tipo || 'mascota';
+  estado.textContent = `${tipo}: ${mascota} · ${actual + 1} de ${cantidad}`;
+}
+
+function indiceCarruselMapa() {
+  const carrusel = document.getElementById('reports-list');
+  if (!carrusel.clientWidth) return 0;
+  return Math.round(carrusel.scrollLeft / (carrusel.clientWidth + 12));
 }
 
 async function toggleMatches(id, estado) {
@@ -1635,9 +1667,24 @@ document.getElementById('reports-list').addEventListener('click', e => {
   if (card && enMapa) toggleHeat(card.dataset.id);
 });
 
+document.getElementById('reports-list').addEventListener('scroll', () => {
+  actualizarCarruselMapa(indiceCarruselMapa());
+});
+
+document.getElementById('map-carousel-dots').addEventListener('click', e => {
+  const punto = e.target.closest('[data-carousel-index]');
+  if (!punto) return;
+  const carrusel = document.getElementById('reports-list');
+  const indice = Number(punto.dataset.carouselIndex);
+  carrusel.scrollTo({ left: indice * (carrusel.clientWidth + 12), behavior: 'smooth' });
+});
+
 async function renderListMap() {
   if (!listMap) {
-    listMap = L.map('list-map').setView([userLoc.lat, userLoc.lng], DEMO_MODE ? 13 : 12);
+    listMap = L.map('list-map', { zoomControl: false }).setView(
+      [userLoc.lat, userLoc.lng],
+      DEMO_MODE ? 13 : 12
+    );
     agregarCapaTiles(listMap);
     clusterGroup = DEMO_MODE ? L.layerGroup() : L.markerClusterGroup();
     listMap.addLayer(clusterGroup);
@@ -2179,6 +2226,10 @@ function ayudaInstalacionManual() {
     : 'Abre el menú del navegador y elige “Instalar aplicación” o “Añadir a pantalla de inicio”.';
 }
 
+function ayudaInstalacionIos() {
+  return 'En iPhone o iPad, abre PetSeñal en Safari, toca Compartir y luego “Añadir a pantalla de inicio”.';
+}
+
 async function instalarApp() {
   if (appEstaInstalada()) {
     toast('PetSeñal ya está instalada en este dispositivo.');
@@ -2208,9 +2259,8 @@ window.addEventListener('appinstalled', () => {
   deferredInstall = null;
   actualizarControlesInstalacion();
 });
-['btn-install', 'btn-install-auth'].forEach(id =>
-  document.getElementById(id).addEventListener('click', instalarApp)
-);
+document.getElementById('btn-install').addEventListener('click', instalarApp);
+document.getElementById('btn-install-ios').addEventListener('click', () => toast(ayudaInstalacionIos()));
 actualizarControlesInstalacion();
 
 /* ============ Privacidad ============ */
