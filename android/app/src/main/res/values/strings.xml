@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Relación app <-> sitio para Android Digital Asset Links. Se inyecta en
+        AndroidManifest.xml vía el meta-data `asset_statements`.
+    -->
+    <string name="assetStatements">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {
+                \"namespace\": \"web\",
+                \"site\": \"https://petsenal.com\"
+            }
+        }]
+    </string>
+</resources>

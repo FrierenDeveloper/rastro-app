@@ -73,3 +73,65 @@ arriba**, y deja de parecer una app.
 - [ ] `/.well-known/assetlinks.json` devuelve el JSON en producción.
 - [ ] Las notificaciones push funcionan en la app instalada.
 - [ ] El `.keystore` y su contraseña están guardados en dos sitios distintos.
+
+## Actualizar el APK cuando la app cambia
+
+La app Android es una **TWA**: un contenedor que abre la web en vivo. **No empaqueta** el
+HTML/CSS/JS, así que los cambios de contenido (onboarding, login, respiración, etc.) **ya se
+ven en la app instalada sin recompilar**. Solo hay que recompilar si quieres cambiar:
+
+- la URL que abre la app: el APK viejo estaba fijado a `https://rastro-app.onrender.com`; el
+  nuevo ya apunta a `https://petsenal.com`;
+- iconos, nombre o `targetSdkVersion`;
+- el `versionCode` (Android/Play lo exigen para aceptar una actualización).
+
+La descarga del login apunta siempre a `frontend/descargar/petsenal.apk`, así que basta
+reemplazar ese archivo; no hay que tocar el código.
+
+### Recompilar (PWABuilder, sin instalar nada)
+
+1. <https://www.pwabuilder.com> → pega `https://petsenal.com` → **Start**.
+2. **Package for stores** → **Android** → **Generate Package**.
+3. Package ID `com.petsenal.app`, nombre `PetSeñal`, display `standalone`.
+4. **Firma**: en las opciones de Android, elige **"Use my own"** y sube el `signing.keystore`
+   original con su contraseña. Es clave: si dejas que PWABuilder cree otra clave, cambia el SHA y
+   entonces (a) hay que actualizar `ANDROID_SHA256_CERT_FINGERPRINTS` en Render y (b) las
+   instalaciones existentes **no** se pueden actualizar: hay que desinstalar y reinstalar.
+5. Sube el `versionCode` (1 → 2, …) en cada build.
+6. Descarga el ZIP y copia el `.apk` sobre `frontend/descargar/petsenal.apk`.
+7. `npm run verify` y commit/push; Render lo despliega.
+
+Si el `.keystore` original se perdió no hay forma de conservar el SHA actual: toca clave nueva,
+actualizar la variable en Render y reinstalar en los teléfonos.
+
+### Recompilar en el proyecto (Android SDK local, sin PWABuilder)
+
+El proyecto Android ya vive en `android/` (template de Bubblewrap adaptado). Compila y
+firma con el SDK que trae PocketDev:
+
+```bash
+cd android
+bash build.sh
+```
+
+`build.sh` corre `gradle assembleRelease`, alinea con `zipalign`, firma con
+`petsenal-release.keystore` (configurado en `keystore.properties`) y copia el
+resultado sobre `frontend/descargar/petsenal.apk`. Requisitos: JDK 17, Gradle
+8.14.3 y Android SDK 36 con build-tools 35.0.0 (ya instalados aquí).
+
+- `android/signing-key-info.txt` guarda el alias, las contraseñas y la huella
+  SHA-256. **No se commitea**: cópialo junto con `android/petsenal-release.keystore`
+  a dos lugares seguros.
+- Para subir la versión antes de un release, cambia `versionCode` y `versionName`
+  en `android/app/build.gradle`.
+- La huella SHA-256 del APK firmado va en Render, en
+  `ANDROID_SHA256_CERT_FINGERPRINTS` (separada por coma si hay varias).
+
+> **Ojo — firma nueva.** El keystore original del primer APK (`SHA-256 3A:91:…`) no está
+> en el repositorio, así que este build usa una clave nueva (`SHA-256 8D:A4:16:85:…`).
+> Hay que **agregar la huella nueva** a `ANDROID_SHA256_CERT_FINGERPRINTS` en Render
+> (pueden quedar las dos separadas por coma) o la app abrirá con la barra del navegador.
+> Si un teléfono ya tenía instalada la app vieja, hay que desinstalarla antes de instalar
+> esta: Android no acepta actualizaciones firmadas con otra clave.
+
+Para compilar con Bubblewrap/Android Studio no hace falta instalar nada más.

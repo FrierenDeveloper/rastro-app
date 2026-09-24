@@ -6,6 +6,15 @@ node_modules/
 .env.local
 *.pem
 
+# Firma Android y artefactos de build (NO commitear el keystore)
+android/petsenal-release.keystore
+android/keystore.properties
+android/signing-key-info.txt
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+
 #Archivos de sistema / temporales
 *.log
 .DS_Store
@@ -22,3 +31,7 @@ backend/.stryker-tmp/
 
 # Documento de trabajo con estado del despliegue
 ESTADO_DESPLIEGUE_Y_ACCESOS.md
+
+# Adjuntos y capturas locales (material de trabajo, no forma parte de la app)
+attachments/
+capturas-petsenal/

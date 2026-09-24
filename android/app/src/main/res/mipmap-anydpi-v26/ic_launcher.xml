@@ -1,0 +1,16 @@
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <background>
+        <layer-list>
+            <item android:drawable="@android:color/white" />
+            <!-- Mismo margen que usa WebAPKs para que el icono no se recorte. -->
+            <item
+                android:drawable="@mipmap/ic_maskable"
+                android:bottom="8.5dp"
+                android:left="8.5dp"
+                android:right="8.5dp"
+                android:top="8.5dp" />
+        </layer-list>
+    </background>
+    <foreground android:drawable="@android:color/transparent" />
+</adaptive-icon>

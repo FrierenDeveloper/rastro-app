@@ -23,6 +23,7 @@ recuperación de contraseña, cabecera, onboarding, manifest y notificaciones.
 | Datos       | PostgreSQL; Supabase funciona como proveedor administrado compatible.                                                       |
 | Fotos       | Cloudflare R2 es la prioridad; Supabase Storage y disco local son respaldos compatibles.                                    |
 | Pruebas     | Vitest, cobertura, ESLint, Prettier y Stryker. El código nuevo de `backend/src/v2/` exige 100 % de cobertura.               |
+| `android/`  | TWA (Trusted Web Activity) con Bubblewrap: envuelve la PWA para Android y se firma con `android/build.sh`.                  |
 | Despliegue  | `render.yaml` define el servicio web de Render; GitHub Actions ejecuta verificación.                                        |
 
 ## Imágenes en Cloudflare R2
@@ -63,10 +64,12 @@ microchips registrados, porque se usa para proteger y comparar esos datos.
 2. Definir el dominio público final, actualizar `APP_URL`, la política de
    privacidad y los enlaces de despliegue todavía usados como ejemplos.
 3. Publicar la PWA en HTTPS y probar instalación en Android, iOS y escritorio.
-4. Si se publicará Android nativo, regenerar el paquete con nombre y package ID
-   `com.petsenal.app`, firmarlo con una clave de publicación custodiada y
-   distribuirlo por Google Play. Los artefactos Android locales no están
-   versionados ni deben tratarse como una publicación oficial.
+4. Android: la app es una TWA en `android/` (package `com.petsenal.app`, apunta a
+   `https://petsenal.com`). Se recompila y firma con `bash android/build.sh`, que
+   copia el APK a `frontend/descargar/petsenal.apk`. La clave de firma
+   (`android/petsenal-release.keystore`) y sus contraseñas (`android/signing-key-info.txt`)
+   no se versionan: hay que custodiarlas. Para publicar en Google Play falta subir el `.aab`
+   y completar la ficha (ver `docs/CHECKLIST_GOOGLE_PLAY.md`).
 5. Mantener los identificadores técnicos heredados que aún contienen el nombre
    anterior (por ejemplo, claves de `localStorage`, caché y contexto
    criptográfico) hasta hacer una migración versionada: cambiarlos sin migrar

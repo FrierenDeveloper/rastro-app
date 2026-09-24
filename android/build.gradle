@@ -1,0 +1,23 @@
+// Proyecto Gradle raíz de la app Android (TWA) de PetSeñal.
+// Generado a partir del template oficial de @bubblewrap/core y ajustado para
+// el toolchain de PocketDev (AGP 8.11.0, compileSdk 36, Java 17).
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.11.0'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}
