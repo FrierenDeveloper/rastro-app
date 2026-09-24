@@ -279,6 +279,7 @@ router.post(
   optionalAuth,
   escaneoLimiter,
   body('chip_id').isString().trim().isLength({ max: 32 }).withMessage('El microchip debe tener 15 dígitos.'),
+  body('notify_owner').optional().isBoolean().withMessage('La solicitud de aviso no es válida.'),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
@@ -292,7 +293,7 @@ router.post(
       // Un registro borrado (o en purga) ya no se encuentra: la consulta lo excluye.
       const registro = (
         await db.query(
-          `SELECT id, owner_user_id, pet_name FROM chip_registrations
+          `SELECT id, owner_user_id, pet_name, species FROM chip_registrations
             WHERE chip_hash = $1 AND deleted_at IS NULL`,
           [hash]
         )
@@ -314,8 +315,14 @@ router.post(
       if (!registro) return res.json({ matched: false });
 
       await registrarAcceso(registro.id, 'read', req.userId || null);
-      avisarAlDueno(registro).catch(() => {});
-      res.json({ matched: true, pet_name: registro.pet_name });
+      const avisar = req.body.notify_owner === true;
+      if (avisar) avisarAlDueno(registro).catch(() => {});
+      res.json({
+        matched: true,
+        pet_name: registro.pet_name,
+        species: registro.species || null,
+        notified: avisar
+      });
     } catch (err) {
       next(err);
     }

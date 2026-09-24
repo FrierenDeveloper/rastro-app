@@ -46,6 +46,23 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain('iconAnchor: [26, 56]');
   });
 
+  it('resume el consentimiento y separa la lectura de microchip', () => {
+    expect(html).toContain('class="chip-consent-details"');
+    expect(html).toContain('Leer consentimiento completo…');
+    expect(html).toContain('id="btn-open-chip-scan"');
+    expect(html).toContain('id="chip-scan-screen"');
+    expect(javascript).toContain('data-action="chip-notify"');
+    expect(javascript).toContain('notify_owner: true');
+  });
+
+  it('incluye un formulario de bugs dirigido al correo de soporte', () => {
+    expect(html).toContain('id="btn-report-bug"');
+    expect(html).toContain('id="bug-modal"');
+    expect(html).toContain('id="bug-description"');
+    expect(javascript).toContain('contacto@petsenal.com');
+    expect(javascript).toContain('[BUG] PetSeñal');
+  });
+
   it('incluye una ficha demo completa sin depender de campos opcionales', () => {
     expect(javascript).toContain("nombre: 'Coco'");
     expect(javascript).toContain("ubicacion: 'Palermo, CABA'");

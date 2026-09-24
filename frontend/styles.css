@@ -1201,12 +1201,71 @@ body.theme-dark #list-map .leaflet-layer {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 1px;
 }
-/* El texto del consentimiento se lee entero: no va en letra chica ni escondido. */
 .chip-consentimiento {
   align-items: flex-start;
   margin-top: 14px;
   font-size: 13px;
   line-height: 1.5;
+}
+.chip-consent-details {
+  margin: 5px 0 14px 35px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+.chip-consent-details summary {
+  width: fit-content;
+  color: #176ca1;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chip-consent-details p {
+  margin: 8px 0 0;
+}
+.chip-scan-launch .submit-btn {
+  margin-top: 0;
+}
+.chip-scan-back {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chip-found-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line));
+  border-radius: var(--r-lg);
+  background: var(--green-soft);
+}
+.chip-found-icon {
+  grid-row: span 2;
+  font-size: 34px;
+}
+.chip-found-card h3,
+.chip-found-card p {
+  margin: 0;
+}
+.chip-found-card .chip-privacy,
+.chip-found-card .submit-btn {
+  grid-column: 1 / -1;
+}
+.chip-found-card .chip-privacy {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+.chip-found-card .submit-btn {
+  margin-top: 4px;
+}
+body.theme-dark .chip-consent-details summary {
+  color: #75c9ff;
 }
 .matches-box {
   margin-top: 8px;

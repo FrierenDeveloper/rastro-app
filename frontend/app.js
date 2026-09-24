@@ -2236,6 +2236,32 @@ document
   .getElementById('btn-tips-close')
   .addEventListener('click', () => document.getElementById('tips-modal').classList.add('hidden'));
 
+/* ============ Informar bugs ============ */
+const bugModal = document.getElementById('bug-modal');
+document.getElementById('btn-report-bug').addEventListener('click', () => {
+  bugModal.classList.remove('hidden');
+  document.getElementById('bug-description').focus();
+});
+document.getElementById('btn-bug-cancel').addEventListener('click', () => bugModal.classList.add('hidden'));
+document.getElementById('form-bug').addEventListener('submit', e => {
+  e.preventDefault();
+  const descripcion = document.getElementById('bug-description').value.trim();
+  if (!descripcion) return toast('Cuéntanos qué ocurrió.');
+  const cuerpo = [
+    'Descripción del bug:',
+    descripcion,
+    '',
+    'Página: ' + window.location.href,
+    'Navegador: ' + window.navigator.userAgent
+  ].join('\n');
+  window.location.href =
+    'mailto:contacto@petsenal.com?subject=' +
+    encodeURIComponent('[BUG] PetSeñal') +
+    '&body=' +
+    encodeURIComponent(cuerpo);
+  bugModal.classList.add('hidden');
+});
+
 /* ============ Onboarding (solo la primera vez) ============ */
 const ONBOARD_PASOS = 3;
 
@@ -2622,6 +2648,21 @@ document.getElementById('form-chip').addEventListener('submit', async e => {
   }
 });
 
+let chipActualEscaneado = '';
+
+function mostrarLectorChip(mostrar) {
+  document.getElementById('chip-scan-launch').classList.toggle('hidden', mostrar);
+  document.getElementById('chip-scan-screen').classList.toggle('hidden', !mostrar);
+  if (!mostrar) return;
+  chipActualEscaneado = '';
+  document.getElementById('chip-scan-codigo').value = '';
+  document.getElementById('chip-scan-resultado').innerHTML = '';
+  document.getElementById('chip-scan-codigo').focus();
+}
+
+document.getElementById('btn-open-chip-scan').addEventListener('click', () => mostrarLectorChip(true));
+document.getElementById('btn-close-chip-scan').addEventListener('click', () => mostrarLectorChip(false));
+
 document.getElementById('btn-chip-scan').addEventListener('click', async () => {
   const caja = document.getElementById('chip-scan-resultado');
   const codigo = document.getElementById('chip-scan-codigo').value.trim();
@@ -2632,14 +2673,36 @@ document.getElementById('btn-chip-scan').addEventListener('click', async () => {
   caja.innerHTML = `<p class="loc-note">Buscando…</p>`;
   try {
     const r = await api('/api/chips/scan', { method: 'POST', body: { chip_id: codigo } });
+    chipActualEscaneado = r.matched ? codigo : '';
     caja.innerHTML = r.matched
-      ? `<div class="match-banner">
-          <h3>✅ Microchip registrado</h3>
-          <p>Está a nombre de <b>${esc(r.pet_name)}</b>. Ya avisamos a su familia. Por su privacidad, no te damos sus datos: si lo encontraste, publica un aviso en «Encontré» para que puedan contactarte.</p>
+      ? `<div class="chip-found-card">
+          <div class="chip-found-icon">${TIPO_ICON[r.species] || '🐾'}</div>
+          <div><h3>${esc(r.pet_name)}</h3><p>${r.species ? esc(r.species) : 'Especie sin especificar'}</p></div>
+          <p class="chip-privacy">Por privacidad solo mostramos información de la mascota.</p>
+          <button type="button" class="submit-btn found" data-action="chip-notify">Informar al dueño</button>
         </div>`
       : `<p class="loc-note">Ese microchip no está registrado en PetSeñal. Publica un aviso en «Encontré»: es la vía para que su familia lo vea.</p>`;
   } catch (ex) {
     caja.innerHTML = `<p class="loc-note">${esc(ex.message)}</p>`;
+  }
+});
+
+document.getElementById('chip-scan-resultado').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="chip-notify"]');
+  if (!btn || !chipActualEscaneado) return;
+  btn.disabled = true;
+  btn.textContent = 'Informando…';
+  try {
+    await api('/api/chips/scan', {
+      method: 'POST',
+      body: { chip_id: chipActualEscaneado, notify_owner: true }
+    });
+    btn.textContent = 'Dueño informado';
+    toast('Avisamos al dueño sin compartir sus datos.');
+  } catch (ex) {
+    btn.disabled = false;
+    btn.textContent = 'Informar al dueño';
+    toast(ex.message);
   }
 });
 

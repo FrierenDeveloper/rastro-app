@@ -811,7 +811,7 @@
 
         <!-- MICROCHIPS -->
         <!-- Registro voluntario. El consentimiento es explícito (casilla sin
-             marcar y con el texto a la vista) y su versión se guarda con cada
+             marcar, resumen visible y detalle desplegable) y su versión se guarda con cada
              registro, como pide la Ley 21.719. El número del chip no se muestra
              a nadie: solo su dueño puede verlo desde aquí. -->
         <section class="view" id="view-chips">
@@ -846,17 +846,22 @@
 
               <label class="check chip-consentimiento">
                 <input type="checkbox" id="chip-reg-consent" />
-                <span>
-                  Doy mi consentimiento para que PetSeñal guarde el código de microchip de mi mascota, su
-                  nombre y su especie con la única finalidad de avisarme si alguien lo escanea. Entiendo que
-                  mi teléfono y mi correo no se muestran nunca a quien escanea, y que puedo ver, corregir o
-                  dar de baja este registro cuando quiera desde «Mis microchips».
-                </span>
+                <span
+                  >Acepto registrar este microchip para que PetSeñal pueda avisarme si alguien lo lee.</span
+                >
               </label>
-              <p class="loc-note">
-                Texto de consentimiento versión v1. El código se guarda protegido: no queda legible en la base
-                de datos y nadie más puede consultarlo.
-              </p>
+              <details class="chip-consent-details">
+                <summary>Leer consentimiento completo…</summary>
+                <p>
+                  Autorizo a PetSeñal a guardar el código de microchip, nombre y especie de mi mascota solo
+                  para avisarme si alguien lo lee. Mi teléfono y correo nunca se muestran a quien escanea.
+                  Puedo consultar, corregir o dar de baja este registro desde «Mis microchips».
+                </p>
+                <p>
+                  Consentimiento versión v1. El código se guarda protegido y no queda legible en la base de
+                  datos.
+                </p>
+              </details>
 
               <button type="submit" class="submit-btn auth">Registrar microchip</button>
             </form>
@@ -868,11 +873,17 @@
             <div id="chips-lista"></div>
           </div>
 
-          <div class="card">
+          <div class="card chip-scan-launch" id="chip-scan-launch">
+            <button type="button" class="submit-btn found" id="btn-open-chip-scan">Leer un microchip</button>
+          </div>
+
+          <div class="card hidden" id="chip-scan-screen">
+            <button type="button" class="chip-scan-back" id="btn-close-chip-scan">
+              ← Volver a Mi PetSeñal
+            </button>
             <h2>Leer un microchip</h2>
             <p class="sub">
-              Si encontraste un animal y un lector te dio su número, escríbelo aquí: avisamos a su familia sin
-              darte sus datos.
+              Escribe el número que mostró el lector. Si está registrado, verás solo los datos de la mascota.
             </p>
             <label>Código del microchip</label>
             <input
@@ -882,7 +893,7 @@
               autocomplete="off"
               placeholder="15 dígitos"
             />
-            <button type="button" class="submit-btn found" id="btn-chip-scan">Buscar el microchip</button>
+            <button type="button" class="submit-btn found" id="btn-chip-scan">Buscar microchip</button>
             <div id="chip-scan-resultado"></div>
           </div>
         </section>
@@ -963,6 +974,10 @@
         <button class="drawer-item" id="btn-tips">
           <svg class="ic" aria-hidden="true"><use href="#i-bulb" /></svg>
           <span>Consejos para encontrar a tu mascota</span>
+        </button>
+        <button class="drawer-item" id="btn-report-bug">
+          <svg class="ic" aria-hidden="true"><use href="#i-mail" /></svg>
+          <span>Informar bugs</span>
         </button>
         <button class="drawer-item hidden" id="tab-admin" data-vista="admin">
           <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>
@@ -1070,6 +1085,32 @@
           <div class="modal-actions">
             <button type="button" class="icon-btn" id="btn-chip-edit-cancel">Cancelar</button>
             <button type="submit" class="submit-btn auth" style="margin-top: 0">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL INFORMAR BUG ===================== -->
+    <div id="bug-modal" class="modal hidden">
+      <div class="modal-box">
+        <h3>
+          <svg class="ic" aria-hidden="true"><use href="#i-mail" /></svg>Informar un bug
+        </h3>
+        <p class="sub">Cuéntanos qué encontraste y qué estabas haciendo cuando ocurrió.</p>
+        <form id="form-bug">
+          <label class="required" for="bug-description">Descripción</label>
+          <textarea
+            id="bug-description"
+            maxlength="2000"
+            required
+            placeholder="Ej: Al tocar Buscar, el mapa quedó en blanco. Ocurrió después de…"
+          ></textarea>
+          <p class="loc-note">
+            Se abrirá tu aplicación de correo con el asunto y contexto técnico preparados.
+          </p>
+          <div class="modal-actions">
+            <button type="button" class="icon-btn" id="btn-bug-cancel">Cancelar</button>
+            <button type="submit" class="submit-btn auth" style="margin-top: 0">Preparar correo</button>
           </div>
         </form>
       </div>

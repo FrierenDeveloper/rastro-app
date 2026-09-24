@@ -29,6 +29,7 @@ const registroFila = (cambios = {}) => ({
   id: UUID,
   owner_user_id: SUB,
   pet_name: 'Firulais',
+  species: 'perro',
   ...cambios
 });
 
@@ -115,13 +116,18 @@ afterEach(() => {
 });
 
 describe('POST /api/chips/scan · coincidencia', () => {
-  it('con coincidencia devuelve solo el nombre de la mascota', async () => {
+  it('con coincidencia devuelve solo información pertinente de la mascota', async () => {
     base();
 
     const res = await escanear({ chip_id: CHIP });
 
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ matched: true, pet_name: 'Firulais' });
+    expect(res.body).toStrictEqual({
+      matched: true,
+      pet_name: 'Firulais',
+      species: 'perro',
+      notified: false
+    });
     // Ni el contacto del dueño, ni su id, ni el id del registro.
     const texto = JSON.stringify(res.body);
     expect(texto).not.toContain(SUB);
@@ -152,12 +158,23 @@ describe('POST /api/chips/scan · coincidencia', () => {
     expect(JSON.stringify(eventos[0])).not.toContain('190.160.1.2');
   });
 
-  it('avisa al dueño por push y por correo, sin decirle quién escaneó', async () => {
+  it('no avisa al dueño hasta que quien encontró al animal lo pide', async () => {
     base();
 
     await escanear({ chip_id: CHIP });
     await reposar();
 
+    expect(push.sendToUser).not.toHaveBeenCalled();
+    expect(mailer.sendMail).not.toHaveBeenCalled();
+  });
+
+  it('avisa al dueño por push y por correo cuando se solicita, sin decirle quién escaneó', async () => {
+    base();
+
+    const res = await escanear({ chip_id: CHIP, notify_owner: true });
+    await reposar();
+
+    expect(res.body.notified).toBe(true);
     expect(push.sendToUser).toHaveBeenCalledWith(
       SUB,
       expect.objectContaining({ title: '🐾 Alguien escaneó el microchip de tu mascota' })
@@ -199,7 +216,7 @@ describe('POST /api/chips/scan · coincidencia', () => {
   it('si el dueño ya no tiene correo, el aviso por correo simplemente no se manda', async () => {
     base({ correo: null });
 
-    const res = await escanear({ chip_id: CHIP });
+    const res = await escanear({ chip_id: CHIP, notify_owner: true });
     await reposar();
 
     expect(res.status).toBe(200);
@@ -212,7 +229,7 @@ describe('POST /api/chips/scan · coincidencia', () => {
     push.sendToUser.mockRejectedValue(new Error('push caído'));
     mailer.sendMail.mockRejectedValue(new Error('correo caído'));
 
-    const res = await escanear({ chip_id: CHIP });
+    const res = await escanear({ chip_id: CHIP, notify_owner: true });
     await reposar();
 
     expect(res.status).toBe(200);
@@ -246,7 +263,7 @@ describe('POST /api/chips/scan · sin coincidencia', () => {
   it('un chip borrado no cuenta como coincidencia: la consulta lo excluye', async () => {
     base({ encontrado: null });
 
-    await escanear({ chip_id: CHIP });
+    await escanear({ chip_id: CHIP, notify_owner: true });
 
     const consulta = db.query.mock.calls.find(call => String(call[0]).includes('chip_hash = $1'));
     expect(String(consulta[0])).toContain('deleted_at IS NULL');
@@ -267,6 +284,16 @@ describe('POST /api/chips/scan · validación y cupo', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toStrictEqual(esperado);
+    expect(eventos).toHaveLength(0);
+  });
+
+  it('rechaza una solicitud de aviso con formato inválido', async () => {
+    base();
+
+    const res = await escanear({ chip_id: CHIP, notify_owner: 'sí' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ error: 'La solicitud de aviso no es válida.' });
     expect(eventos).toHaveLength(0);
   });
 
@@ -336,7 +363,7 @@ describe('POST /api/chips/scan · parámetros y avisos exactos', () => {
   it('en un escaneo anónimo la traza queda sin actor', async () => {
     base();
 
-    await escanear({ chip_id: CHIP });
+    await escanear({ chip_id: CHIP, notify_owner: true });
 
     expect(accesos[0][4]).toBeNull();
   });
@@ -344,7 +371,7 @@ describe('POST /api/chips/scan · parámetros y avisos exactos', () => {
   it('el correo al dueño lleva el nombre, el aviso y la firma', async () => {
     base();
 
-    await escanear({ chip_id: CHIP });
+    await escanear({ chip_id: CHIP, notify_owner: true });
     await reposar();
 
     const correo = mailer.sendMail.mock.calls[0][0];
@@ -358,7 +385,7 @@ describe('POST /api/chips/scan · parámetros y avisos exactos', () => {
   it('el push lleva una etiqueta propia del registro, para no repetir avisos', async () => {
     base();
 
-    await escanear({ chip_id: CHIP });
+    await escanear({ chip_id: CHIP, notify_owner: true });
     await reposar();
 
     expect(push.sendToUser).toHaveBeenCalledWith(SUB, expect.objectContaining({ tag: 'chip-scan-' + UUID }));
