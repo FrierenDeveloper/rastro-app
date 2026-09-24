@@ -70,10 +70,14 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain('iconAnchor: [26, 56]');
   });
 
-  it('presenta cuatro cualidades y termina con la misión en la primera visita', () => {
+  it('presenta cinco tarjetas horizontales y termina con la misión', () => {
     expect(html.match(/class="onboard-step"/g)).toHaveLength(5);
     const dots = html.match(/class="onboard-dots">([\s\S]*?)<\/div>/)?.[1] || '';
     expect(dots.match(/<i/g)).toHaveLength(5);
+    expect(html).toContain('Avisa a quienes están cerca');
+    expect(html).toContain('onboard-map-ripple');
+    expect(css).toMatch(/\.onboard-step\s*\{[^}]*grid-template-columns:/);
+    expect(css).toContain('@keyframes onboard-radar-pulse');
     expect(html).toContain('<h3>Nuestra misión</h3>');
     expect(javascript).toContain('const ONBOARD_PASOS = 5');
     expect(javascript).toContain("localStorage.getItem('rastro_onboard') === '1'");

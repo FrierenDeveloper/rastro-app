@@ -1337,58 +1337,88 @@ Estoy buscando a mi mascota y me está costando llevarlo solo. ¿Puedes acompañ
     <!-- ===================== ONBOARDING ===================== -->
     <div id="onboarding" class="modal hidden">
       <div class="modal-box onboard">
-        <!-- Los tres pasos van en un carril que se arrastra con el dedo (o con
-             las flechas del teclado). El carril toma el alto del paso más alto,
-             así el cartel no salta de tamaño al deslizar. -->
+        <!-- Cada paso es una tarjeta horizontal. El carril se arrastra con el
+             dedo (o con las flechas del teclado) sin cambiar de altura. -->
         <div class="onboard-viewport">
           <div class="onboard-track" id="onboard-track">
             <div class="onboard-step" data-step="0">
-              <div class="onboard-emoji">
-                <svg class="ic" aria-hidden="true"><use href="#i-map" /></svg>
+              <div class="onboard-visual onboard-map-visual" aria-hidden="true">
+                <svg class="onboard-map-art" viewBox="0 0 240 180" focusable="false">
+                  <path
+                    class="onboard-map-road"
+                    d="M-10 40 86 82l72-48 95 35M-8 144l82-50 66 38 83-57M54-10l31 58-19 74 34 68m90-200-30 55 31 61 4 78"
+                  />
+                  <path class="onboard-map-river" d="m-12 112 51-29 45 13 36-25 43 8 89-46" />
+                  <circle class="onboard-map-ripple ripple-one" cx="120" cy="82" r="34" />
+                  <circle class="onboard-map-ripple ripple-two" cx="120" cy="82" r="57" />
+                  <circle class="onboard-map-ripple ripple-three" cx="120" cy="82" r="80" />
+                  <circle class="onboard-map-point" cx="53" cy="111" r="4" />
+                  <circle class="onboard-map-point" cx="187" cy="52" r="4" />
+                  <circle class="onboard-map-point" cx="177" cy="128" r="4" />
+                  <svg class="onboard-map-logo" x="101" y="54" width="38" height="46" viewBox="0 0 40 48">
+                    <use href="#i-petsenal-pin" />
+                  </svg>
+                  <g class="onboard-map-alert" transform="translate(134 100)">
+                    <rect width="91" height="27" rx="13.5" />
+                    <circle cx="14" cy="13.5" r="4" />
+                    <text x="24" y="18">Aviso a vecinos</text>
+                  </g>
+                </svg>
               </div>
-              <h3>Encuentra cerca de ti</h3>
-              <p class="sub">
-                Explora el mapa y descubre avisos de mascotas perdidas o encontradas en tu comunidad.
-              </p>
+              <div class="onboard-copy">
+                <h3>Avisa a quienes están cerca</h3>
+                <p class="sub">
+                  Al publicar una mascota perdida, se avisa a las personas con alertas activadas en esa zona.
+                  Así más vecinos pueden estar atentos y ayudar.
+                </p>
+              </div>
             </div>
             <div class="onboard-step" data-step="1">
-              <div class="onboard-emoji">
+              <div class="onboard-visual onboard-emoji" aria-hidden="true">
                 <svg class="ic" aria-hidden="true"><use href="#i-camera" /></svg>
               </div>
-              <h3>Publica un aviso claro</h3>
-              <p class="sub">
-                Agrega una foto, sus características y dónde se perdió o fue vista para que otras personas
-                puedan reconocerla.
-              </p>
+              <div class="onboard-copy">
+                <h3>Publica un aviso claro</h3>
+                <p class="sub">
+                  Agrega una foto, sus características y dónde se perdió o fue vista para que otras personas
+                  puedan reconocerla.
+                </p>
+              </div>
             </div>
             <div class="onboard-step" data-step="2">
-              <div class="onboard-emoji">
+              <div class="onboard-visual onboard-emoji" aria-hidden="true">
                 <svg class="ic" aria-hidden="true"><use href="#i-chat" /></svg>
               </div>
-              <h3>Conversa con privacidad</h3>
-              <p class="sub">
-                Coordina desde el chat de la app. Tu teléfono y correo no se muestran públicamente, y el mapa
-                comparte una ubicación aproximada.
-              </p>
+              <div class="onboard-copy">
+                <h3>Conversa con privacidad</h3>
+                <p class="sub">
+                  Coordina desde el chat de la app. Tu teléfono y correo no se muestran públicamente, y el
+                  mapa comparte una ubicación aproximada.
+                </p>
+              </div>
             </div>
             <div class="onboard-step" data-step="3">
-              <div class="onboard-emoji">
+              <div class="onboard-visual onboard-emoji" aria-hidden="true">
                 <svg class="ic" aria-hidden="true"><use href="#i-heart" /></svg>
               </div>
-              <h3>Una comunidad que acompaña</h3>
-              <p class="sub">
-                Comparte avisos, recibe alertas por zona y encuentra orientación práctica mientras buscas.
-              </p>
+              <div class="onboard-copy">
+                <h3>Una comunidad que acompaña</h3>
+                <p class="sub">
+                  Comparte avisos, recibe alertas por zona y encuentra orientación práctica mientras buscas.
+                </p>
+              </div>
             </div>
             <div class="onboard-step" data-step="4">
-              <div class="onboard-emoji">
+              <div class="onboard-visual onboard-emoji" aria-hidden="true">
                 <svg class="ic" aria-hidden="true"><use href="#i-petsenal-pin" /></svg>
               </div>
-              <h3>Nuestra misión</h3>
-              <p class="sub">
-                Conectar a personas para que cada mascota perdida pueda volver a casa. Más patas, más
-                reencuentros.
-              </p>
+              <div class="onboard-copy">
+                <h3>Nuestra misión</h3>
+                <p class="sub">
+                  Conectar a personas para que cada mascota perdida pueda volver a casa. Más patas, más
+                  reencuentros.
+                </p>
+              </div>
             </div>
           </div>
         </div>
