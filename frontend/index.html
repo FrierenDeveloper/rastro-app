@@ -350,10 +350,6 @@
           <span>Instalar PetSeñal</span>
         </button>
         <p>Instálala desde el navegador, rápido y sin avisos.</p>
-        <a class="auth-apk" href="/descargar/petsenal.apk" download>
-          <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
-          Descargar app para Android (APK)
-        </a>
       </div>
     </div>
 
@@ -815,6 +811,17 @@
              registro, como pide la Ley 21.719. El número del chip no se muestra
              a nadie: solo su dueño puede verlo desde aquí. -->
         <section class="view" id="view-chips">
+          <div class="card support-entry">
+            <div class="support-entry-icon" aria-hidden="true">♡</div>
+            <div>
+              <h2>No estás solo</h2>
+              <p class="sub">Calma el cuerpo, ordena la búsqueda y pide apoyo cuando lo necesites.</p>
+            </div>
+            <button type="button" class="submit-btn auth" id="btn-open-support">
+              Abrir espacio de apoyo
+            </button>
+          </div>
+
           <div class="card">
             <h2>Registrar el microchip de tu mascota</h2>
             <p class="sub">
@@ -896,6 +903,88 @@
             <button type="button" class="submit-btn found" id="btn-chip-scan">Buscar microchip</button>
             <div id="chip-scan-resultado"></div>
           </div>
+        </section>
+
+        <!-- APOYO DURANTE LA BÚSQUEDA -->
+        <section class="view support-view" id="view-support">
+          <button type="button" class="chip-scan-back" id="btn-close-support">← Volver a Mi PetSeñal</button>
+          <div class="support-intro">
+            <span aria-hidden="true">♡</span>
+            <div>
+              <h2>No estás solo</h2>
+              <p>Perder a una mascota puede ser abrumador. Avanza una acción a la vez.</p>
+            </div>
+          </div>
+
+          <article class="card support-section">
+            <p class="support-kicker">01 · Ahora</p>
+            <h2>Calma inmediata y guía práctica</h2>
+            <p class="sub">Un minuto para bajar el ritmo antes de decidir el siguiente paso.</p>
+            <div class="breathing-guide">
+              <div class="breathing-orb" id="breathing-orb" data-phase="idle" aria-hidden="true"></div>
+              <strong id="breathing-status" aria-live="polite">Cuando estés listo</strong>
+              <span id="breathing-countdown">Inhala 4 · pausa 2 · exhala 6</span>
+              <button type="button" class="submit-btn auth" id="btn-breathing">Empezar 1 minuto</button>
+            </div>
+            <ol class="support-steps">
+              <li>Apoya ambos pies y afloja los hombros.</li>
+              <li>Nombra cinco cosas que ves y tres sonidos que escuchas.</li>
+              <li>Elige una sola acción pequeña para hacer ahora.</li>
+            </ol>
+          </article>
+
+          <article class="card support-section">
+            <p class="support-kicker">02 · Organiza</p>
+            <h2>Plan de búsqueda y pausas</h2>
+            <p class="sub">Marca lo realizado. El avance cuenta aunque hoy no tengas respuestas.</p>
+            <div class="support-checklist" id="search-support-plan">
+              <label><input type="checkbox" /> Confirmé lugar y hora de la última vez que fue visto.</label>
+              <label><input type="checkbox" /> Publiqué el aviso con foto clara y datos actuales.</label>
+              <label
+                ><input type="checkbox" /> Avisé a vecinos, conserjes, veterinarias o refugios
+                cercanos.</label
+              >
+              <label><input type="checkbox" /> Repartí zonas y horarios con otra persona.</label>
+              <label><input type="checkbox" /> Programé una pausa para tomar agua y comer algo.</label>
+            </div>
+            <p class="support-progress" id="search-plan-progress" aria-live="polite">0 de 5 pasos</p>
+            <button type="button" class="icon-btn support-reset" id="btn-reset-support-plan">
+              Reiniciar plan
+            </button>
+            <div class="pause-note">
+              <b>Ritmo sugerido:</b> busca 25 minutos y pausa 5. Si estás agotado, evita conducir y entrega tu
+              zona a alguien de confianza.
+            </div>
+          </article>
+
+          <article class="card support-section">
+            <p class="support-kicker">03 · Acompáñate</p>
+            <h2>Red de apoyo y ayuda profesional</h2>
+            <p class="sub">Pedir compañía también es parte del plan.</p>
+            <label for="support-message">Mensaje para alguien de confianza</label>
+            <textarea id="support-message">
+Estoy buscando a mi mascota y me está costando llevarlo solo. ¿Puedes acompañarme o ayudarme con una parte de la búsqueda?</textarea>
+            <button type="button" class="submit-btn found" id="btn-share-support">Compartir mensaje</button>
+
+            <div class="professional-help">
+              <h3>Ayuda profesional en Chile</h3>
+              <a href="tel:6003607777"><b>Salud Responde</b><span>600 360 7777 · orientación 24/7</span></a>
+              <a href="tel:*4141"
+                ><b>Línea *4141</b><span>crisis de salud mental · gratuita y confidencial</span></a
+              >
+              <a href="tel:131"><b>SAMU 131</b><span>si existe una emergencia o riesgo inmediato</span></a>
+            </div>
+            <p class="support-source">
+              Recursos oficiales del Ministerio de Salud de Chile. Este espacio acompaña, pero no reemplaza
+              atención profesional.
+              <a
+                href="https://saludresponde.minsal.cl/gatekeepers-prevencion-del-suicidio/"
+                target="_blank"
+                rel="noopener"
+                >Ver fuentes oficiales</a
+              >
+            </p>
+          </article>
         </section>
 
         <!-- ADMIN -->
@@ -988,10 +1077,6 @@
           <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
           <span>Instalar la app</span>
         </button>
-        <a class="drawer-item" href="/descargar/petsenal.apk" download>
-          <svg class="ic" aria-hidden="true"><use href="#i-download" /></svg>
-          <span>Descargar app Android (APK)</span>
-        </a>
         <button class="drawer-item hidden" id="btn-push">
           <svg class="ic" aria-hidden="true"><use href="#i-bell" /></svg>
           <span id="push-label">Activar notificaciones</span>

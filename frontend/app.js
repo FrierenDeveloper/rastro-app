@@ -762,6 +762,7 @@ function mostrarVista(tab) {
   if (tab === 'chips') {
     renderMisChips();
   }
+  if (tab !== 'support') detenerRespiracion();
   // Al salir de la vista, cualquier número revelado vuelve a enmascararse.
   if (tab !== 'chips') ocultarChipVisible();
 }
@@ -2235,6 +2236,102 @@ document
 document
   .getElementById('btn-tips-close')
   .addEventListener('click', () => document.getElementById('tips-modal').classList.add('hidden'));
+
+/* ============ No estás solo ============ */
+const FASES_RESPIRACION = [
+  { nombre: 'Inhala', segundos: 4, fase: 'inhale' },
+  { nombre: 'Sostén', segundos: 2, fase: 'hold' },
+  { nombre: 'Exhala', segundos: 6, fase: 'exhale' }
+];
+let respiracionTimer = null;
+let respiracionFase = 0;
+let respiracionSegundos = 0;
+let respiracionCiclos = 0;
+
+function pintarRespiracion() {
+  const fase = FASES_RESPIRACION[respiracionFase];
+  document.getElementById('breathing-orb').dataset.phase = fase.fase;
+  document.getElementById('breathing-status').textContent = fase.nombre;
+  document.getElementById('breathing-countdown').textContent = `${respiracionSegundos} segundos`;
+}
+
+function detenerRespiracion(completada = false) {
+  clearInterval(respiracionTimer);
+  respiracionTimer = null;
+  document.getElementById('breathing-orb').dataset.phase = 'idle';
+  document.getElementById('breathing-status').textContent = completada
+    ? 'Terminaste. Elige una acción pequeña.'
+    : 'Cuando estés listo';
+  document.getElementById('breathing-countdown').textContent = 'Inhala 4 · pausa 2 · exhala 6';
+  document.getElementById('btn-breathing').textContent = 'Empezar 1 minuto';
+}
+
+function avanzarRespiracion() {
+  respiracionSegundos -= 1;
+  if (respiracionSegundos > 0) return pintarRespiracion();
+  respiracionFase = (respiracionFase + 1) % FASES_RESPIRACION.length;
+  if (respiracionFase === 0) respiracionCiclos += 1;
+  if (respiracionCiclos === 5) return detenerRespiracion(true);
+  respiracionSegundos = FASES_RESPIRACION[respiracionFase].segundos;
+  pintarRespiracion();
+}
+
+function iniciarRespiracion() {
+  respiracionFase = 0;
+  respiracionCiclos = 0;
+  respiracionSegundos = FASES_RESPIRACION[0].segundos;
+  document.getElementById('btn-breathing').textContent = 'Detener';
+  pintarRespiracion();
+  respiracionTimer = setInterval(avanzarRespiracion, 1000);
+}
+
+document.getElementById('btn-open-support').addEventListener('click', () => mostrarVista('support'));
+document.getElementById('btn-close-support').addEventListener('click', () => mostrarVista('chips'));
+document.getElementById('btn-breathing').addEventListener('click', () => {
+  if (respiracionTimer) detenerRespiracion();
+  else iniciarRespiracion();
+});
+
+const pasosApoyo = [...document.querySelectorAll('#search-support-plan input')];
+function actualizarProgresoApoyo() {
+  const completos = pasosApoyo.filter(paso => paso.checked).length;
+  document.getElementById('search-plan-progress').textContent = `${completos} de ${pasosApoyo.length} pasos`;
+}
+pasosApoyo.forEach(paso => paso.addEventListener('change', actualizarProgresoApoyo));
+document.getElementById('btn-reset-support-plan').addEventListener('click', () => {
+  pasosApoyo.forEach(paso => {
+    paso.checked = false;
+  });
+  actualizarProgresoApoyo();
+});
+
+async function copiarMensajeApoyo(texto) {
+  if (!navigator.clipboard) return false;
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function compartirMensajeApoyo() {
+  const campo = document.getElementById('support-message');
+  const texto = campo.value.trim() || campo.defaultValue;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Necesito apoyo', text: texto });
+      return;
+    } catch (error) {
+      if (error && error.name === 'AbortError') return;
+    }
+  }
+  const copiado = await copiarMensajeApoyo(texto);
+  toast(copiado ? 'Mensaje copiado. Envíalo a alguien de confianza.' : 'Selecciona y copia el mensaje.');
+  if (!copiado) campo.focus();
+}
+
+document.getElementById('btn-share-support').addEventListener('click', compartirMensajeApoyo);
 
 /* ============ Informar bugs ============ */
 const bugModal = document.getElementById('bug-modal');

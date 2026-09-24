@@ -33,10 +33,16 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain("aplicarTema(guardado || 'light')");
   });
 
-  it('mantiene las acciones sobre el mapa y extiende el mapa tras la navegación', () => {
+  it('mantiene el mapa nítido, controles compactos y separación sobre la navegación', () => {
     expect(css).toMatch(/\.home-actions \{[^}]*z-index: 2/);
     expect(css).toMatch(/\.home-map-stage \{[^}]*z-index: 0/);
-    expect(css).toMatch(/\.home-map-stage \{[^}]*bottom: calc\(-85px/);
+    expect(css).toMatch(/\.home-map-stage \{[^}]*bottom: calc\(-68px/);
+    expect(css).toMatch(/\.home-action \{[^}]*min-height: 84px/);
+    expect(css).toMatch(/nav\.bottom-nav button \{[^}]*min-height: 48px/);
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*bottom: calc\(82px/);
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) \.home-actions \{[^}]*backdrop-filter: none/);
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) \.report-card \{[^}]*backdrop-filter: none/);
+    expect(css).toMatch(/body:not\(\.theme-dark\) #list-map \.leaflet-layer \{[^}]*filter: none/);
   });
 
   it('muestra marcadores de mascotas visibles en el mapa', () => {
@@ -63,6 +69,23 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain('[BUG] PetSeñal');
   });
 
+  it('incluye apoyo emocional práctico con respiración y recursos oficiales', () => {
+    expect(html).toContain('id="btn-open-support"');
+    expect(html).toContain('id="view-support"');
+    expect(html).toContain('Calma inmediata y guía práctica');
+    expect(html).toContain('Plan de búsqueda y pausas');
+    expect(html).toContain('Red de apoyo y ayuda profesional');
+    expect(html).toContain('id="breathing-status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('href="tel:*4141"');
+    expect(html).toContain('href="tel:6003607777"');
+    expect(html).toContain('href="tel:131"');
+    expect(html).toContain('saludresponde.minsal.cl/gatekeepers-prevencion-del-suicidio');
+    expect(javascript).toContain('detenerRespiracion');
+    expect(javascript).toContain('navigator.share');
+    expect(javascript).toContain('navigator.clipboard');
+  });
+
   it('incluye una ficha demo completa sin depender de campos opcionales', () => {
     expect(javascript).toContain("nombre: 'Coco'");
     expect(javascript).toContain("ubicacion: 'Palermo, CABA'");
@@ -86,7 +109,8 @@ describe('pantalla principal de referencia', () => {
   it('ofrece instalar PetSeñal directamente desde la pantalla de acceso', () => {
     expect(html).toContain('id="btn-install-auth"');
     expect(html).toContain('Instalar PetSeñal');
-    expect(html).toContain('/descargar/petsenal.apk');
+    expect(html).not.toContain('/descargar/petsenal.apk');
+    expect(html).not.toContain('Descargar app Android (APK)');
     expect(javascript).toContain("['btn-install', 'btn-install-auth']");
     expect(javascript).toContain("'(display-mode: standalone)'");
     expect(javascript).toContain('Añadir a pantalla de inicio');
