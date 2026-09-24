@@ -1,0 +1,102 @@
+name: monitoreo-uptime
+
+# "Bot" vigilante que revisa desde GitHub que la app responda y avisa cuando no.
+# No depende de cuentas externas: si falla, GitHub notifica por correo al dueño
+# del repositorio y queda un issue abierto con la etiqueta "caida". Opcionalmente
+# manda un mensaje de Telegram si defines los secretos TELEGRAM_BOT_TOKEN y
+# TELEGRAM_CHAT_ID (ver docs/RESPALDO_Y_MONITOREO.md).
+#
+# Dos límites a tener en cuenta:
+#   - GitHub puede retrasar el `schedule` unos minutos y lo PAUSA tras 60 días
+#     sin actividad en el repo; si pasa, vuelve a habilitarlo desde Actions.
+#   - Cada corrida consume minutos de Actions. En un repo privado, cada 15
+#     minutos cabe en el plan gratuito; un intervalo menor puede agotarlo.
+# Para caídas con aviso más rápido, UptimeRobot (misma doc) es más confiable.
+
+on:
+  schedule:
+    # Cada 15 minutos: además, mantiene despierta la instancia free de Render.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL a revisar
+        required: false
+        default: https://petsenal.com/api/health
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: monitoreo-uptime
+  cancel-in-progress: false
+
+jobs:
+  vigilar:
+    name: Chequear /api/health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Consultar la salud de la app
+        env:
+          URL: ${{ github.event.inputs.url || 'https://petsenal.com/api/health' }}
+        run: |
+          set -uo pipefail
+          for intento in 1 2 3; do
+            codigo=$(curl -sS -o /tmp/salud.json -w '%{http_code}' --max-time 20 "$URL" 2>/dev/null)
+            codigo=${codigo:-000}
+            cuerpo=$(cat /tmp/salud.json 2>/dev/null || true)
+            echo "Intento $intento: HTTP $codigo · $cuerpo"
+            if [ "$codigo" = "200" ] && printf '%s' "$cuerpo" | grep -q '"ok":true'; then
+              echo "La app responde bien."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::$URL no respondió con {\"ok\":true} tras 3 intentos."
+          exit 1
+
+      - name: Avisar por Telegram (si está configurado)
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -uo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram no configurado; se omite el aviso."
+            exit 0
+          fi
+          curl -sS --max-time 20 -X POST \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d text="🔴 PetSeñal no responde: $(date -u +'%Y-%m-%d %H:%M UTC')"
+
+      - name: Dejar constancia en un issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          gh label create caida --color B60205 --description "La app no responde" --force >/dev/null 2>&1 || true
+          abierto=$(gh issue list --label caida --state open --json number --jq '.[0].number // empty')
+          if [ -n "$abierto" ]; then
+            gh issue comment "$abierto" --body "Sigue caída: $(date -u +'%Y-%m-%d %H:%M UTC')."
+          else
+            gh issue create \
+              --title "🔴 PetSeñal no responde ($(date -u +'%Y-%m-%d %H:%M UTC'))" \
+              --label caida \
+              --body "El monitor no obtuvo \`{\"ok\":true}\` de https://petsenal.com/api/health."
+          fi
+
+      - name: Cerrar el aviso cuando se recupera
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          gh issue list --label caida --state open --json number --jq '.[].number' | while read -r numero; do
+            [ -n "$numero" ] || continue
+            gh issue close "$numero" --comment "La app volvió a responder a las $(date -u +'%Y-%m-%d %H:%M UTC')."
+          done

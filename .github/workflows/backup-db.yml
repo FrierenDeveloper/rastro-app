@@ -1,0 +1,116 @@
+name: respaldo-db
+
+# Respaldo diario de la base de datos (Postgres/Supabase) a un bucket PRIVADO de
+# Cloudflare R2. Supabase free no incluye respaldos automáticos, así que este
+# workflow es la única red de seguridad antes de un borrado accidental.
+#
+# Secretos que hay que crear en GitHub → Settings → Secrets and variables →
+# Actions (nunca en el archivo):
+#   DATABASE_URL          conexión DIRECTA (puerto 5432) o, mejor, SESSION POOLER.
+#                         No sirve el transaction pooler (puerto 6543): pg_dump
+#                         necesita una sesión estable.
+#   R2_ACCOUNT_ID         ID de la cuenta de Cloudflare.
+#   R2_ACCESS_KEY_ID      credencial de R2 con permiso de escritura.
+#   R2_SECRET_ACCESS_KEY  secreto de esa credencial.
+#   R2_BACKUP_BUCKET      bucket PRIVADO solo para respaldos (ej. respaldos-petsenal).
+# Para restaurar, ver docs/RESPALDO_Y_MONITOREO.md.
+on:
+  schedule:
+    # 04:17 UTC = madrugada en Chile (fuera del horario de más uso).
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: respaldo-db
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    name: pg_dump -> R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Instalar un cliente PostgreSQL reciente
+        # El runner trae un cliente que puede ser más viejo que el servidor y
+        # pg_dump se niega a volcar una base más nueva que él. PGDG da la última.
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client
+          pg_dump --version
+
+      - name: Volcar la base
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::Falta el secreto DATABASE_URL."
+            exit 1
+          fi
+          ARCHIVO="petsenal-$(date -u +%Y-%m-%d_%H%M).sql.gz"
+          echo "ARCHIVO=$ARCHIVO" >> "$GITHUB_ENV"
+          # --clean --if-exists deja el volcado listo para restaurar encima.
+          pg_dump "$DATABASE_URL" --no-owner --no-privileges --clean --if-exists | gzip -9 > "$ARCHIVO"
+          BYTES=$(stat -c%s "$ARCHIVO")
+          echo "Respaldo $ARCHIVO: $BYTES bytes"
+          # Un respaldo vacío es peor que no tenerlo: parece que hay copia y no hay.
+          if [ "$BYTES" -lt 1024 ]; then
+            echo "::error::El respaldo pesa menos de 1 KB; se aborta para no guardar basura."
+            exit 1
+          fi
+
+      - name: Subir el respaldo a R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${R2_ACCOUNT_ID:-}" ] || [ -z "${R2_BACKUP_BUCKET:-}" ]; then
+            echo "::error::Faltan R2_ACCOUNT_ID o R2_BACKUP_BUCKET."
+            exit 1
+          fi
+          ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          aws s3 cp "$ARCHIVO" "s3://$R2_BACKUP_BUCKET/$ARCHIVO" \
+            --endpoint-url "$ENDPOINT" --only-show-errors
+          echo "Subido s3://$R2_BACKUP_BUCKET/$ARCHIVO"
+
+      - name: Conservar copia como artefacto (30 días)
+        # Segunda red de seguridad: si R2 falla, el artefacto queda en el run.
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-db-${{ github.run_number }}
+          path: '*.sql.gz'
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Borrar respaldos de más de 30 días en R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          LIMITE=$(date -u -d '30 days ago' +%Y-%m-%d)
+          aws s3 ls "s3://$R2_BACKUP_BUCKET/" --endpoint-url "$ENDPOINT" | while read -r fecha hora bytes nombre; do
+            [ -n "$nombre" ] || continue
+            if [[ "$fecha" < "$LIMITE" ]]; then
+              echo "Borrando $nombre (del $fecha)"
+              aws s3 rm "s3://$R2_BACKUP_BUCKET/$nombre" --endpoint-url "$ENDPOINT" --only-show-errors
+            fi
+          done
