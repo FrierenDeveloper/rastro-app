@@ -39,6 +39,13 @@ describe('pantalla principal de referencia', () => {
     expect(css).toMatch(/\.home-map-stage \{[^}]*bottom: calc\(-85px/);
   });
 
+  it('muestra marcadores de mascotas visibles en el mapa', () => {
+    expect(css).toMatch(/\.animal-marker \{[^}]*width: 46px[^}]*height: 46px/);
+    expect(css).toMatch(/\.animal-emoji \.animal-svg \{[^}]*width: 36px[^}]*height: 36px/);
+    expect(javascript).toContain('iconSize: [52, 60]');
+    expect(javascript).toContain('iconAnchor: [26, 56]');
+  });
+
   it('incluye una ficha demo completa sin depender de campos opcionales', () => {
     expect(javascript).toContain("nombre: 'Coco'");
     expect(javascript).toContain("ubicacion: 'Palermo, CABA'");

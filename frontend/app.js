@@ -100,9 +100,9 @@ function markerIcon(report) {
   return L.divIcon({
     className: 'animal-marker-wrap',
     html: `<span class="animal-marker ${estado}"><span class="animal-face"><span class="animal-emoji">${animal}</span><span class="animal-collar" style="background:${collar}"></span></span></span>`,
-    iconSize: [42, 48],
-    iconAnchor: [21, 44],
-    popupAnchor: [0, -42]
+    iconSize: [52, 60],
+    iconAnchor: [26, 56],
+    popupAnchor: [0, -52]
   });
 }
 
