@@ -202,6 +202,18 @@ describe('pantalla principal de referencia', () => {
     expect(css).toMatch(/main\s*\{[^}]*overscroll-behavior:\s*contain/);
   });
 
+  it('mide modales, chat y pantallas de acceso con el viewport dinámico', () => {
+    // Con la barra del navegador visible, 100vh (viewport grande) supera el área
+    // real. En un modal eso es peor que un simple desplazamiento: su contenido
+    // entra en 90vh, no se genera scroll interno y el final queda inalcanzable.
+    // Por eso los contenedores con alto acotado usan dvh, con vh como respaldo.
+    expect(css).toMatch(/\.modal-box\s*\{[^}]*max-height:\s*90vh[^}]*max-height:\s*90dvh/);
+    expect(css).toMatch(/\.conv-msgs\s*\{[^}]*max-height:\s*52vh[^}]*max-height:\s*52dvh/);
+    expect(css).toMatch(/\.drawer\s*\{[^}]*height:\s*100vh[^}]*height:\s*100dvh/);
+    expect(css).toMatch(/#boot-screen\s*\{[^}]*min-height:\s*100dvh/);
+    expect(css).toMatch(/#auth-screen,\s*#reset-screen\s*\{[^}]*min-height:\s*100dvh/);
+  });
+
   it('aprovecha las pantallas de escritorio con un diseño de dos columnas', () => {
     // La app es móvil primero. En pantallas grandes, la media query final amplía
     // el armazón para no dejarlo como una columna angosta y vertical.

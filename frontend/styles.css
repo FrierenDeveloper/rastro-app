@@ -168,6 +168,7 @@ button:disabled {
    guardada. Si la red tarda o falla, la huella sigue caminando en bucle. */
 #boot-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -291,6 +292,7 @@ button:disabled {
   flex-direction: column;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 28px 22px 34px;
   background:
     radial-gradient(
@@ -1847,6 +1849,7 @@ body.theme-dark .chip-consent-details summary {
   border-radius: var(--r-lg);
   padding: 14px;
   max-height: 52vh;
+  max-height: 52dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1928,6 +1931,10 @@ body.theme-dark .chip-consent-details summary {
   width: 100%;
   max-width: 440px;
   max-height: 90vh;
+  /* dvh = viewport visible. Con 90vh (viewport grande) y la barra del navegador
+     a la vista, la caja superaba el área real y su contenido, al "entrar" en
+     90vh, no generaba scroll: el final quedaba recortado e inalcanzable. */
+  max-height: 90dvh;
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
 }
@@ -1974,6 +1981,10 @@ body.theme-dark .chip-consent-details summary {
 .drawer {
   position: fixed;
   inset: 0;
+  /* Igual que los modales: alto del viewport visible para que el último ítem del
+     menú no quede por debajo de la barra del navegador. */
+  height: 100vh;
+  height: 100dvh;
   z-index: var(--z-ventana);
 }
 .drawer-scrim {
