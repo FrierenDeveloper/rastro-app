@@ -128,6 +128,8 @@ describe('pantalla principal de referencia', () => {
     expect(css).toContain(".breathing-orb[data-phase='hold']");
     expect(css).toContain('animation: respiracion-mantener');
     expect(css).toContain(".breathing-orb[data-phase='exhale']");
+    expect(css).toContain('@keyframes respiracion-exhalar');
+    expect(css).toMatch(/\.breathing-orb\[data-phase='exhale'\] \{[^}]*animation: respiracion-exhalar 6s/);
   });
 
   it('incluye una ficha demo completa sin depender de campos opcionales', () => {
@@ -156,6 +158,7 @@ describe('pantalla principal de referencia', () => {
     expect(html).toContain('id="btn-install-android"');
     expect(html).toContain('Descargar para Android');
     expect(html).toContain('href="/descargar/petsenal.apk"');
+    expect(html).not.toContain('iPhone usa Safari y Android descarga el APK');
     expect(html.match(/class="auth-install-btn"/g)).toHaveLength(2);
     expect(javascript).toContain("getElementById('btn-install-ios')");
     expect(javascript).toContain('En iPhone o iPad');

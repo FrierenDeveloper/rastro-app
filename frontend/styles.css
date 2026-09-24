@@ -1337,17 +1337,30 @@ body.theme-dark .chip-consent-details summary {
   transition: transform 300ms ease-in-out;
 }
 .breathing-orb[data-phase='inhale'] {
-  transform: scale(1.18);
-  transition: transform 4s ease-in-out;
+  animation: respiracion-inhalar 4s ease-in-out forwards;
 }
 .breathing-orb[data-phase='hold'] {
   transform: scale(1.18);
-  transition: transform 0.2s linear;
   animation: respiracion-mantener 0.22s ease-in-out infinite;
 }
 .breathing-orb[data-phase='exhale'] {
-  transform: scale(0.82);
-  transition: transform 6s ease-in-out;
+  animation: respiracion-exhalar 6s ease-in-out forwards;
+}
+@keyframes respiracion-inhalar {
+  from {
+    transform: scale(0.82);
+  }
+  to {
+    transform: scale(1.18);
+  }
+}
+@keyframes respiracion-exhalar {
+  from {
+    transform: scale(1.18);
+  }
+  to {
+    transform: scale(0.82);
+  }
 }
 @keyframes respiracion-mantener {
   0%,
