@@ -1334,6 +1334,7 @@ body.theme-dark .chip-consent-details summary {
   background: radial-gradient(circle at 35% 30%, #dcfff7, var(--green));
   box-shadow: 0 0 0 10px color-mix(in srgb, var(--green) 10%, transparent);
   transform: scale(0.82);
+  transition: transform 300ms ease-in-out;
 }
 .breathing-orb[data-phase='inhale'] {
   transform: scale(1.18);
@@ -3024,7 +3025,7 @@ body.theme-dark #view-home:not(.home-list-mode) .home-actions {
   min-height: 0;
   margin: 0;
 }
-main:has(#view-home:not(.home-list-mode)) {
+main:has(#view-home.active:not(.home-list-mode)) {
   overflow: visible;
 }
 #view-home:not(.home-list-mode) #list-map {
@@ -3059,7 +3060,7 @@ nav.bottom-nav {
   gap: 7px;
   padding: 5px 10px calc(5px + env(safe-area-inset-bottom));
   border-top: 0;
-  border-radius: 22px 22px 0 0;
+  border-radius: 0;
   background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
