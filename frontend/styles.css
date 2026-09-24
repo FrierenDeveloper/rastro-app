@@ -981,17 +981,17 @@ input[type='file'] {
 }
 .animal-emoji .animal-svg {
   display: block;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   overflow: visible;
   filter: drop-shadow(0 1px 1px rgba(10, 38, 38, 0.24));
 }
 .animal-collar {
   position: absolute;
-  bottom: 2px;
+  bottom: 2.5px;
   left: 50%;
-  width: 18px;
-  height: 5px;
+  width: 21px;
+  height: 6px;
   border-radius: 2px;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.7);

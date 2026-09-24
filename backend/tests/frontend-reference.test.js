@@ -64,9 +64,19 @@ describe('pantalla principal de referencia', () => {
 
   it('muestra marcadores de mascotas visibles en el mapa', () => {
     expect(css).toMatch(/\.animal-marker \{[^}]*width: 46px[^}]*height: 46px/);
-    expect(css).toMatch(/\.animal-emoji \.animal-svg \{[^}]*width: 36px[^}]*height: 36px/);
+    expect(css).toMatch(/\.animal-emoji \.animal-svg \{[^}]*width: 42px[^}]*height: 42px/);
+    expect(css).toMatch(/\.animal-collar \{[^}]*bottom: 2\.5px[^}]*width: 21px[^}]*height: 6px/);
     expect(javascript).toContain('iconSize: [52, 60]');
     expect(javascript).toContain('iconAnchor: [26, 56]');
+  });
+
+  it('presenta cuatro cualidades y termina con la misión en la primera visita', () => {
+    expect(html.match(/class="onboard-step"/g)).toHaveLength(5);
+    const dots = html.match(/class="onboard-dots">([\s\S]*?)<\/div>/)?.[1] || '';
+    expect(dots.match(/<i/g)).toHaveLength(5);
+    expect(html).toContain('<h3>Nuestra misión</h3>');
+    expect(javascript).toContain('const ONBOARD_PASOS = 5');
+    expect(javascript).toContain("localStorage.getItem('rastro_onboard') === '1'");
   });
 
   it('resume el consentimiento y separa la lectura de microchip', () => {

@@ -2410,7 +2410,7 @@ document.getElementById('form-bug').addEventListener('submit', e => {
 });
 
 /* ============ Onboarding (solo la primera vez) ============ */
-const ONBOARD_PASOS = 3;
+const ONBOARD_PASOS = 5;
 
 function initOnboarding() {
   if (localStorage.getItem('rastro_onboard') === '1') return;
