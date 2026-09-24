@@ -3297,6 +3297,121 @@ body.theme-dark #view-home:not(.home-list-mode) .report-card {
   }
 }
 
+/* ============================================================================
+   Escritorio (>= 900px)
+   La app es móvil primero: en celular es una columna angosta y vertical. En
+   pantallas grandes aprovechamos el ancho sin tocar el HTML: el armazón se
+   ensancha, la vista Mapa acompaña el mapa con un panel de avisos al costado,
+   "Buscar" pasa a una cuadrícula y los formularios se centran en una columna
+   legible. Todo vive detrás de esta media query, así que el móvil no cambia.
+   ========================================================================== */
+@media (min-width: 900px) {
+  body {
+    /* Fondo algo más oscuro para que el armazón se lea como una app centrada. */
+    background: var(--paper-2);
+  }
+
+  #app {
+    max-width: 1180px;
+    border-inline: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
+  }
+
+  header {
+    padding-inline: 26px;
+  }
+
+  main {
+    padding: 26px;
+  }
+
+  /* La vista Home sangra hasta el borde del marco (como en móvil). */
+  #view-home {
+    margin: -2px -26px -26px;
+  }
+
+  /* Formularios, chats y consejos: columna legible centrada, no a todo lo ancho. */
+  .view > .card,
+  #threads-list,
+  #conversation {
+    max-width: 860px;
+    margin-inline: auto;
+  }
+
+  /* --- Vista Mapa: mapa a la izquierda, panel de avisos a la derecha --- */
+  #view-home:not(.home-list-mode) .home-actions {
+    width: calc(100% - 420px);
+  }
+  #view-home:not(.home-list-mode) #reports-list {
+    top: 14px;
+    right: 14px;
+    bottom: 14px;
+    left: auto;
+    width: 380px;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: none;
+  }
+  #view-home:not(.home-list-mode) .report-card {
+    flex: 0 0 auto;
+    width: 100%;
+    scroll-snap-align: none;
+  }
+  #view-home:not(.home-list-mode) .map-my-location {
+    right: calc(380px + 28px);
+    bottom: 26px;
+  }
+  #view-home:not(.home-list-mode) .map-carousel-dots,
+  #view-home:not(.home-list-mode) .map-carousel-status {
+    display: none;
+  }
+
+  /* --- Vista Buscar: las tarjetas se reparten en columnas --- */
+  #view-home.home-list-mode > .home-location-search,
+  #view-home.home-list-mode > .home-search-secondary,
+  #view-home.home-list-mode > .home-filters {
+    width: min(calc(100% - 32px), 1000px);
+    margin-inline: auto;
+  }
+  #view-home.home-list-mode .home-map-stage,
+  #view-home.home-list-mode .reunion-legend {
+    width: min(calc(100% - 32px), 1000px);
+    margin-inline: auto;
+  }
+  #view-home.home-list-mode #reports-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+  #view-home.home-list-mode #reports-list .report-card {
+    margin-bottom: 0;
+  }
+
+  /* El muro de reencuentros también se reparte. */
+  #reunions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 10px;
+  }
+  #reunions-grid .reunion-card {
+    margin-bottom: 0;
+  }
+
+  /* La barra inferior deja de ocupar todo el ancho: una píldora centrada. */
+  nav.bottom-nav {
+    align-self: center;
+    width: min(calc(100% - 32px), 620px);
+    margin-bottom: 14px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+  }
+  nav.bottom-nav::before {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

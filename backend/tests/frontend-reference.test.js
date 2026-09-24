@@ -201,4 +201,49 @@ describe('pantalla principal de referencia', () => {
     expect(css).toMatch(/main\s*\{[^}]*min-height:\s*0/);
     expect(css).toMatch(/main\s*\{[^}]*overscroll-behavior:\s*contain/);
   });
+
+  it('aprovecha las pantallas de escritorio con un diseño de dos columnas', () => {
+    // La app es móvil primero. En pantallas grandes, la media query final amplía
+    // el armazón para no dejarlo como una columna angosta y vertical.
+    expect(css).toContain('@media (min-width: 900px)');
+    expect(css).toMatch(/@media \(min-width: 900px\) \{[\s\S]*#app \{[^}]*max-width: 1180px/);
+    // La vista Mapa pone los avisos en un panel lateral en vez del carrusel de abajo.
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*flex-direction: column/);
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*overflow-y: auto/);
+    // "Buscar" reparte las tarjetas en una cuadrícula.
+    expect(css).toMatch(
+      /#view-home\.home-list-mode #reports-list \{[^}]*display: grid[^}]*grid-template-columns/
+    );
+    // Los formularios se centran en una columna legible.
+    expect(css).toMatch(/\.view > \.card[^{]*\{[^}]*max-width: 860px/);
+  });
+});
+
+describe('términos y condiciones públicos', () => {
+  const terminosPath = path.join(frontendPath, 'terminos', 'index.html');
+  const terminos = fs.existsSync(terminosPath) ? fs.readFileSync(terminosPath, 'utf8') : '';
+
+  it('publica una página de términos y condiciones estable y accesible', () => {
+    expect(fs.existsSync(terminosPath)).toBe(true);
+    expect(terminos).toContain('<title>Términos y condiciones');
+    expect(terminos).toContain('class="legal-doc"');
+    expect(terminos).toContain('Última actualización:');
+    expect(terminos).toContain('mailto:contacto@petsenal.com');
+    expect(terminos).toContain('<a class="legal-volver" href="/">');
+  });
+
+  it('cubre aceptación, uso indebido, responsabilidad y datos personales', () => {
+    expect(terminos).toContain('Aceptación');
+    expect(terminos).toContain('Conducta prohibida');
+    expect(terminos).toContain('Límite de responsabilidad');
+    expect(terminos).toContain('Tus datos');
+    expect(terminos).toContain('/privacidad/');
+  });
+
+  it('enlaza los términos desde el acceso y desde el modal de privacidad', () => {
+    const acceso = html.match(/id="auth-screen"[\s\S]*?id="app"/)?.[0] || '';
+    const privacidad = html.match(/id="privacy-modal"[\s\S]*?id="zona-intro"/)?.[0] || '';
+    expect(acceso).toContain('href="/terminos/"');
+    expect(privacidad).toContain('href="/terminos/"');
+  });
 });

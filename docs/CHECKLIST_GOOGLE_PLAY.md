@@ -12,6 +12,8 @@ que nada cambió.
 - [ ] Configurar `CORS_ORIGIN` en el `.env` de producción con el dominio real de tu app.
 - [x] Publicar `docs/POLITICA_DE_PRIVACIDAD.md` en una URL pública y accesible sin login:
       https://tu-dominio.com/privacidad/ (vive en `frontend/privacidad/index.html`).
+- [x] Publicar los términos y condiciones en una URL pública:
+      https://petsenal.com/terminos/ (vive en `frontend/terminos/index.html`).
 - [ ] Decidir el nombre final, ícono y capturas de pantalla de la app.
       Nombre e ícono ya están (normales + maskable en `frontend/icons/`); faltan las capturas.
 
@@ -54,7 +56,8 @@ Tienes dos caminos razonables:
       apps sin clasificar.
 - [ ] Completar el formulario **Data Safety** (usa `docs/DATA_SAFETY_FORM.md` como
       base) y que coincida exactamente con tu política de privacidad.
-- [ ] Declarar la URL de la política de privacidad.
+- [ ] Declarar la URL de la política de privacidad y, si la app lo pide, la de términos
+      (`https://petsenal.com/privacidad/` y `https://petsenal.com/terminos/`).
 
 ## Fase 5 — Prueba cerrada (obligatoria en cuentas personales nuevas)
 
