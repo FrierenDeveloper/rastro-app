@@ -601,8 +601,12 @@ describe('POST /register · correo de confirmación', () => {
     const aviso = mailer.sendMail.mock.calls[0][0];
     expect(aviso.to).toBe(correo);
     expect(aviso.subject).toBe('Confirma tu correo en PetSeñal');
-    const enlace = aviso.text.match(/\/\?verify=([0-9a-f]{64})/);
+    // El enlace debe apuntar al endpoint que verifica en el servidor. Antes
+    // apuntaba a `/?verify=<token>`, un parámetro que la app nunca leía: se
+    // abría la portada y la cuenta quedaba sin verificar.
+    const enlace = aviso.text.match(/\/api\/auth\/verify\?token=([0-9a-f]{64})/);
     expect(enlace).not.toBeNull();
+    expect(aviso.text).not.toContain('/?verify=');
     expect(parametros[0]).toBe(crypto.createHash('sha256').update(enlace[1]).digest('hex'));
     // expires_at y created_at son dos Date.now() distintos: la diferencia es de
     // 24 horas salvo el milisegundo que pueda pasar entre las dos llamadas.

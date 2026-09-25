@@ -131,7 +131,11 @@ function hashResetToken(raw) {
 
 // Manda el correo de confirmación (solo útil si hay proveedor configurado).
 async function enviarVerificacion(userId, email, req) {
-  const link = `${baseUrl(req)}/?verify=`;
+  // El enlace apunta DIRECTO al endpoint que verifica: al abrirlo desde el
+  // correo, el servidor marca el correo y redirige a /?verified=1. Antes se
+  // armaba como `/?verify=<token>`, un parámetro que la app nunca leía, así que
+  // entrar al enlace no verificaba nada.
+  const link = `${baseUrl(req)}/api/auth/verify?token=`;
   const rawToken = crypto.randomBytes(32).toString('hex');
   await db.query('UPDATE email_verifications SET used = TRUE WHERE user_id = $1 AND used = FALSE', [userId]);
   await db.query(
