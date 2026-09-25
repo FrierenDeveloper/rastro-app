@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../db');
 const push = require('../push');
 const { requireAuth } = require('../middleware/auth');
+const { validarEndpoint } = require('../src/v2/push-endpoint');
 
 const router = express.Router();
 
@@ -24,6 +25,12 @@ router.post(
       if (!errors.isEmpty()) return res.status(400).json({ error: 'Suscripción inválida.' });
 
       const { endpoint, keys } = req.body;
+      // El endpoint lo elige quien se suscribe y el servidor hace una petición
+      // HTTPS SALIENTE contra él: sin validar sirve de proxy ciego hacia la red
+      // interna (SSRF) y de amplificador. Se valida antes de guardarlo.
+      const motivo = validarEndpoint(endpoint);
+      if (motivo) return res.status(400).json({ error: motivo });
+
       await db.query(
         `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
          VALUES ($1,$2,$3,$4,$5,$6)

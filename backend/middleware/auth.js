@@ -30,20 +30,28 @@ async function requireAuth(req, res, next) {
   }
 }
 
-// No bloquea la request si no hay token, pero lo decodifica si existe.
-// Se usa en endpoints públicos para saber si el aviso es del usuario actual.
-function optionalAuth(req, res, next) {
+// No bloquea la request si no hay sesión válida. En endpoints públicos solo
+// conserva la identidad de un JWT cuya cuenta siga viva y no haya sido revocada.
+async function optionalAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (token) {
-    try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      req.userId = payload.sub;
-    } catch (err) {
-      /* token inválido: seguimos como anónimo */
-    }
+  if (!token) return next();
+
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return next(); // un token inválido no convierte un endpoint público en privado
   }
-  next();
+
+  try {
+    const result = await db.query('SELECT token_version FROM users WHERE id = $1', [payload.sub]);
+    const user = result.rows[0];
+    if (user && (payload.ver || 0) === user.token_version) req.userId = payload.sub;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 // Exige que la cuenta tenga el correo confirmado. Se usa en las acciones que

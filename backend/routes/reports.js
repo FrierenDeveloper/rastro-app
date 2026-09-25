@@ -10,6 +10,7 @@ const push = require('../push');
 const { radioBusquedaKm, curvaRadio, sugerenciaBusqueda } = require('../busqueda');
 const { desdeCuandoVale } = require('../ubicacion');
 const { hashPerceptual } = require('../src/v2/phash');
+const { MAX_PIXELES, dimensionesImagen, excedePresupuesto } = require('../src/v2/limites-imagen');
 const chip = require('../src/v2/chip');
 const { cajaBusqueda, coincidenciasDeOtros, duplicadosDeFoto } = require('../src/v2/coincidencias');
 const { sugerenciasAmplias } = require('../src/v2/matching');
@@ -68,7 +69,15 @@ const chipLimiter = rateLimit({
 // (Supabase Storage o disco local, según esté configurado).
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    // Sin esto, busboy acepta un número ilimitado de campos (fields/parts son
+    // Infinity por defecto) y cada uno puede pesar 1 MB: un multipart con miles
+    // de campos antes del archivo agota la memoria sin que nada lo corte.
+    fields: 10,
+    parts: 20,
+    fieldSize: 10 * 1024
+  },
   fileFilter: (req, file, cb) => {
     const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
     cb(ok ? null : new Error('Formato de imagen no permitido.'), ok);
@@ -83,6 +92,18 @@ function tipoImagenReal(buf) {
   if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
   if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
   return null;
+}
+
+// El tamaño del ARCHIVO no dice nada del coste de decodificarlo: un PNG de 60 KB
+// puede declarar 20000x20000 y pedir ~1,5 GB al decodificarse (y el OOM del
+// proceso no se puede atrapar). Por eso el tope se mide en píxeles de la
+// cabecera, antes de que nadie decodifique nada.
+const ERROR_RESOLUCION = `La imagen tiene una resolución demasiado alta (máximo ${
+  MAX_PIXELES / 1000000
+} megapíxeles).`;
+
+function resolucionExcesiva(buf) {
+  return excedePresupuesto(dimensionesImagen(buf));
 }
 
 function haversine(lat1, lng1, lat2, lng2) {
@@ -388,6 +409,7 @@ router.post(
       if (req.file) {
         const tipoReal = tipoImagenReal(req.file.buffer);
         if (!tipoReal) return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
+        if (resolucionExcesiva(req.file.buffer)) return res.status(413).json({ error: ERROR_RESOLUCION });
         fotoHash = hashPerceptual(req.file.buffer);
         fotoUrl = await storage.savePhoto(req.file.buffer, tipoReal);
       }
@@ -1125,6 +1147,7 @@ router.post(
       if (req.file) {
         const tipoReal = tipoImagenReal(req.file.buffer);
         if (!tipoReal) return res.status(400).json({ error: 'El archivo no es una imagen válida.' });
+        if (resolucionExcesiva(req.file.buffer)) return res.status(413).json({ error: ERROR_RESOLUCION });
         // Guardar SIEMPRE antes de borrar: si esto falla, la foto anterior (la
         // que la base sigue referenciando) tiene que seguir viva. Antes se
         // borraba primero, así que un fallo del almacenamiento dejaba el

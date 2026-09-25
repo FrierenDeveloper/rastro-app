@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +9,25 @@ const html = fs.readFileSync(path.join(frontendPath, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(frontendPath, 'styles.css'), 'utf8');
 const javascript = fs.readFileSync(path.join(frontendPath, 'app.js'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(frontendPath, 'manifest.json'), 'utf8'));
+
+function extraerFuncion(nombre) {
+  return (
+    javascript.match(new RegExp(`(?:async )?function ${nombre}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}`))?.[0] || ''
+  );
+}
+
+function tabAdminFalso() {
+  const clases = new Set(['hidden']);
+  return {
+    clases,
+    elemento: {
+      classList: {
+        add: nombre => clases.add(nombre),
+        remove: nombre => clases.delete(nombre)
+      }
+    }
+  };
+}
 
 describe('pantalla principal de referencia', () => {
   it('mantiene la jerarquía visual de cabecera, mapa y navegación', () => {
@@ -228,6 +248,111 @@ describe('pantalla principal de referencia', () => {
     );
     // Los formularios se centran en una columna legible.
     expect(css).toMatch(/\.view > \.card[^{]*\{[^}]*max-width: 860px/);
+  });
+});
+
+describe('visibilidad del panel de administración', () => {
+  it.each([true, false])(
+    'al iniciar sesión carga del servidor is_admin=%s antes de arrancar',
+    async esAdmin => {
+      const onAuthSuccess = extraerFuncion('onAuthSuccess');
+      const llamadas = [];
+      const guardado = [];
+      const contexto = {
+        token: null,
+        me: null,
+        localStorage: { setItem: (clave, valor) => guardado.push([clave, valor]) },
+        api: async ruta => {
+          llamadas.push(ruta);
+          return { user: { id: 'u-1', is_admin: esAdmin } };
+        },
+        showApp: () => llamadas.push('showApp'),
+        startApp: () => llamadas.push(`startApp:${contexto.me && contexto.me.is_admin}`)
+      };
+
+      await vm.runInNewContext(
+        `(async () => { ${onAuthSuccess}; await onAuthSuccess('jwt-test'); })()`,
+        contexto
+      );
+
+      expect(contexto.me.is_admin).toBe(esAdmin);
+      expect(guardado).toStrictEqual([['rastro_token', 'jwt-test']]);
+      expect(llamadas).toStrictEqual(['/api/auth/me', 'showApp', `startApp:${esAdmin}`]);
+    }
+  );
+
+  it('ignora una respuesta tardía de /me si ya se cerró esa sesión', async () => {
+    let completarMe;
+    const respuestaPendiente = new Promise(resolve => {
+      completarMe = resolve;
+    });
+    const llamadas = [];
+    const contexto = {
+      token: null,
+      me: null,
+      localStorage: { setItem: () => {} },
+      api: () => respuestaPendiente,
+      showApp: () => llamadas.push('showApp'),
+      startApp: () => llamadas.push('startApp')
+    };
+    const tarea = vm.runInNewContext(
+      `(async () => { ${extraerFuncion('onAuthSuccess')}; await onAuthSuccess('jwt-cerrado'); })()`,
+      contexto
+    );
+    contexto.token = null;
+    contexto.me = null;
+    completarMe({ user: { id: 'u-admin', is_admin: true } });
+    await tarea;
+
+    expect(contexto.me).toBeNull();
+    expect(llamadas).toStrictEqual([]);
+  });
+
+  it('logout vuelve a ocultar el botón después de una sesión administradora', () => {
+    const tab = tabAdminFalso();
+    const borrados = [];
+    const paneles = {
+      'admin-flagged': { replaceChildren: () => borrados.push('admin-flagged') },
+      'admin-users': { replaceChildren: () => borrados.push('admin-users') }
+    };
+    const contexto = {
+      token: 'jwt-admin',
+      me: { is_admin: true },
+      currentConv: { poll: null },
+      localStorage: { removeItem: () => {} },
+      ubicacion: { detener: () => {} },
+      showAuth: () => {},
+      document: {
+        getElementById: id => (id === 'tab-admin' ? tab.elemento : paneles[id] || null)
+      }
+    };
+
+    vm.runInNewContext(
+      `${extraerFuncion('mostrarTabAdmin')}; ${extraerFuncion('limpiarDatosAdmin')}; ${extraerFuncion(
+        'logout'
+      )}; mostrarTabAdmin(); logout();`,
+      contexto
+    );
+
+    expect(contexto.me).toBeNull();
+    expect(tab.clases.has('hidden')).toBe(true);
+    expect(borrados).toStrictEqual(['admin-flagged', 'admin-users']);
+  });
+
+  it('oculta de nuevo el botón al pasar de admin a cuenta normal', () => {
+    const tab = tabAdminFalso();
+    const contexto = {
+      me: null,
+      document: { getElementById: id => (id === 'tab-admin' ? tab.elemento : null) }
+    };
+    const mostrar = extraerFuncion('mostrarTabAdmin');
+    vm.runInNewContext(`${mostrar}; mostrarTabAdmin()`, contexto);
+    contexto.me = { is_admin: true };
+    vm.runInNewContext('mostrarTabAdmin()', contexto);
+    contexto.me = { is_admin: false };
+    vm.runInNewContext('mostrarTabAdmin()', contexto);
+
+    expect(tab.clases.has('hidden')).toBe(true);
   });
 });
 

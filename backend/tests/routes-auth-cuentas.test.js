@@ -548,8 +548,24 @@ describe('GET /me', () => {
     expect(db.query).toHaveBeenCalledWith(SQL_USUARIO_ME, ['u-1']);
   });
 
+  it('no marca como admin una cuenta de ADMIN_EMAILS cuyo correo no está verificado', async () => {
+    prepararBase(async () => ({
+      rows: [{ id: 'u-1', email: 'jefa@test.local', email_verified: false }]
+    }));
+
+    const res = await conIp(pedir(app).get('/api/auth/me')).set(
+      'Authorization',
+      `Bearer ${tokenPara('u-1')}`
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.is_admin).toBe(false);
+  });
+
   it('la segunda cuenta de la lista (con espacios) también es administradora', async () => {
-    prepararBase(async () => ({ rows: [{ id: 'u-2', email: 'jefa2@test.local' }] }));
+    prepararBase(async () => ({
+      rows: [{ id: 'u-2', email: 'jefa2@test.local', email_verified: true }]
+    }));
 
     const res = await conIp(pedir(app).get('/api/auth/me')).set(
       'Authorization',

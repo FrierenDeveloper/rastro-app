@@ -455,7 +455,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
     );
     const u = result.rows[0];
     if (!u) return res.status(404).json({ error: 'Usuario no encontrado.' });
-    res.json({ user: { ...u, is_admin: esAdmin(u.email) } });
+    res.json({ user: { ...u, is_admin: u.email_verified === true && esAdmin(u.email) } });
   } catch (err) {
     next(err);
   }

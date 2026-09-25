@@ -24,6 +24,10 @@ const NO_AUTENTICADO = { error: 'No autenticado.' };
 const SUSCRIPCION_INVALIDA = { error: 'Suscripción inválida.' };
 const DATOS_INVALIDOS = { error: 'Datos inválidos.' };
 const UBICACION_INVALIDA = { error: 'Ubicación inválida.' };
+const ENDPOINT_NO_PERMITIDO = {
+  error: 'El endpoint de la suscripción apunta a una dirección no permitida.'
+};
+const ENDPOINT_SIN_HTTPS = { error: 'El endpoint de la suscripción debe usar HTTPS.' };
 
 const relleno = largo => 'x'.repeat(largo);
 
@@ -135,6 +139,39 @@ describe('POST /subscribe', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toStrictEqual(SUSCRIPCION_INVALIDA);
+  });
+
+  // El endpoint lo elige quien se suscribe y el servidor hace una petición HTTPS
+  // SALIENTE contra él (web-push llama a https.request contra el host que
+  // venga): sin validar sirve de proxy ciego hacia la red interna (SSRF).
+  it.each([
+    ['loopback', 'https://127.0.0.1/x', ENDPOINT_NO_PERMITIDO],
+    ['loopback ofuscado en hexadecimal', 'https://0x7f.0.0.1/x', ENDPOINT_NO_PERMITIDO],
+    ['loopback como entero decimal', 'https://2130706433/x', ENDPOINT_NO_PERMITIDO],
+    ['red privada', 'https://192.168.1.1/x', ENDPOINT_NO_PERMITIDO],
+    ['metadata de nube', 'https://169.254.169.254/latest/meta-data', ENDPOINT_NO_PERMITIDO],
+    ['localhost', 'https://localhost/x', ENDPOINT_NO_PERMITIDO],
+    ['sin HTTPS', 'http://127.0.0.1/x', ENDPOINT_SIN_HTTPS]
+  ])('rechaza un endpoint de %s sin guardar la suscripción', async (_caso, endpoint, esperado) => {
+    prepararBase();
+
+    const res = await conToken(pedir(app).post('/api/push/subscribe').send({ endpoint, keys: CLAVES }));
+
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual(esperado);
+    // Solo el SELECT de token_version: no se llegó a tocar push_subscriptions.
+    expect(db.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('un endpoint legítimo de un servicio push se sigue guardando', async () => {
+    prepararBase();
+
+    const res = await conToken(
+      pedir(app).post('/api/push/subscribe').send({ endpoint: ENDPOINT, keys: CLAVES })
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.body).toStrictEqual({ ok: true });
   });
 
   it('un endpoint vacío, nulo, numérico o de 2001 caracteres es inválido', async () => {

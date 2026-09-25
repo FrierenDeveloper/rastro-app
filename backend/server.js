@@ -8,6 +8,7 @@ const db = require('./db');
 const storage = require('./storage');
 const push = require('./push');
 const { keyPorIp } = require('./middleware/client-ip');
+const { directivasCsp } = require('./src/v2/politica-csp');
 
 if (!process.env.JWT_SECRET) {
   console.error('Falta JWT_SECRET en el archivo .env. Revisa .env.example.');
@@ -44,52 +45,7 @@ app.use(
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: [
-          "'self'",
-          'https://cdnjs.cloudflare.com', // Leaflet JS
-          'https://unpkg.com', // Leaflet.markercluster
-          'https://accounts.google.com' // Google Sign-In
-        ],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'", // Leaflet inline styles
-          'https://cdnjs.cloudflare.com', // Leaflet CSS
-          'https://unpkg.com', // Leaflet.markercluster CSS
-          'https://fonts.googleapis.com' // Google Fonts CSS
-        ],
-        fontSrc: [
-          "'self'",
-          'https://fonts.gstatic.com' // Google Fonts archivos
-        ],
-        imgSrc: [
-          "'self'",
-          'data:',
-          'blob:',
-          'https://*.tile.openstreetmap.org', // Mapa OSM (subdominios)
-          'https://tile.openstreetmap.org', // Mapa OSM
-          'https://server.arcgisonline.com', // Tiles Esri
-          'https://*.tile.opentopomap.org', // Tiles OpenTopoMap (respaldo)
-          'https://cdnjs.cloudflare.com', // iconos de Leaflet
-          'https://*.supabase.co' // Fotos en Supabase Storage
-        ],
-        connectSrc: [
-          "'self'",
-          'https://*.supabase.co', // Supabase API
-          'https://fonts.googleapis.com',
-          'https://fonts.gstatic.com',
-          'https://cdnjs.cloudflare.com',
-          'https://unpkg.com',
-          'https://accounts.google.com'
-        ],
-        frameSrc: [
-          "'self'",
-          'https://accounts.google.com' // iframe de Google Sign-In
-        ],
-        workerSrc: ["'self'"],
-        manifestSrc: ["'self'"]
-      }
+      directives: directivasCsp(process.env.R2_PUBLIC_URL)
     }
   })
 );

@@ -67,6 +67,16 @@ describe('requireAuth', () => {
     expect(db.query).not.toHaveBeenCalled();
   });
 
+  it('no acepta un JWT válido si viene bajo un esquema distinto de Bearer', async () => {
+    const token = jwt.sign({ sub: 'usuario-1', ver: 0 }, SECRETO);
+    const res = resFalsa();
+    await requireAuth(reqFalsa({ headers: { authorization: `Token: ${token}` } }), res, vi.fn());
+
+    expect(res.codigo).toBe(401);
+    expect(res.cuerpo).toEqual({ error: 'No autenticado.' });
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
   it('un token inválido o vencido es 401 de sesión inválida', async () => {
     const res = resFalsa();
     await requireAuth(reqFalsa({ headers: { authorization: 'Bearer no-es-un-jwt' } }), res, vi.fn());
@@ -145,19 +155,81 @@ describe('requireAuth', () => {
 });
 
 describe('optionalAuth', () => {
-  it('sin token sigue como anónimo', () => {
+  beforeEach(() => {
+    db.query.mockReset();
+  });
+
+  it('sin token sigue como anónimo sin intentar verificarlo', async () => {
     const req = reqFalsa();
     const next = vi.fn();
-    optionalAuth(req, resFalsa(), next);
+    const verificar = vi.spyOn(jwt, 'verify');
+    await optionalAuth(req, resFalsa(), next);
 
     expect(next).toHaveBeenCalledWith();
     expect(req.userId).toBeUndefined();
+    expect(db.query).not.toHaveBeenCalled();
+    expect(verificar).not.toHaveBeenCalled();
+    verificar.mockRestore();
   });
 
-  it('con token válido anota el usuario', () => {
-    const req = reqFalsa({ headers: { authorization: `Bearer ${jwt.sign({ sub: 'u-7' }, SECRETO)}` } });
-    optionalAuth(req, resFalsa(), vi.fn());
+  it('con token válido y sesión vigente anota el usuario', async () => {
+    db.query.mockResolvedValue({ rows: [{ token_version: 2 }] });
+    const req = reqFalsa({
+      headers: { authorization: `Bearer ${jwt.sign({ sub: 'u-7', ver: 2 }, SECRETO)}` }
+    });
+    const next = vi.fn();
+    await optionalAuth(req, resFalsa(), next);
+
     expect(req.userId).toBe('u-7');
+    expect(db.query).toHaveBeenCalledWith('SELECT token_version FROM users WHERE id = $1', ['u-7']);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('acepta como versión cero un token legado sin campo ver', async () => {
+    db.query.mockResolvedValue({ rows: [{ token_version: 0 }] });
+    const req = reqFalsa({ headers: { authorization: `Bearer ${jwt.sign({ sub: 'u-8' }, SECRETO)}` } });
+    const next = vi.fn();
+    await optionalAuth(req, resFalsa(), next);
+
+    expect(req.userId).toBe('u-8');
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('un token revocado sigue como anónimo', async () => {
+    db.query.mockResolvedValue({ rows: [{ token_version: 3 }] });
+    const req = reqFalsa({
+      headers: { authorization: `Bearer ${jwt.sign({ sub: 'u-7', ver: 2 }, SECRETO)}` }
+    });
+    const next = vi.fn();
+    await optionalAuth(req, resFalsa(), next);
+
+    expect(req.userId).toBeUndefined();
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('un token de una cuenta eliminada sigue como anónimo', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+    const req = reqFalsa({
+      headers: { authorization: `Bearer ${jwt.sign({ sub: 'u-7', ver: 0 }, SECRETO)}` }
+    });
+    const next = vi.fn();
+    await optionalAuth(req, resFalsa(), next);
+
+    expect(req.userId).toBeUndefined();
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('un fallo de base de datos se propaga a next', async () => {
+    const fallo = new Error('sin conexión');
+    db.query.mockRejectedValue(fallo);
+    const req = reqFalsa({
+      headers: { authorization: `Bearer ${jwt.sign({ sub: 'u-7', ver: 0 }, SECRETO)}` }
+    });
+    const next = vi.fn();
+    await optionalAuth(req, resFalsa(), next);
+
+    expect(req.userId).toBeUndefined();
+    expect(next).toHaveBeenCalledWith(fallo);
   });
 
   it('con token inválido no falla: sigue como anónimo', () => {
@@ -167,12 +239,25 @@ describe('optionalAuth', () => {
 
     expect(next).toHaveBeenCalledWith();
     expect(req.userId).toBeUndefined();
+    expect(db.query).not.toHaveBeenCalled();
   });
 
   it('ignora una cabecera que no empieza por Bearer', () => {
     const req = reqFalsa({ headers: { authorization: `Basic ${jwt.sign({ sub: 'u' }, SECRETO)}` } });
     optionalAuth(req, resFalsa(), vi.fn());
     expect(req.userId).toBeUndefined();
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('ignora un esquema incorrecto aunque el resto contenga un JWT válido', async () => {
+    const valido = jwt.sign({ sub: 'u-9', ver: 0 }, SECRETO);
+    const req = reqFalsa({ headers: { authorization: `Token: ${valido}` } });
+    const next = vi.fn();
+    await optionalAuth(req, resFalsa(), next);
+
+    expect(req.userId).toBeUndefined();
+    expect(db.query).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith();
   });
 });
 

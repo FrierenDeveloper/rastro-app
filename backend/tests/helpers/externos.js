@@ -13,8 +13,10 @@ import { inyectar } from './base.js';
 
 /* ------------------------------- Postgres -------------------------------- */
 // `new Pool(...)` debe devolver este objeto para poder inspeccionar con qué
-// opciones se construyó y qué consultas recibe.
-export const poolFalso = { query: vi.fn(async () => ({ rows: [] })) };
+// opciones se construyó y qué consultas recibe. `on` está porque db.js registra
+// un listener de 'error' sobre el pool: sin esta función, cargar db.js en
+// cualquier prueba reventaría con "pool.on is not a function".
+export const poolFalso = { query: vi.fn(async () => ({ rows: [] })), on: vi.fn() };
 
 export const PoolFalso = vi.fn(function () {
   return poolFalso;

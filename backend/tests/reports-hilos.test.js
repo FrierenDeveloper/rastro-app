@@ -427,19 +427,19 @@ describe('GET /api/reports/:id', () => {
         created_at: 1700000000000
       }
     });
-    // optionalAuth no consulta la base: la única consulta es la del aviso.
+    // optionalAuth no consulta la base cuando la petición es anónima.
     expect(db.query.mock.calls).toHaveLength(1);
     expect(db.query).toHaveBeenCalledWith(SQL_AVISO, [UUID]);
   });
 
-  it('con el token del dueño marca es_mio y sigue haciendo una sola consulta', async () => {
+  it('con el token vigente del dueño marca es_mio tras validar la sesión', async () => {
     prepararBase({ aviso: aviso() });
 
     const res = await conToken(pedir(app).get(`/api/reports/${UUID}`), DUENO);
 
     expect(res.status).toBe(200);
     expect(res.body.report.es_mio).toBe(true);
-    expect(db.query.mock.calls).toHaveLength(1);
+    expect(db.query.mock.calls).toHaveLength(2);
   });
 
   it('con el token de otra persona es_mio queda en false', async () => {

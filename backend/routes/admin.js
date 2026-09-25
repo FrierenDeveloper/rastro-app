@@ -23,8 +23,14 @@ if (!ADMIN_EMAILS.length) {
 
 async function requireAdmin(req, res, next) {
   try {
-    const u = (await db.query('SELECT email FROM users WHERE id = $1', [req.userId])).rows[0];
-    if (!u || !ADMIN_EMAILS.includes(String(u.email).toLowerCase())) {
+    // Además de estar en la lista, el correo tiene que estar VERIFICADO. Sin
+    // esta comprobación bastaba con registrar una dirección de ADMIN_EMAILS
+    // para entrar al panel: sin proveedor de correo el registro nace con
+    // email_verified = true (ver routes/auth.js), así que no había ninguna
+    // barrera. Se exige en este único sitio, y no ruta por ruta, para que una
+    // ruta nueva no pueda olvidarse de pedirlo.
+    const u = (await db.query('SELECT email, email_verified FROM users WHERE id = $1', [req.userId])).rows[0];
+    if (!u || !ADMIN_EMAILS.includes(String(u.email).toLowerCase()) || u.email_verified !== true) {
       return res.status(403).json({ error: 'No tienes permisos de administrador.' });
     }
     next();

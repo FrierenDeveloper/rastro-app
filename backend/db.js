@@ -12,7 +12,23 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // Supabase requiere SSL; en Postgres local normalmente no hace falta.
-  ssl: process.env.DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL.includes('supabase.co') ? { rejectUnauthorized: false } : false,
+  // Agotadas estas conexiones, las peticiones esperan en cola en vez de abrir
+  // más. Sin los dos timeouts, una conexión que no llega a establecerse o una
+  // consulta lenta se quedan colgadas para siempre en vez de fallar rápido.
+  max: 10,
+  connectionTimeoutMillis: 5000,
+  statement_timeout: 15000
+});
+
+// El pool emite 'error' cuando el servidor cierra una conexión que estaba
+// ociosa (reinicio de la base, failover del pooler, corte de NAT). Sin este
+// listener, EventEmitter lo relanza como excepción NO capturada y el proceso
+// entero muere: la app caía por un evento de infraestructura, no por un ataque.
+// Se registra y se sigue: el pool descarta la conexión rota y la siguiente
+// consulta abre otra.
+pool.on('error', err => {
+  console.error('[db] error en una conexión ociosa del pool:', err && err.message);
 });
 
 async function init() {

@@ -44,7 +44,7 @@ const OTRO = 'curioso-9';
 const UUID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
 const JEFA = 'jefa@test.local';
 const SQL_TOKEN = 'SELECT token_version FROM users WHERE id = $1';
-const SQL_EMAIL = 'SELECT email FROM users WHERE id = $1';
+const SQL_EMAIL = 'SELECT email, email_verified FROM users WHERE id = $1';
 const SIN_PERMISOS = { error: 'No tienes permisos de administrador.' };
 const SIN_SESION = { error: 'Sesión inválida o expirada.' };
 const NO_AUTENTICADO = { error: 'No autenticado.' };
@@ -55,12 +55,13 @@ beforeEach(() => {
 });
 
 // Encoda las respuestas de la base para una petición que atraviesa requireAuth
-// (token_version) y requireAdmin (email). `resto` responde a las consultas
-// propias de cada ruta; por defecto, cero filas.
-function prepararBase({ version = 0, existe = true, email = JEFA, resto } = {}) {
+// (token_version) y requireAdmin (email + email_verified). `resto` responde a
+// las consultas propias de cada ruta; por defecto, cero filas.
+function prepararBase({ version = 0, existe = true, email = JEFA, verificada = true, resto } = {}) {
   db.query.mockImplementation(async (sql, params) => {
     if (sql.includes('token_version')) return { rows: existe ? [{ token_version: version }] : [] };
-    if (sql.includes('SELECT email FROM users')) return { rows: email === null ? [] : [{ email }] };
+    if (sql.includes('SELECT email,'))
+      return { rows: email === null ? [] : [{ email, email_verified: verificada }] };
     if (resto) return resto(sql, params);
     return { rows: [] };
   });
@@ -186,6 +187,29 @@ describe('control de acceso al panel', () => {
     // la cadena vacía y esta cuenta pasaría como administradora.
     prepararBase({ email: '' });
     const res = await conToken(pedir(app).get('/api/admin/users'), 'sin-correo');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(SIN_PERMISOS);
+  });
+
+  // El agujero que cierra este par de pruebas: sin proveedor de correo el
+  // registro nace con email_verified = true (routes/auth.js), así que bastaba
+  // con registrar una dirección que estuviera en ADMIN_EMAILS para entrar al
+  // panel sin verificar nada.
+  it('una cuenta de ADMIN_EMAILS con el correo SIN verificar no entra', async () => {
+    prepararBase({ verificada: false });
+    const res = await conToken(pedir(app).get('/api/admin/users'));
+
+    expect(res.status).toBe(403);
+    expect(res.body).toStrictEqual(SIN_PERMISOS);
+    expect(db.query).not.toHaveBeenCalledWith(expect.stringContaining('FROM users u'));
+  });
+
+  it('un valor falsy que no sea el booleano false tampoco entra', async () => {
+    // La comprobación es `!== true` a propósito: con `=== false` un 0 (que es
+    // como Postgres puede devolver un booleano en algunas columnas) colaría.
+    prepararBase({ verificada: 0 });
+    const res = await conToken(pedir(app).get('/api/admin/users'));
 
     expect(res.status).toBe(403);
     expect(res.body).toStrictEqual(SIN_PERMISOS);

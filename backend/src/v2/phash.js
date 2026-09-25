@@ -13,6 +13,7 @@
 
 const jpeg = require('jpeg-js');
 const { PNG } = require('pngjs');
+const { dimensionesImagen, excedePresupuesto } = require('./limites-imagen');
 
 const ANCHO_HASH = 9; // 9 columnas -> 8 comparaciones por fila
 const ALTO_HASH = 8; // 8 filas
@@ -34,15 +35,20 @@ function tipoImagen(buffer) {
 
 function decodificar(buffer) {
   const tipo = tipoImagen(buffer);
+  if (!tipo) return null;
+  // Bomba de descompresión: el tamaño del ARCHIVO no dice nada del coste de
+  // decodificarlo. Un PNG de 60 KB puede declarar 20000x20000 y hacer que pngjs
+  // reserve ~1,5 GB, y el OOM del proceso no es una excepción que se pueda
+  // atrapar. Se mira la cabecera antes de tocar el decodificador; como el
+  // control vive aquí, protege a cualquier llamador y no depende de que la ruta
+  // se acuerde de comprobarlo.
+  if (excedePresupuesto(dimensionesImagen(buffer))) return null;
   if (tipo === 'image/jpeg') {
     const img = jpeg.decode(buffer, { useTArray: true });
     return { width: img.width, height: img.height, data: img.data };
   }
-  if (tipo === 'image/png') {
-    const png = PNG.sync.read(buffer);
-    return { width: png.width, height: png.height, data: png.data };
-  }
-  return null;
+  const png = PNG.sync.read(buffer); // el único tipo que queda es image/png
+  return { width: png.width, height: png.height, data: png.data };
 }
 
 function luminancia(datos, i) {

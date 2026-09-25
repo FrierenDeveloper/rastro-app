@@ -2,6 +2,7 @@
 // Código nuevo de src/v2: cobertura 100% obligatoria (ver AGENTS.md).
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import zlib from 'node:zlib';
 import { PNG } from 'pngjs';
 import jpeg from 'jpeg-js';
 
@@ -50,6 +51,35 @@ function jpegDe(width, height, pixel) {
 
 const solido = (r, g, b) => () => [r, g, b];
 const gradiente = x => [x * 20, x * 20, x * 20];
+
+// PNG "bomba": la cabecera declara más píxeles de los que el servidor acepta,
+// pero el archivo pesa poquísimo porque los píxeles se comprimen a casi nada.
+// Es la forma real del ataque: el tamaño del archivo no delata nada. Se usa
+// escala de grises (1 byte por píxel en vez de 4) solo para que el búfer de la
+// prueba no sea innecesariamente grande; pngjs lo expande igual a RGBA al
+// decodificar, así que el coste real que se evita es el mismo.
+function pngBomba(width, height) {
+  const trozo = (tipo, datos) => {
+    const largo = Buffer.alloc(4);
+    largo.writeUInt32BE(datos.length);
+    const cuerpo = Buffer.concat([Buffer.from(tipo, 'ascii'), datos]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(cuerpo) >>> 0);
+    return Buffer.concat([largo, cuerpo, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // 8 bits por muestra
+  ihdr[9] = 0; // escala de grises
+  const crudo = Buffer.alloc((width + 1) * height); // todo en cero: comprime a nada
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    trozo('IHDR', ihdr),
+    trozo('IDAT', zlib.deflateSync(crudo, { level: 9 })),
+    trozo('IEND', Buffer.alloc(0))
+  ]);
+}
 
 function pngSolido(r, g, b) {
   return pngDe(ANCHO_HASH, ALTO_HASH, solido(r, g, b));
@@ -125,6 +155,21 @@ describe('hashPerceptual', () => {
   it('una cabecera JPEG con bytes basura no rompe: null', () => {
     const falso = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(12, 0x00)]);
     expect(hashPerceptual(falso)).toBeNull();
+  });
+
+  // La prueba que importa de la revisión: sin el tope de píxeles, este mismo
+  // archivo se decodificaba y pedía 4 bytes por píxel (96 MB aquí; con una
+  // cabecera de 20000x20000, ~1,5 GB), y un OOM del proceso no se puede atrapar.
+  it('rechaza una bomba de descompresión sin llegar a decodificarla', () => {
+    const bomba = pngBomba(6000, 4000); // 24 Mpx: por encima del tope de 20
+    expect(bomba.length).toBeLessThan(5 * 1024 * 1024); // pasaría el filtro de multer
+    expect(hashPerceptual(bomba)).toBeNull();
+  });
+
+  it('una imagen justo por debajo del tope sí se procesa (el tope no es un portazo)', () => {
+    // 16 Mpx: grande de verdad, pero dentro del presupuesto.
+    const grande = pngBomba(4000, 4000);
+    expect(hashPerceptual(grande)).toMatch(/^[0-9a-f]{16}$/);
   });
 });
 

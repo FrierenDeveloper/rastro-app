@@ -446,6 +446,8 @@ function logout() {
   token = null;
   me = null;
   localStorage.removeItem('rastro_token');
+  mostrarTabAdmin();
+  limpiarDatosAdmin();
   if (currentConv.poll) {
     clearInterval(currentConv.poll);
     currentConv.poll = null;
@@ -454,9 +456,18 @@ function logout() {
   showAuth();
 }
 
-function onAuthSuccess(newToken) {
+async function onAuthSuccess(newToken) {
   token = newToken;
   localStorage.setItem('rastro_token', token);
+  let usuario = null;
+  try {
+    const data = await api('/api/auth/me');
+    usuario = data.user || null;
+  } catch {
+    /* Si la cuenta no se pudo consultar, arrancamos sin privilegios locales. */
+  }
+  if (token !== newToken) return; // otra sesión cerró/cambió mientras /me respondía
+  me = usuario;
   showApp();
   startApp();
 }
@@ -511,7 +522,7 @@ document.getElementById('form-login').addEventListener('submit', async e => {
         password: document.getElementById('login-password').value
       }
     });
-    onAuthSuccess(data.token);
+    await onAuthSuccess(data.token);
   } catch (ex) {
     err.textContent = ex.message;
     err.classList.add('show');
@@ -555,7 +566,7 @@ document.getElementById('form-register').addEventListener('submit', async e => {
         captcha: challenge
       }
     });
-    onAuthSuccess(data.token);
+    await onAuthSuccess(data.token);
   } catch (ex) {
     err.textContent = ex.message;
     err.classList.add('show');
@@ -645,7 +656,7 @@ function initGoogle() {
             auth: false,
             body: { credential: resp.credential }
           });
-          onAuthSuccess(data.token);
+          await onAuthSuccess(data.token);
         } catch (ex) {
           toast(ex.message);
         }
@@ -2939,7 +2950,16 @@ document.getElementById('btn-resend-verify').addEventListener('click', async () 
 
 /* ============ Panel de administración ============ */
 function mostrarTabAdmin() {
-  if (me && me.is_admin) document.getElementById('tab-admin').classList.remove('hidden');
+  const tab = document.getElementById('tab-admin');
+  if (!tab) return;
+  if (me && me.is_admin) tab.classList.remove('hidden');
+  else tab.classList.add('hidden');
+}
+function limpiarDatosAdmin() {
+  for (const id of ['admin-flagged', 'admin-users']) {
+    const contenedor = document.getElementById(id);
+    if (contenedor) contenedor.replaceChildren();
+  }
 }
 async function renderAdmin() {
   const flagged = document.getElementById('admin-flagged');

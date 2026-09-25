@@ -74,7 +74,13 @@ describe('construcción del Pool', () => {
     expect(PoolFalso).toHaveBeenCalledTimes(1);
     expect(opcionesDelPool().connectionString).toBe(URL_LOCAL);
     expect(opcionesDelPool().ssl).toBe(false);
-    expect(opcionesDelPool()).toEqual({ connectionString: URL_LOCAL, ssl: false });
+    expect(opcionesDelPool()).toEqual({
+      connectionString: URL_LOCAL,
+      ssl: false,
+      max: 10,
+      connectionTimeoutMillis: 5000,
+      statement_timeout: 15000
+    });
     expect(db.pool).toBe(poolFalso);
   });
 
@@ -100,6 +106,37 @@ describe('construcción del Pool', () => {
     cargarDb();
 
     expect(opcionesDelPool().ssl).toBe(false);
+  });
+
+  // Sin listener de 'error', el pool relanza el error de una conexión ociosa
+  // como excepción NO capturada y el proceso Node muere entero. Lo dispara la
+  // infraestructura (el pooler cierra conexiones ociosas, un failover, un corte
+  // de NAT), así que no es hipotético: es una caída esperando a ocurrir.
+  function manejadorDeError() {
+    cargarDb();
+    const registro = poolFalso.on.mock.calls.find(([evento]) => evento === 'error');
+    expect(registro).toBeDefined();
+    return registro[1];
+  }
+
+  it('registra un listener que deja constancia del error en vez de morir', () => {
+    const manejador = manejadorDeError();
+
+    expect(() => manejador(new Error('conexión cerrada por el servidor'))).not.toThrow();
+    // Se afirma el CONTENIDO, no sólo que no reviente: si el console.error
+    // desapareciera o dejara de incluir el mensaje, la caída de conexiones
+    // pasaría inadvertida en los registros y nadie se enteraría.
+    expect(errores).toHaveBeenCalledWith(
+      '[db] error en una conexión ociosa del pool:',
+      'conexión cerrada por el servidor'
+    );
+  });
+
+  it('el listener no depende de que el error traiga mensaje', () => {
+    const manejador = manejadorDeError();
+
+    expect(() => manejador(undefined)).not.toThrow();
+    expect(errores).toHaveBeenCalledWith('[db] error en una conexión ociosa del pool:', undefined);
   });
 
   it('faltando DATABASE_URL avisa por consola y termina con código 1', () => {
