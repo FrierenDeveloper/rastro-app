@@ -374,6 +374,31 @@ router.post(
   }
 );
 
+// Si la cuenta encontrada por correo nunca se había usado con Google, se
+// enlaza con este inicio de sesión.
+//
+// Hallazgo de seguridad: esa cuenta pudo haberla creado CUALQUIERA que
+// conociera el correo (con /register, sin acceso al buzón). Si luego el
+// dueño real entra con Google por primera vez, antes solo se enlazaba el
+// `google_sub` y la contraseña de quien se adelantó seguía siendo válida:
+// ambos terminaban con acceso a la misma cuenta. Ahora, el primer inicio de
+// sesión con Google que llega a una cuenta así prueba quién es el dueño del
+// correo (Google ya lo verificó): se invalida esa contraseña con una
+// aleatoria, se marca el correo como verificado (si no lo estaba) y sube
+// `token_version`, así que cualquier sesión abierta con la contraseña
+// anterior queda cerrada.
+async function enlazarPrimeraVezConGoogle(user, sub) {
+  const nuevaVersion = (user.token_version || 0) + 1;
+  const passwordAleatoria = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+  await db.query(
+    'UPDATE users SET google_sub = $1, password_hash = $2, token_version = $3, email_verified = TRUE WHERE id = $4',
+    [sub, passwordAleatoria, nuevaVersion, user.id]
+  );
+  // El token que se firma más abajo usa este objeto: si no se actualiza aquí,
+  // saldría firmado con la versión vieja y quedaría revocado de inmediato.
+  user.token_version = nuevaVersion;
+}
+
 /* ---------- Iniciar sesión con Google (opcional) ---------- */
 // Solo funciona si configuras GOOGLE_CLIENT_ID en el .env. Verifica el token
 // directamente contra Google (no necesita dependencias extra).
@@ -438,7 +463,7 @@ router.post(
         // aquí con un error explícito que el manejador global convierte en 500.
         if (!user) throw new Error('[auth/google] el correo ya existia pero no se pudo recuperar la cuenta');
       } else if (!user.google_sub && info.sub) {
-        await db.query('UPDATE users SET google_sub = $1 WHERE id = $2', [info.sub, user.id]);
+        await enlazarPrimeraVezConGoogle(user, info.sub);
       }
 
       res.json({

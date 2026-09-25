@@ -411,10 +411,45 @@ describe('POST /google · cuenta existente', () => {
     const res = await conIp(pedir(app).post('/api/auth/google')).send({ credential: credencial() });
 
     expect(res.status).toBe(200);
-    expect(db.query).toHaveBeenCalledWith('UPDATE users SET google_sub = $1 WHERE id = $2', [
-      'google-sub-1',
-      'u-1'
-    ]);
+    const [sql, parametros] = consultaCon('UPDATE users SET google_sub');
+    expect(sql).toBe(
+      'UPDATE users SET google_sub = $1, password_hash = $2, token_version = $3, email_verified = TRUE WHERE id = $4'
+    );
+    expect(parametros[0]).toBe('google-sub-1');
+    expect(parametros[1]).toMatch(/^\$2[ab]\$12\$/);
+    expect(parametros[2]).toBe(1);
+    expect(parametros[3]).toBe('u-1');
+  });
+
+  // Hallazgo: antes solo se enlazaba el google_sub y la contraseña puesta por
+  // quien creó la cuenta seguía siendo válida. Ahora Google, al probar que es
+  // el dueño del correo, invalida esa contraseña, verifica la cuenta y revoca
+  // cualquier sesión abierta con la contraseña anterior.
+  it('al enlazar por primera vez, invalida la contraseña anterior y cierra sesiones abiertas', async () => {
+    prepararBase(async sql =>
+      sql.includes(SQL_BUSCAR_GOOGLE)
+        ? {
+            rows: [
+              {
+                id: 'u-1',
+                email: 'ana@test.local',
+                phone: null,
+                token_version: 4,
+                password_hash: 'hash-de-quien-se-adelanto',
+                email_verified: false
+              }
+            ]
+          }
+        : { rows: [] }
+    );
+
+    const res = await conIp(pedir(app).post('/api/auth/google')).send({ credential: credencial() });
+
+    expect(res.status).toBe(200);
+    expect(jwt.verify(res.body.token, process.env.JWT_SECRET)).toMatchObject({ sub: 'u-1', ver: 5 });
+    const [, parametros] = consultaCon('UPDATE users SET google_sub');
+    expect(parametros).toStrictEqual(['google-sub-1', expect.stringMatching(/^\$2[ab]\$12\$/), 5, 'u-1']);
+    expect(parametros[1]).not.toBe('hash-de-quien-se-adelanto');
   });
 
   it('si Google no manda sub, no se asocia nada', async () => {
