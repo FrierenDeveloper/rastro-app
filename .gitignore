@@ -15,6 +15,18 @@ android/.gradle/
 android/build/
 android/app/build/
 
+# Proyecto Gradle antiguo de la raíz, reemplazado por android/. Guarda los
+# keystores de firma (petsenal.keystore, rastro.keystore) y artefactos de build:
+# nunca debe versionarse. Las rutas van ancladas a la raíz para no afectar a
+# android/ ni al APK publicado en frontend/descargar/.
+/android-build/
+/build/
+/.gradle/
+/app/build/
+/*.apk
+/*.aab
+/*.idsig
+
 #Archivos de sistema / temporales
 *.log
 .DS_Store
