@@ -235,10 +235,10 @@ describe('pantalla principal de referencia', () => {
   });
 
   it('aprovecha las pantallas de escritorio con un diseño de dos columnas', () => {
-    // La app es móvil primero. En pantallas grandes, la media query final amplía
-    // el armazón para no dejarlo como una columna angosta y vertical.
+    // La app es móvil primero. En escritorio, el armazón usa todo el viewport y
+    // reserva una columna lateral para la navegación.
     expect(css).toContain('@media (min-width: 900px)');
-    expect(css).toMatch(/@media \(min-width: 900px\) \{[\s\S]*#app \{[^}]*max-width: 1180px/);
+    expect(css).toMatch(/@media \(min-width: 900px\) \{[\s\S]*#app \{[^}]*width: 100%[^}]*max-width: none/);
     // La vista Mapa pone los avisos en un panel lateral en vez del carrusel de abajo.
     expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*flex-direction: column/);
     expect(css).toMatch(/#view-home:not\(\.home-list-mode\) #reports-list \{[^}]*overflow-y: auto/);
