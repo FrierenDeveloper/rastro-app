@@ -14,6 +14,7 @@ const {
   distanciaKm,
   emparejar,
   buscarCoincidencias,
+  esFuerte,
   sugerir,
   sugerenciasAmplias,
   SUGERENCIA_MINIMA,
@@ -124,6 +125,22 @@ describe('emparejar', () => {
     ]);
   });
 
+  it('comparte una cualidad débil pero no llega al mínimo: no empareja', () => {
+    // Comparte solo el collar (4 puntos), está a media distancia (10) y muy
+    // antiguo (1): 30 + 10 + 4 + 1 = 45, por debajo del mínimo de 50. Es el
+    // único camino que llega a la comprobación de puntaje (ya pasó la cualidad).
+    const debil = encontrado({
+      lat: 40.007,
+      color: 'atigrado',
+      sexo: 'hembra',
+      raza: 'beagle',
+      collar: 'rojo',
+      created_at: T0 + 31 * 24 * H
+    });
+    expect(emparejar(perdido(), debil)).toBeNull();
+    expect(emparejar(perdido(), debil, { puntajeMinimo: 0 }).puntaje).toBe(45);
+  });
+
   it('funciona con el aviso base en cualquiera de los dos estados', () => {
     expect(emparejar(encontrado(), perdido()).puntaje).toBe(100);
   });
@@ -147,7 +164,10 @@ describe('emparejar', () => {
     expect(emparejar(perdido(), flojo)).toBeNull();
   });
 
-  it('el mínimo se puede bajar por opciones', () => {
+  it('bajar el puntaje mínimo NO basta si solo comparten el tipo', () => {
+    // Aun con el umbral en 0, exigimos al menos una cualidad real (color, sexo,
+    // raza, collar o el mismo chip). Antes, un aviso cercano y reciente con todo
+    // distinto avisaba solo por ser de la misma especie.
     const flojo = encontrado({
       lat: 40.007186,
       color: 'atigrado',
@@ -155,9 +175,21 @@ describe('emparejar', () => {
       raza: 'beagle',
       collar: 'azul'
     });
-    const m = emparejar(perdido(), flojo, { puntajeMinimo: 43 });
-    expect(m.puntaje).toBe(43);
-    expect(m.motivos).toEqual(['Mismo tipo de mascota', 'A 0.8 km', 'Fechas compatibles']);
+    expect(emparejar(perdido(), flojo, { puntajeMinimo: 0 })).toBeNull();
+  });
+
+  it('con una sola cualidad compartida y el umbral bajo sí empareja', () => {
+    const parecido = encontrado({
+      lat: 40.007186,
+      color: 'atigrado',
+      sexo: 'macho', // único campo que coincide
+      raza: 'beagle',
+      collar: 'azul'
+    });
+    const m = emparejar(perdido(), parecido, { puntajeMinimo: 0 });
+    expect(m).not.toBeNull();
+    expect(m.motivos).toContain('Mismo sexo');
+    expect(m.motivos).not.toContain('Mismo color');
   });
 
   it('un color parecido suma menos que uno igual y se explica', () => {
@@ -241,6 +273,65 @@ describe('emparejar', () => {
     expect(RADIO_TOPE_KM).toBe(5);
     expect(emparejar(a, dentro, { puntajeMinimo: 0 })).not.toBeNull();
     expect(emparejar(a, fuera, { puntajeMinimo: 0 })).toBeNull();
+  });
+});
+
+describe('exigir más que el tipo (anti falsos positivos)', () => {
+  const TODO_DISTINTO = {
+    color: 'atigrado',
+    sexo: 'hembra',
+    raza: 'beagle',
+    collar: 'azul'
+  };
+
+  it('mismo tipo, cerca y reciente pero sin ninguna otra cualidad: no empareja', () => {
+    // Era el falso positivo: 30 (tipo) + 25 (<=0.5 km) + 3 (fecha) = 58.
+    expect(emparejar(perdido(), encontrado(TODO_DISTINTO))).toBeNull();
+  });
+
+  it('una raza compartida alcanza por sí sola', () => {
+    expect(emparejar(perdido(), encontrado({ ...TODO_DISTINTO, raza: 'labrador' }))).not.toBeNull();
+  });
+
+  it('un collar compartido alcanza por sí solo', () => {
+    expect(emparejar(perdido(), encontrado({ ...TODO_DISTINTO, collar: 'rojo' }))).not.toBeNull();
+  });
+
+  it('un color parecido (comparte una palabra) cuenta como cualidad', () => {
+    expect(emparejar(perdido(), encontrado({ ...TODO_DISTINTO, color: 'blanco' }))).not.toBeNull();
+  });
+
+  it('un sexo vacío en un lado no es una cualidad compartida', () => {
+    expect(emparejar(perdido(), encontrado({ ...TODO_DISTINTO, sexo: '' }))).toBeNull();
+  });
+});
+
+describe('esFuerte', () => {
+  it('tipo, color, sexo y collar coincidentes => fuerte', () => {
+    expect(esFuerte(perdido(), encontrado())).toBe(true);
+  });
+
+  it('si falta el mismo collar no es fuerte', () => {
+    expect(esFuerte(perdido(), encontrado({ collar: 'azul' }))).toBe(false);
+  });
+
+  it('si el sexo es distinto o vacío no es fuerte', () => {
+    expect(esFuerte(perdido(), encontrado({ sexo: 'hembra' }))).toBe(false);
+    expect(esFuerte(perdido(), encontrado({ sexo: '' }))).toBe(false);
+  });
+
+  it('el color parecido también cuenta como fuerte', () => {
+    expect(esFuerte(perdido(), encontrado({ color: 'blanco' }))).toBe(true);
+  });
+
+  it('emparejar marca fuerte en el resultado', () => {
+    expect(emparejar(perdido(), encontrado()).fuerte).toBe(true);
+    expect(emparejar(perdido(), encontrado({ collar: 'azul' })).fuerte).toBe(false);
+  });
+
+  it('la coincidencia por microchip también es fuerte', () => {
+    const m = emparejar(perdido({ chip_hash: HUELLA_A }), encontrado({ chip_hash: HUELLA_A }));
+    expect(m.fuerte).toBe(true);
   });
 });
 

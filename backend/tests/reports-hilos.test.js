@@ -758,7 +758,9 @@ describe('GET /api/reports/:id/matches', () => {
       lng: 0.03,
       created_at: 1700000000000,
       distancia_km: 1.1,
-      por_chip: false
+      por_chip: false,
+      // Mismo color, pero sexo distinto y sin collar: no es "fuerte".
+      fuerte: false
     });
     expect(res.body.matches[1].distancia_km).toBe(3.3);
     expect(res.body.matches[1].es_mio).toBe(false);

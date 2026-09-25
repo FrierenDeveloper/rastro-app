@@ -154,6 +154,29 @@ function mismoChip(a, b) {
   return Boolean(ha) && ha === hb;
 }
 
+// ¿Comparten algo MÁS que el tipo? Cerca y reciente NO basta: sin al menos una
+// cualidad real (color igual o parecido, o sexo/raza/collar iguales) no se
+// empareja. Así se corta el falso positivo de "mismo tipo y cerca". El chip no
+// se mira aquí porque emparejar() ya lo resolvió antes. Un campo vacío en los
+// dos lados no cuenta (los dos "sin collar" no coinciden).
+function compartenCualidad(perdido, encontrado) {
+  if (puntosColor(perdido.color, encontrado.color) >= PESO_COLOR_PARCIAL) return true;
+  if (puntosSexo(perdido.sexo, encontrado.sexo) === PESO_SEXO) return true;
+  if (puntosRaza(perdido.raza, encontrado.raza) === PESO_RAZA) return true;
+  if (puntosCollar(perdido.collar, encontrado.collar) === PESO_COLLAR) return true;
+  return false;
+}
+
+// Coincidencia fuerte: además del tipo (obligatorio), coinciden color (igual o
+// parecido), sexo y collar. Es el subconjunto que la app muestra aparte.
+function esFuerte(perdido, encontrado) {
+  return (
+    puntosColor(perdido.color, encontrado.color) >= PESO_COLOR_PARCIAL &&
+    puntosSexo(perdido.sexo, encontrado.sexo) === PESO_SEXO &&
+    puntosCollar(perdido.collar, encontrado.collar) === PESO_COLLAR
+  );
+}
+
 // El aviso de referencia puede ser el "perdido" o el "encontrado"; aquí se
 // orienta la pareja para razonar siempre igual.
 function orientar(a, b) {
@@ -185,6 +208,7 @@ function coincidenciaPorChip(candidato, dist) {
     puntaje: PUNTAJE_CHIP,
     distancia_km: Math.round(dist * 10) / 10,
     por_chip: true,
+    fuerte: true,
     motivos: ['Coincidencia por microchip', textoDistancia(dist)]
   };
 }
@@ -220,6 +244,10 @@ function emparejar(base, candidato, opciones) {
   const pCollar = puntosCollar(perdido.collar, encontrado.collar);
   const puntaje = PESO_TIPO + pDist + pColor + pSexo + pRaza + pCollar + pTiempo;
 
+  // Regla dura: no basta con el tipo, la cercanía y la fecha. Sin una cualidad
+  // real compartida (color, sexo, raza, collar o el mismo chip) no se avisa.
+  if (!compartenCualidad(perdido, encontrado)) return null;
+
   const minimo = Number.isFinite(op.puntajeMinimo) ? op.puntajeMinimo : PUNTAJE_MINIMO;
   if (puntaje < minimo) return null;
 
@@ -227,6 +255,7 @@ function emparejar(base, candidato, opciones) {
     id: candidato.id,
     puntaje,
     distancia_km: Math.round(dist * 10) / 10,
+    fuerte: esFuerte(perdido, encontrado),
     motivos: motivos({ pDist, pColor, pSexo, pRaza, pCollar, pTiempo, dist })
   };
 }
@@ -334,6 +363,7 @@ module.exports = {
   distanciaKm,
   emparejar,
   buscarCoincidencias,
+  esFuerte,
   sugerir,
   sugerenciasAmplias,
   SUGERENCIA_MINIMA,

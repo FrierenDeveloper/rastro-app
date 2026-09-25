@@ -13,7 +13,7 @@ const { hashPerceptual } = require('../src/v2/phash');
 const { MAX_PIXELES, dimensionesImagen, excedePresupuesto } = require('../src/v2/limites-imagen');
 const chip = require('../src/v2/chip');
 const { cajaBusqueda, coincidenciasDeOtros, duplicadosDeFoto } = require('../src/v2/coincidencias');
-const { sugerenciasAmplias } = require('../src/v2/matching');
+const { sugerenciasAmplias, esFuerte } = require('../src/v2/matching');
 // Misma constante que usa el cuadro de búsqueda de src/v2: antes aquí estaba
 // escrito 111.32 a mano y el cuadro quedaba más estrecho que el radio.
 const { KM_POR_GRADO, COS_MINIMO } = require('../src/v2/geo');
@@ -834,7 +834,11 @@ router.get('/:id/matches', requireAuth, infoLimiter, param('id').isUUID(), async
       .map(c => ({
         ...publicReport(c, req.userId),
         distancia_km: Math.round(c.dist * 10) / 10,
-        por_chip: c.porChip
+        por_chip: c.porChip,
+        // "Fuerte" = mismo tipo + color (igual o parecido) + sexo + collar. La
+        // app las muestra en un apartado propio; el resto son coincidencias
+        // posibles. El microchip siempre es fuerte.
+        fuerte: c.porChip || esFuerte(report, c)
       }));
 
     // Las sugerencias amplias son un extra opcional: sin ?amplio=1 la respuesta es

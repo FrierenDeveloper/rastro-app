@@ -775,6 +775,18 @@ describe('POST /api/reports/ · coincidencias entre avisos', () => {
     );
   });
 
+  it('mismo tipo y cerca pero sin otra cualidad no avisa (corta el falso positivo)', async () => {
+    // A la misma altura del aviso y con todo distinto. Antes el puntaje por tipo
+    // + cercanía + fecha (58) superaba el mínimo y avisaba; ahora se exige al
+    // menos una cualidad real, así que esta coincidencia no debe existir.
+    baseConCandidatos([candidatoZona({ color: 'atigrado', sexo: 'hembra', raza: 'beagle', collar: 'azul' })]);
+    const res = await crear(AVISO);
+    await reposar();
+
+    expect(res.status).toBe(201);
+    expect(push.sendToUser).not.toHaveBeenCalled();
+  });
+
   it('una coincidencia por debajo del puntaje mínimo no avisa a nadie', async () => {
     // Mismo tipo y fechas, pero lejos del centro del radio y sin nada más en
     // común: matching.js lo descarta y la ruta no debe mandar push.

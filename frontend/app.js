@@ -1298,6 +1298,17 @@ function htmlSugerencias(sugerencias) {
     ${filas}
   </div>`;
 }
+function matchItemHTML(m) {
+  return `<div class="match-item">${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${m.por_chip ? 'mismo microchip' : esc(m.distancia_km) + ' km'}</div>`;
+}
+function matchBannerHTML(titulo, nota, matches) {
+  if (!matches.length) return '';
+  return `<div class="match-banner">
+    <h3>${ico('paw')} ${esc(titulo)}</h3>
+    <p>${esc(nota)}</p>
+    ${matches.map(matchItemHTML).join('')}
+  </div>`;
+}
 function renderMatchBanner(containerId, matches, sugerencias) {
   const el = document.getElementById(containerId);
   const extra = htmlSugerencias(sugerencias);
@@ -1305,14 +1316,22 @@ function renderMatchBanner(containerId, matches, sugerencias) {
     el.innerHTML = '';
     return;
   }
-  const fuertes = matches.length
-    ? `<div class="match-banner">
-    <h3>${ico('paw')} ${matches.length} posible${matches.length > 1 ? 's' : ''} coincidencia${matches.length > 1 ? 's' : ''} cerca</h3>
-    <p>Mismo tipo de animal, color parecido y a menos de 5 km; o el mismo microchip, aunque esté lejos. Ábrelo desde "Mapa" para contactar dentro de la app.</p>
-    ${matches.map(m => `<div class="match-item">${TIPO_ICON[m.tipo] || '🐾'} ${esc(m.color)} · ${m.por_chip ? 'mismo microchip' : esc(m.distancia_km) + ' km'}</div>`).join('')}
-  </div>`
-    : '';
-  el.innerHTML = fuertes + extra;
+  // "Fuerte" = coinciden tipo, color (igual o parecido), sexo y collar; o el
+  // mismo microchip. El resto son coincidencias posibles, con menos peso visual.
+  const fuertes = matches.filter(m => m.fuerte);
+  const otras = matches.filter(m => !m.fuerte);
+  el.innerHTML =
+    matchBannerHTML(
+      `Coincidencia${fuertes.length === 1 ? '' : 's'} fuerte${fuertes.length === 1 ? '' : 's'}`,
+      'Coinciden el tipo, el color, el sexo y el collar, o es el mismo microchip. Ábrelo desde "Mapa" para contactar dentro de la app.',
+      fuertes
+    ) +
+    matchBannerHTML(
+      `Coincidencia${otras.length === 1 ? '' : 's'} posible${otras.length === 1 ? '' : 's'}`,
+      'Mismo tipo y cerca, con al menos una característica en común. Revísalas: no son una confirmación.',
+      otras
+    ) +
+    extra;
 }
 async function handleSubmit(estado, key) {
   const get = id => document.getElementById(id + '-' + key).value.trim();
@@ -1532,9 +1551,7 @@ async function toggleMatches(id, estado) {
     // Solo el dueño de un aviso PERDIDO puede confirmar un avistamiento (la
     // coincidencia es un aviso "encontrado" que él reconoce como su mascota).
     const puedeConfirmar = estado === 'perdido';
-    const fuertes = matches
-      .map(
-        m => `
+    const filaHTML = m => `
         <div class="match-row">
           ${
             m.foto_url
@@ -1549,11 +1566,14 @@ async function toggleMatches(id, estado) {
                 : ''
             }
           </div>
-        </div>`
-      )
-      .join('');
+        </div>`;
+    const bloque = (titulo, lista) =>
+      lista.length ? `<p class="loc-note">${esc(titulo)}</p>` + lista.map(filaHTML).join('') : '';
+    const fuertes = matches.filter(m => m.fuerte);
+    const otras = matches.filter(m => !m.fuerte);
     box.innerHTML =
-      (fuertes || `<span class="none">Sin coincidencias cercanas.</span>`) + htmlSugerencias(sugerencias);
+      (bloque('Coincidencias fuertes', fuertes) + bloque('Otras coincidencias posibles', otras) ||
+        `<span class="none">Sin coincidencias cercanas.</span>`) + htmlSugerencias(sugerencias);
   } catch (ex) {
     box.innerHTML = `<span class="none">${esc(ex.message)}</span>`;
   }
