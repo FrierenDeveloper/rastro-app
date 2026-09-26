@@ -7,7 +7,7 @@ name: monitoreo-uptime
 # TELEGRAM_CHAT_ID (ver docs/RESPALDO_Y_MONITOREO.md).
 #
 # Dos límites a tener en cuenta:
-#   - GitHub puede retrasar el `schedule` unos minutos y lo PAUSA tras 60 días
+#   - GitHub puede retrasar el schedule unos minutos y lo PAUSA tras 60 días
 #     sin actividad en el repo; si pasa, vuelve a habilitarlo desde Actions.
 #   - Cada corrida consume minutos de Actions. En un repo privado, cada 15
 #     minutos cabe en el plan gratuito; un intervalo menor puede agotarlo.
@@ -38,14 +38,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Descargar repositorio para usar gh
+        uses: actions/checkout@v4
+
       - name: Consultar la salud de la app
+        id: salud
+        continue-on-error: true
         env:
-          URL: ${{ github.event.inputs.url || 'https://petsenal.com/api/health' }}
+          URL: \${{ github.event.inputs.url || 'https://petsenal.com/api/health' }}
         run: |
           set -uo pipefail
           for intento in 1 2 3; do
             codigo=$(curl -sS -o /tmp/salud.json -w '%{http_code}' --max-time 20 "$URL" 2>/dev/null)
-            codigo=${codigo:-000}
+            codigo=\${codigo:-000}
             cuerpo=$(cat /tmp/salud.json 2>/dev/null || true)
             echo "Intento $intento: HTTP $codigo · $cuerpo"
             if [ "$codigo" = "200" ] && printf '%s' "$cuerpo" | grep -q '"ok":true'; then
@@ -58,13 +63,13 @@ jobs:
           exit 1
 
       - name: Avisar por Telegram (si está configurado)
-        if: failure()
+        if: steps.salud.outcome == 'failure'
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: \${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: \${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           set -uo pipefail
-          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+          if [ -z "\${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "\${TELEGRAM_CHAT_ID:-}" ]; then
             echo "Telegram no configurado; se omite el aviso."
             exit 0
           fi
@@ -74,11 +79,11 @@ jobs:
             -d text="🔴 PetSeñal no responde: $(date -u +'%Y-%m-%d %H:%M UTC')"
 
       - name: Dejar constancia en un issue
-        if: failure()
+        if: steps.salud.outcome == 'failure'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
           gh label create caida --color B60205 --description "La app no responde" --force >/dev/null 2>&1 || true
           abierto=$(gh issue list --label caida --state open --json number --jq '.[0].number // empty')
           if [ -n "$abierto" ]; then
@@ -91,11 +96,11 @@ jobs:
           fi
 
       - name: Cerrar el aviso cuando se recupera
-        if: success()
+        if: steps.salud.outcome == 'success'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
           gh issue list --label caida --state open --json number --jq '.[].number' | while read -r numero; do
             [ -n "$numero" ] || continue
             gh issue close "$numero" --comment "La app volvió a responder a las $(date -u +'%Y-%m-%d %H:%M UTC')."
