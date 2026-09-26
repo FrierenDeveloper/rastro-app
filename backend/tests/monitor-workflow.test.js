@@ -30,7 +30,7 @@ describe('workflow de vigilancia (uptime)', () => {
   });
 
   it('cierra el aviso cuando la app se recupera', () => {
-    expect(workflow).toContain("if: steps.salud.outcome == 'success'");
+    expect(workflow).toContain('if: success()');
     expect(workflow).toContain('gh issue close');
   });
 

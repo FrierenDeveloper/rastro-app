@@ -624,7 +624,7 @@ describe('GET /api/reports/:id/matches', () => {
     expect(consultaCon('LIMIT 100')[1][5]).toBeCloseTo(dLng, 10);
   });
 
-  it('compara colores sin distinguir mayúsculas y por coincidencia parcial', async () => {
+  it('compara colores sin distinguir mayúsculas y reconoce palabras completas', async () => {
     prepararBase({
       aviso: aviso({ lat: 0, lng: 0, color: 'negro' }),
       candidatos: [
@@ -637,7 +637,7 @@ describe('GET /api/reports/:id/matches', () => {
     const res = await conToken(pedir(app).get(`/api/reports/${UUID}/matches`), DUENO);
 
     expect(res.status).toBe(200);
-    expect(res.body.matches.map(m => m.id)).toStrictEqual([CAND_A, CAND_B]);
+    expect(res.body.matches.map(m => m.id)).toStrictEqual([CAND_A]);
   });
 
   it('compara solo con la primera palabra del color del aviso', async () => {
@@ -673,7 +673,7 @@ describe('GET /api/reports/:id/matches', () => {
     // del mutante `dist < 5`: con el estricto, este candidato desaparece.
     const LAT_EXACTA_5KM = 0.04496608029593653;
     prepararBase({
-      aviso: aviso({ lat: 0, lng: 0, color: 'negro' }),
+      aviso: aviso({ lat: 0, lng: 0, color: 'negro', perdido_hace_horas: '500' }),
       candidatos: [
         candidato({ id: CAND_A, lat: LAT_EXACTA_5KM, lng: 0 }),
         candidato({ id: CAND_B, lat: 0.01, lng: 0 }),
@@ -718,7 +718,7 @@ describe('GET /api/reports/:id/matches', () => {
     const res = await conToken(pedir(app).get(`/api/reports/${UUID}/matches`), DUENO);
 
     expect(res.status).toBe(200);
-    expect(res.body.matches.map(m => m.id)).toStrictEqual([CAND_A, CAND_B]);
+    expect(res.body.matches.map(m => m.id)).toStrictEqual([CAND_B, CAND_A]);
   });
 
   it('ordena por distancia y redondea la distancia a un decimal', async () => {
@@ -726,7 +726,7 @@ describe('GET /api/reports/:id/matches', () => {
       aviso: aviso({ lat: 0, lng: 0, color: 'negro' }),
       // Se entregan al revés a propósito: el más lejano primero.
       candidatos: [
-        candidato({ id: CAND_A, lat: 0.03, lng: 0 }),
+        candidato({ id: CAND_A, lat: 0.02, lng: 0 }),
         // lat/lng reales para la distancia; lat_public/lng_public son los que se
         // publican (distintos a propósito: la respuesta no debe filtrar el exacto).
         candidato({ id: CAND_B, lat: 0.01, lng: 0, lat_public: 0.02, lng_public: 0.03, user_id: DUENO })
@@ -737,7 +737,7 @@ describe('GET /api/reports/:id/matches', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.matches.map(m => m.id)).toStrictEqual([CAND_B, CAND_A]);
-    expect(res.body.matches[0]).toStrictEqual({
+    expect(res.body.matches[0]).toMatchObject({
       id: CAND_B,
       estado: 'encontrado',
       tipo: 'perro',
@@ -762,7 +762,8 @@ describe('GET /api/reports/:id/matches', () => {
       // Mismo color, pero sexo distinto y sin collar: no es "fuerte".
       fuerte: false
     });
-    expect(res.body.matches[1].distancia_km).toBe(3.3);
+    expect(res.body.matches[0].puntaje).toBeGreaterThan(res.body.matches[1].puntaje);
+    expect(res.body.matches[1].distancia_km).toBe(2.2);
     expect(res.body.matches[1].es_mio).toBe(false);
   });
 

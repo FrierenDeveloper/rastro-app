@@ -53,6 +53,18 @@ describe('pantalla principal de referencia', () => {
     expect(javascript).toContain("aplicarTema(guardado || 'light')");
   });
 
+  it('mantiene el control de ubicación compacto, accesible y dentro del mapa', () => {
+    const boton = html.match(/<button[^>]*id="btn-my-loc"[\s\S]*?<\/button>/)?.[0] || '';
+    expect(boton).toContain('aria-label="Ubicarme en mi ubicación actual"');
+    expect(boton).toContain('title="Ubicarme"');
+    expect(boton).not.toContain('<span>Ir a mí</span>');
+    expect(css).toMatch(/\.map-my-location \{[^}]*width:\s*48px[^}]*height:\s*48px/);
+    expect(css).toMatch(
+      /\.map-my-location \{[^}]*right:\s*16px[^}]*bottom:\s*calc\(206px \+ env\(safe-area-inset-bottom\)\)/
+    );
+    expect(css).toMatch(/#view-home:not\(\.home-list-mode\) \.map-my-location \{[^}]*bottom:\s*22px/);
+  });
+
   it('mantiene el mapa nítido, controles compactos y separación sobre la navegación', () => {
     expect(css).toMatch(/\.home-actions \{[^}]*z-index: 2/);
     expect(css).toMatch(/\.home-map-stage \{[^}]*z-index: 0/);

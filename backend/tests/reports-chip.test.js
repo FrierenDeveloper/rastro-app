@@ -745,7 +745,8 @@ describe('GET /api/reports/:id/matches · microchip', () => {
 
   it('descarta un candidato cerca pero con un color que no se parece en nada', async () => {
     base({ fila: avisoFila({ color: 'negro' }) });
-    candidatos = [candidato({ id: 'otro-color', color: 'dorado' })];
+    // Sin color, sexo, raza ni collar compartidos no alcanza con estar cerca.
+    candidatos = [candidato({ id: 'otro-color', color: 'dorado', sexo: 'hembra' })];
 
     const res = await buscarMatches(UUID);
 

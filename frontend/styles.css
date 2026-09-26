@@ -2945,26 +2945,39 @@ body.theme-dark .mode-toggle {
 }
 .map-my-location {
   position: absolute;
-  right: 17px;
-  bottom: 196px;
+  right: 16px;
+  bottom: calc(206px + env(safe-area-inset-bottom));
   z-index: 600;
   display: grid;
   place-items: center;
-  width: 66px;
-  height: 66px;
-  padding: 8px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border: 1px solid #d5e7e7;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.94);
   color: #073f43;
-  font-size: 11px;
-  font-weight: 700;
   cursor: pointer;
   box-shadow: 0 8px 22px rgba(0, 48, 51, 0.16);
+  transition:
+    box-shadow var(--ease),
+    transform var(--ease),
+    background var(--ease);
+}
+.map-my-location:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0, 48, 51, 0.2);
+}
+.map-my-location:active {
+  transform: scale(0.96);
+}
+.map-my-location:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--green) 48%, transparent);
+  outline-offset: 3px;
 }
 .map-my-location .ic {
-  width: 24px;
-  height: 24px;
+  width: 21px;
+  height: 21px;
   fill: currentColor;
 }
 #view-home:not(.home-list-mode) #reports-list {
@@ -3289,6 +3302,11 @@ body.theme-dark .report-location {
 body.theme-dark #view-home:not(.home-list-mode) .report-card {
   background: color-mix(in srgb, var(--card) 94%, transparent);
   border-color: color-mix(in srgb, var(--green) 24%, transparent);
+}
+body.theme-dark .map-my-location {
+  border-color: color-mix(in srgb, var(--green) 32%, transparent);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  color: var(--green-ink);
 }
 
 @media (max-width: 390px) {
