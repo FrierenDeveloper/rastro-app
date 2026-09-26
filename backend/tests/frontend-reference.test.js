@@ -383,4 +383,11 @@ describe('términos y condiciones públicos', () => {
     expect(acceso).toContain('href="/terminos/"');
     expect(privacidad).toContain('href="/terminos/"');
   });
+
+  it('deja el scroll legal en la página, no confinado al main de la app', () => {
+    const reglaLegal = css.match(/\.legal-doc\s*\{[^}]*\}/)?.[0] || '';
+    expect(reglaLegal).toMatch(/overflow:\s*visible/);
+    expect(reglaLegal).toMatch(/overscroll-behavior:\s*auto/);
+    expect(reglaLegal).toMatch(/flex:\s*none/);
+  });
 });
