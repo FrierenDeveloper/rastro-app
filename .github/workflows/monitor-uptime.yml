@@ -96,7 +96,7 @@ jobs:
           fi
 
       - name: Cerrar el aviso cuando se recupera
-        if: steps.salud.outcome == 'success'
+        if: success()
         env:
           GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: |
