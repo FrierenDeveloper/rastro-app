@@ -58,7 +58,9 @@ describe('pantalla principal de referencia', () => {
     expect(boton).toContain('aria-label="Ubicarme en mi ubicación actual"');
     expect(boton).toContain('title="Ubicarme"');
     expect(boton).not.toContain('<span>Ir a mí</span>');
-    expect(css).toMatch(/\.map-my-location \{[^}]*width:\s*48px[^}]*height:\s*48px/);
+    expect(css).toMatch(
+      /@media \(max-width: 899px\) \{[^}]*\.map-my-location \{[^}]*width:\s*42px[^}]*height:\s*42px/s
+    );
     expect(css).toMatch(
       /\.map-my-location \{[^}]*right:\s*16px[^}]*bottom:\s*calc\(206px \+ env\(safe-area-inset-bottom\)\)/
     );

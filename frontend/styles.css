@@ -3339,6 +3339,18 @@ body.theme-dark .map-my-location {
   }
 }
 
+@media (max-width: 899px) {
+  .map-my-location {
+    width: 42px;
+    height: 42px;
+  }
+
+  .map-my-location .ic {
+    width: 18px;
+    height: 18px;
+  }
+}
+
 /* ============================================================================
    Escritorio (>= 900px)
    La app es móvil primero: en celular es una columna angosta y vertical. En
