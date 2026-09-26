@@ -23,14 +23,14 @@ describe('workflow de vigilancia (uptime)', () => {
 
   it('avisa cuando la app no responde y deja constancia reabrible', () => {
     expect(workflow).toContain('::error::');
-    expect(workflow).toContain('if: failure()');
+    expect(workflow).toContain("if: steps.salud.outcome == 'failure'");
     expect(workflow).toContain('api.telegram.org');
     expect(workflow).toContain('gh issue create');
     expect(workflow).toContain('gh issue comment');
   });
 
   it('cierra el aviso cuando la app se recupera', () => {
-    expect(workflow).toContain('if: success()');
+    expect(workflow).toContain("if: steps.salud.outcome == 'success'");
     expect(workflow).toContain('gh issue close');
   });
 
