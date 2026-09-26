@@ -13,7 +13,7 @@ const { hashPerceptual } = require('../src/v2/phash');
 const { MAX_PIXELES, dimensionesImagen, excedePresupuesto } = require('../src/v2/limites-imagen');
 const chip = require('../src/v2/chip');
 const { cajaBusqueda, coincidenciasDeOtros, duplicadosDeFoto } = require('../src/v2/coincidencias');
-const { sugerenciasAmplias, esFuerte } = require('../src/v2/matching');
+const { sugerenciasAmplias, buscarCoincidencias } = require('../src/v2/matching');
 // Misma constante que usa el cuadro de búsqueda de src/v2: antes aquí estaba
 // escrito 111.32 a mano y el cuadro quedaba más estrecho que el radio.
 const { KM_POR_GRADO, COS_MINIMO } = require('../src/v2/geo');
@@ -821,26 +821,32 @@ router.get('/:id/matches', requireAuth, infoLimiter, param('id').isUUID(), async
       ]
     );
 
+    const puntajesPorId = new Map(
+      buscarCoincidencias(report, candidatos.rows, { limite: candidatos.rows.length }).map(match => [
+        match.id,
+        match
+      ])
+    );
     const matches = candidatos.rows
-      .map(c => ({
-        ...c,
-        dist: haversine(report.lat, report.lng, c.lat, c.lng),
-        porChip: coincidePorChip(report, c)
-      }))
-      // El mismo microchip no necesita ni estar cerca ni tener el color parecido:
-      // es el mismo animal.
-      .filter(c => c.porChip || (c.dist <= 5 && coincideColor(report.color, c.color)))
-      .sort((a, b) => Number(b.porChip) - Number(a.porChip) || a.dist - b.dist)
-      .map(c => ({
-        ...publicReport(c, req.userId),
-        distancia_km: Math.round(c.dist * 10) / 10,
-        por_chip: c.porChip,
-        // "Fuerte" = mismo tipo + color (igual o parecido) + sexo + collar. La
-        // app las muestra en un apartado propio; el resto son coincidencias
-        // posibles. El microchip siempre es fuerte.
-        fuerte: c.porChip || esFuerte(report, c)
+      .map(c => {
+        const match = puntajesPorId.get(c.id);
+        return match ? { candidato: c, match } : null;
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          Number(Boolean(b.match.por_chip)) - Number(Boolean(a.match.por_chip)) ||
+          b.match.puntaje - a.match.puntaje ||
+          a.match.distancia_km - b.match.distancia_km
+      )
+      .map(({ candidato, match }) => ({
+        ...publicReport(candidato, req.userId),
+        puntaje: match.puntaje,
+        distancia_km: match.distancia_km,
+        por_chip: Boolean(match.por_chip),
+        fuerte: match.fuerte,
+        motivos: match.motivos
       }));
-
     // Las sugerencias amplias son un extra opcional: sin ?amplio=1 la respuesta es
     // exactamente la de siempre.
     if (req.query.amplio === '1') {
