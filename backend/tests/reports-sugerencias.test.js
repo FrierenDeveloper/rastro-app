@@ -113,6 +113,42 @@ afterEach(() => {
 });
 
 describe('GET /:id/matches sin amplio', () => {
+  it('ordena por puntaje del motor y desempata por distancia desde la pérdida', async () => {
+    base();
+    const lejosConDatos = candidato({
+      id: 'a1111111-a111-4111-8111-111111111111',
+      lat: 40.025,
+      raza: 'labrador',
+      sexo: 'macho',
+      collar: 'rojo'
+    });
+    const cercaMenosSimilar = candidato({
+      id: 'b1111111-b111-4111-8111-111111111111',
+      lat: 40.005,
+      raza: 'beagle',
+      sexo: 'hembra',
+      collar: 'azul'
+    });
+    const igualPuntajeMasCerca = candidato({
+      id: 'c1111111-c111-4111-8111-111111111111',
+      lat: 40.01,
+      raza: 'labrador',
+      sexo: 'macho',
+      collar: 'rojo'
+    });
+    candidatosCaja = [cercaMenosSimilar, lejosConDatos, igualPuntajeMasCerca];
+
+    const res = await buscar(UUID);
+
+    expect(res.status).toBe(200);
+    expect(res.body.matches.map(match => match.id)).toEqual([
+      igualPuntajeMasCerca.id,
+      lejosConDatos.id,
+      cercaMenosSimilar.id
+    ]);
+    expect(res.body.matches[0].puntaje).toBeGreaterThan(res.body.matches[2].puntaje);
+  });
+
   it('responde exactamente como antes: solo coincidencias fuertes', async () => {
     base();
 
